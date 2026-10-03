@@ -1,4 +1,5 @@
 import type {CustomerCartLine,CustomerCheckoutDraft,CustomerPendingIntent} from './product-types';
+import {validateMfkCustomerCommercialFreshnessProof,type MfkCustomerCommercialFreshnessProof} from '../../contracts/customer-commercial-freshness-v1';
 
 const STORAGE_KEY='mfk:customer:workspace:v1';
 
@@ -90,11 +91,14 @@ function normalizePendingIntent(value:unknown):CustomerPendingIntent|null{
     submissionId,
     fallbackReference:typeof value.fallbackReference==='string'?value.fallbackReference:undefined,
   });
+  let commercialFreshness:MfkCustomerCommercialFreshnessProof|undefined;
+  try{commercialFreshness=validateMfkCustomerCommercialFreshnessProof(value.commercialFreshness);}catch{}
   return Object.freeze({
     submissionId,menuRevision,idempotencyKey,createdAt,updatedAt,state,
     cart:Object.freeze([...safeArray<CustomerCartLine>(value.cart)]),
     checkout,
     fallbackReference,
+    ...(commercialFreshness?{commercialFreshness}:{}),
     ...(Number.isSafeInteger(Number(value.publishedTotalMinor))&&Number(value.publishedTotalMinor)>=0?{publishedTotalMinor:Number(value.publishedTotalMinor)}:{}),
     ...(typeof value.canonicalOrderId==='string'&&value.canonicalOrderId?{canonicalOrderId:value.canonicalOrderId}:{}),
     ...(typeof value.canonicalDisplay==='string'&&value.canonicalDisplay?{canonicalDisplay:value.canonicalDisplay}:{}),
@@ -179,6 +183,7 @@ export function createCustomerPendingIntent(
   cart:readonly CustomerCartLine[],
   checkout:CustomerCheckoutDraft,
   menuRevision:string,
+  commercialFreshness?:MfkCustomerCommercialFreshnessProof,
 ):CustomerPendingIntent{
   const submissionId=createCustomerSubmissionId();
   const now=new Date().toISOString();
@@ -186,6 +191,7 @@ export function createCustomerPendingIntent(
   return Object.freeze({
     submissionId,
     menuRevision:String(menuRevision||'').trim(),
+    ...(commercialFreshness?{commercialFreshness}:{}),
     idempotencyKey:`customer-order:${submissionId}`,
     createdAt:now,
     updatedAt:now,

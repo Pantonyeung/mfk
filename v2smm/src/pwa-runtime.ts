@@ -4,6 +4,7 @@ import {createSmmLanOrderAdapter,type SmmLanTransport} from './smt-lan-adapter';
 import {createPwaLanTransport,readSmmLanPwaConfig} from './pwa-lan';
 import {createPwaCloudTransport} from './pwa-cloud';
 import {readSmmStaffSession} from './pwa-staff';
+import {reconcileSmmConfig,subscribeSmmConfigChanges} from './config-sync';
 
 function webSmtAcceptanceMode(){
   if(typeof window==='undefined')return false;
@@ -52,16 +53,26 @@ async function lanRequest(payload:object){
   return json;
 }
 async function readCloudSnapshot():Promise<SmmReadModelSnapshot>{
+  const config=await reconcileSmmConfig();
   const headers:Record<string,string>={Accept:'application/json'};
   if(webSmtAcceptanceMode()){
     const session=readSmmStaffSession();
     if(session)headers['x-mfk-smm-session']=session.sessionToken;
   }
-  const response=await fetch(cloudSnapshotUrl(),{method:'GET',cache:'no-store',headers});
+  const separator=cloudSnapshotUrl().includes('?')?'&':'?';
+  const response=await fetch(cloudSnapshotUrl()+separator+'config=0',{method:'GET',cache:'no-store',headers});
   if(!response.ok)throw new Error('SMM_INTERNET_HTTP_'+response.status);
-  const json=await response.json();
-  if(!isSnapshot(json))throw new Error('SMM_INTERNET_SNAPSHOT_INVALID');
-  return Object.freeze({...json,connectionPath:'INTERNET' as const});
+  const dynamic=await response.json() as Partial<SmmReadModelSnapshot>;
+  const merged={
+    ...config,
+    ...dynamic,
+    menu:config.menu,
+    diningTables:config.diningTables,
+    connectionPath:'INTERNET' as const,
+    observedAt:String(dynamic.observedAt||config.observedAt||new Date().toISOString()),
+  };
+  if(!isSnapshot(merged))throw new Error('SMM_INTERNET_SNAPSHOT_INVALID');
+  return Object.freeze(merged);
 }
 
 function hybridTransport(lan:SmmLanTransport|null,cloud:SmmLanTransport):SmmLanTransport{
@@ -95,6 +106,7 @@ export function createPwaRuntimePort():SmmRuntimePort{
   const orders=createSmmLanOrderAdapter(hybridTransport(lan,cloud),15000);
   return Object.freeze({
     portId:'MFK_SMM_PORT_V1' as const,
+    subscribeConfigChanges:subscribeSmmConfigChanges,
     async readSnapshot(){
       if(config){
         try{

@@ -1,5 +1,10 @@
 import {buildKeetaMenuProjection} from './keeta-menu-projection.ts';
 import {buildKeetaSellabilityProjection,buildKeetaWeeklyHoursProjection,chunkKeetaSpuStatus} from './keeta-store-projection.ts';
+import {
+  KEETA_PROVIDER_STATUS_KEY,
+  executeKeetaProviderMutationPlan,
+  planKeetaProviderMutations,
+} from './keeta-provider-mutation.ts';
 import {MFK_KEETA_ORDER_INTENT_SCHEMA,validateMfkKeetaOrderAck} from '../contracts/keeta-order-intake-v1.ts';
 import {normalizeKeetaStandardProviderOrderFacts} from '../integrations/keeta/src/order-facts.js';
 const KEETA_AUTHORIZE_URL='https://merchant.mykeeta.com/m/web/openapi/authorize';
@@ -18,6 +23,7 @@ const KEETA_STORE_HOURS_UPDATE_URL='https://open.mykeeta.com/api/open/scm/shop/b
 const KEETA_STORE_DETAILS_URL='https://open.mykeeta.com/api/open/scm/shop/base/get';
 const KEETA_STORE_REST_URL='https://open.mykeeta.com/api/open/scm/shop/status/rest';
 const KEETA_STORE_OPEN_URL='https://open.mykeeta.com/api/open/scm/shop/status/open';
+const KEETA_PROVIDER_API_BASE='https://open.mykeeta.com/api/open';
 const TOKEN_REFRESH_WINDOW_MS=5*24*60*60*1000;
 const TOKEN_REFRESH_MIN_INTERVAL_MS=60_000;
 const TOKEN_REFRESH_RETRY_MS=5*60*1000;
@@ -435,6 +441,31 @@ async function keetaProviderJson(config,token,url,params){
   return Object.freeze({code,message:String(row.message||'Success'),data:row.data??null,errorList:Array.isArray(row.errorList)?row.errorList:[]});
 }
 
+async function keetaProviderMutationJson(config,token,path,params){
+  let raw;
+  try{
+    raw=await sendSignedProviderRequest({
+      url:KEETA_PROVIDER_API_BASE+path,
+      params:{accessToken:token.accessToken,appId:config.appId,...params,timestamp:Math.floor(Date.now()/1000)},
+      appSecret:config.appSecret,
+    });
+  }catch(error){
+    throw Object.assign(new Error(error instanceof Error?error.message:'KEETA_PROVIDER_MUTATION_TRANSPORT_UNKNOWN'),{unknown:true});
+  }
+  let row;
+  try{row=record(JSON.parse(raw),'KEETA_PROVIDER_MUTATION_RESPONSE_INVALID');}
+  catch(error){throw Object.assign(new Error(error instanceof Error?error.message:'KEETA_PROVIDER_MUTATION_RESPONSE_INVALID'),{unknown:true});}
+  const code=Number(row.code);
+  if(!Number.isSafeInteger(code))throw Object.assign(new Error('KEETA_PROVIDER_MUTATION_CODE_INVALID'),{unknown:true});
+  if(code!==0){
+    throw Object.assign(new Error('KEETA_PROVIDER_'+code+':'+String(row.message||'')),{providerRejected:true,providerCode:code});
+  }
+  return Object.freeze({
+    code,message:String(row.message||'Success'),data:row.data??null,
+    errorList:Array.isArray(row.errorList)?Object.freeze(row.errorList):Object.freeze([]),
+  });
+}
+
 async function syncKeetaSellability(config,token,snapshot,runtimeSellability=[]){
   const projection=buildKeetaSellabilityProjection(snapshot,runtimeSellability);
   if(!projection.enabled)throw new Error('KEETA_SELLABILITY_SYNC_DISABLED_BY_PUBLISHED_CONFIG');
@@ -806,6 +837,50 @@ export class KeetaRuntimeStore{
     }
   }
 
+  async providerMutationRequest(path,params){
+    const config=requireRuntimeConfig(this.env);
+    let token=await this.usableToken();
+    try{
+      return await keetaProviderMutationJson(config,token,path,params);
+    }catch(error){
+      if(!isProviderAccessTokenMissing(error))throw error;
+      token=await this.recoverProviderAccessToken(token,error);
+      return keetaProviderMutationJson(config,token,path,params);
+    }
+  }
+
+  async providerMutationStatus(){
+    return await this.state.storage.get(KEETA_PROVIDER_STATUS_KEY)||Object.freeze({
+      schema:'MFK_KEETA_PROVIDER_STATUS_V1',headSeq:0,providerAppliedSeq:0,behindCount:0,
+      lastOperation:null,taskId:null,state:'APPLIED',observedAt:new Date().toISOString(),error:null,
+    });
+  }
+
+  async applyProviderDelta(input){
+    const body=record(input,'KEETA_PROVIDER_DELTA_INPUT_INVALID');
+    const currentEntities=record(body.currentEntities,'KEETA_PROVIDER_CURRENT_ENTITIES_REQUIRED');
+    const plan=planKeetaProviderMutations({batch:body.batch,currentEntities});
+    const config=requireRuntimeConfig(this.env);
+    return executeKeetaProviderMutationPlan({
+      plan,currentEntities,providerShopId:config.providerShopId,storage:this.state.storage,
+      request:(path,params)=>this.providerMutationRequest(path,params),
+    });
+  }
+
+  async requireProviderRecovery(input){
+    const body=record(input,'KEETA_PROVIDER_RECOVERY_INPUT_INVALID');
+    const current=await this.providerMutationStatus();
+    const headSeq=Number(body.headSeq);
+    if(!Number.isSafeInteger(headSeq)||headSeq<0)throw new Error('KEETA_PROVIDER_RECOVERY_HEAD_INVALID');
+    const status=Object.freeze({
+      ...current,headSeq,providerAppliedSeq:Number(current.providerAppliedSeq)||0,
+      behindCount:Math.max(0,headSeq-(Number(current.providerAppliedSeq)||0)),state:'UNKNOWN',
+      observedAt:new Date().toISOString(),error:nonEmpty(String(body.reason||''),'KEETA_PROVIDER_RECOVERY_REASON_REQUIRED'),
+    });
+    await this.state.storage.put(KEETA_PROVIDER_STATUS_KEY,status);
+    return status;
+  }
+
   async alarm(){
     try{
       const token=await this.loadToken();
@@ -830,6 +905,7 @@ export class KeetaRuntimeStore{
     const providerTokenInvalid=await this.state.storage.get('oauth:provider-token-invalid');
     const autoRefresh=await this.state.storage.get('oauth:auto-refresh')||{};
     const providerAuthorization=await this.state.storage.get('provider:authorization')||null;
+    const providerMutation=await this.providerMutationStatus();
     const scheduledAlarmAt=typeof this.state.storage.getAlarm==='function'
       ?await this.state.storage.getAlarm()
       :null;
@@ -880,6 +956,7 @@ export class KeetaRuntimeStore{
         duplicateCount:Number(journal.duplicateCount)||0,
         conflictCount:Number(journal.conflictCount)||0,
       },
+      providerMutation,
       knownExternalBlocker:(Number(journal.acceptedCount)||0)>0?null:'KEETA_LIVE_WEBHOOK_SIGNING_SEMANTICS_MISMATCH',
       automaticOrderMutation:false,
       providerCommandActivation:false,
@@ -888,6 +965,20 @@ export class KeetaRuntimeStore{
 
   async fetch(request){
     const url=new URL(request.url);
+
+    if(url.pathname==='/internal/provider/status'&&request.method==='GET'){
+      return json(await this.providerMutationStatus());
+    }
+
+    if(url.pathname==='/internal/provider/delta'&&request.method==='POST'){
+      try{return json(await this.applyProviderDelta(await request.json()));}
+      catch(error){return json({code:error instanceof Error?error.message:'KEETA_PROVIDER_DELTA_FAILED'},409);}
+    }
+
+    if(url.pathname==='/internal/provider/recovery-required'&&request.method==='POST'){
+      try{return json(await this.requireProviderRecovery(await request.json()));}
+      catch(error){return json({code:error instanceof Error?error.message:'KEETA_PROVIDER_RECOVERY_FAILED'},409);}
+    }
 
     if(url.pathname==='/admin/status'&&(request.method==='GET'||request.method==='POST')){
       return json(await this.status());
@@ -1064,6 +1155,9 @@ export class KeetaRuntimeStore{
         const body=record(await request.json(),'KEETA_MENU_SYNC_INPUT_INVALID');
         const revision=positiveInt(body.revision,'KEETA_MENU_ADMIN_REVISION_INVALID');
         const adminFingerprint=nonEmpty(body.adminFingerprint,'KEETA_MENU_ADMIN_FINGERPRINT_REQUIRED');
+        const reason=nonEmpty(body.reason,'KEETA_RECOVERY_FULL_MENU_REASON_REQUIRED');
+        const sourceToSeq=Number(body.sourceToSeq);
+        if(!Number.isSafeInteger(sourceToSeq)||sourceToSeq<0)throw new Error('KEETA_RECOVERY_FULL_MENU_SOURCE_SEQ_INVALID');
         const projection=buildKeetaMenuProjection(body.snapshot);
         const snapshotFingerprint=await sha256Hex(stable(projection.payload));
         const config=requireRuntimeConfig(this.env);
@@ -1077,13 +1171,16 @@ export class KeetaRuntimeStore{
         }
         const submittedAt=new Date().toISOString();
         const row=Object.freeze({
-          state:'SUBMITTED',
+          state:'PENDING',
           provider:'KEETA',
+          operation:'RECOVERY_FULL_MENU_SYNC',
           canonicalStoreId:'MF01',
           providerShopId:Number(this.env.KEETA_PROVIDER_SHOP_ID),
           taskId,
           adminRevision:revision,
           adminFingerprint,
+          sourceToSeq,
+          reason,
           snapshotFingerprint,
           summary:projection.summary,
           submittedAt,
@@ -1100,7 +1197,9 @@ export class KeetaRuntimeStore{
 
     if(url.pathname==='/admin/menu/status'&&(request.method==='GET'||request.method==='POST')){
       const latest=await this.state.storage.get('menu:sync:latest');
-      return latest?json(latest):json({state:'NEVER_SYNCED',provider:'KEETA',canonicalStoreId:'MF01'});
+      if(!latest)return json({state:'NEVER_SYNCED',provider:'KEETA',canonicalStoreId:'MF01'});
+      const legacyState={SUBMITTED:'PENDING',COMPLETED:'APPLIED',PARTIAL:'REJECTED'}[String(latest.state)];
+      return json(legacyState?Object.freeze({...latest,state:legacyState}):latest);
     }
 
 
@@ -1883,7 +1982,7 @@ export class KeetaRuntimeStore{
               const updated=Object.freeze({
                 ...current,
                 ...(envelope.eventId===1202?{
-                  state:completion.errors.length?'PARTIAL':'COMPLETED',
+                  state:completion.errors.length?'REJECTED':'APPLIED',
                   completion:Object.freeze({
                     messageId:envelope.messageId,
                     completedAt:acceptedAt,
@@ -1905,6 +2004,24 @@ export class KeetaRuntimeStore{
               const latest=await this.state.storage.get('menu:sync:latest');
               if(latest&&Number(latest.taskId)===Number(menuTaskId)){
                 await this.state.storage.put('menu:sync:latest',updated);
+              }
+              if(envelope.eventId===1202){
+                const providerStatus=await this.providerMutationStatus();
+                const sourceToSeq=Number(current.sourceToSeq)||0;
+                const nextHeadSeq=Math.max(Number(providerStatus.headSeq)||0,sourceToSeq);
+                const currentAppliedSeq=Number(providerStatus.providerAppliedSeq)||0;
+                const nextAppliedSeq=completion.errors.length?currentAppliedSeq:Math.max(currentAppliedSeq,sourceToSeq);
+                await this.state.storage.put(KEETA_PROVIDER_STATUS_KEY,Object.freeze({
+                  ...providerStatus,
+                  headSeq:nextHeadSeq,
+                  providerAppliedSeq:nextAppliedSeq,
+                  behindCount:Math.max(0,nextHeadSeq-nextAppliedSeq),
+                  lastOperation:'RECOVERY_FULL_MENU_SYNC',
+                  taskId:Number(menuTaskId),
+                  state:completion.errors.length?'REJECTED':nextAppliedSeq===nextHeadSeq?'APPLIED':'PENDING',
+                  observedAt:acceptedAt,
+                  error:completion.errors.length?'KEETA_RECOVERY_FULL_MENU_PARTIAL_OR_REJECTED':null,
+                }));
               }
             }
           }

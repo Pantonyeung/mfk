@@ -60,7 +60,7 @@ test('UI3 Combo renders only from exact product.comboId and never heuristics',()
 });
 
 test('UI3 required validation, unavailable choices and price readiness block Add locally',()=>{
-  assert.match(productSheet,/const addReady=product\.available&&variationOk&&validation\.ok&&comboValidation\.ok&&priceReady&&quantity>=1/);
+  assert.match(productSheet,/const addReady=commercialReady&&product\.available&&variationOk&&validation\.ok&&comboValidation\.ok&&priceReady&&quantity>=1/);
   assert.match(productSheet,/disabled=\{!choice\.available\|\|\(maxReached&&!active\)\}/);
   assert.match(productSheet,/disabled=\{disabled\}/);
   assert.match(productSheet,/disabled=\{!addReady\}/);

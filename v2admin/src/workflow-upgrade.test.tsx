@@ -105,7 +105,8 @@ describe('MFK Admin complete operational workflows',()=>{
     expect(keetaActionErrorText('KEETA_MENU_SYNC_PROVIDER_115000200')).toBe('Keeta 操作未完成：KEETA_MENU_SYNC_PROVIDER_115000200');
     expect(keetaActionErrorText('')).toBe('');
     const sync=render('/admin/channels/sync-policy');
-    expect(sync).toContain('同步完整菜單到 Keeta');
+    expect(sync).toContain('RECOVERY_FULL_MENU_SYNC');
+    expect(sync).toContain('執行 destructive full replace');
     expect(sync).toContain('更新同步狀態');
   });
 

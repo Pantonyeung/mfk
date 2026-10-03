@@ -13,6 +13,24 @@ class MemoryStorage{
 function runtime(){
   return new CustomerRuntimeStore({storage:new MemoryStorage()}, {});
 }
+function verifiedOrder(intent:Record<string,any>){
+  const commercialProof={
+    schema:'MFK_CUSTOMER_COMMERCIAL_FRESHNESS_V1',keyId:'test',storeId:'MF01',customerPortSeq:7,
+    projectionHash:'fnv1a32:test',canonicalRevision:7,canonicalFingerprint:'fingerprint-7',
+    issuedAt:'2026-09-23T12:00:00.000Z',expiresAt:'2026-09-23T12:05:00.000Z',freshnessToken:'payload.signature',
+  };
+  const normalized={...intent,customerPortSeq:7,projectionHash:'fnv1a32:test',canonicalRevision:7,commercialProof};
+  const lines=normalized.cart.map((line:Record<string,any>)=>({lineId:line.lineId,productId:line.productId,quantity:line.quantity,publishedUnitPriceMinor:line.publishedUnitPriceMinor}));
+  const totalMinor=lines.reduce((sum:number,line:Record<string,number>)=>sum+line.quantity*line.publishedUnitPriceMinor,0);
+  return{
+    intent:normalized,
+    commercialGrant:{
+      schema:'MFK_CUSTOMER_COMMERCIAL_GRANT_V1',storeId:'MF01',submissionId:normalized.submissionId,
+      customerPortSeq:7,projectionHash:'fnv1a32:test',canonicalRevision:7,canonicalFingerprint:'fingerprint-7',
+      proofExpiresAt:commercialProof.expiresAt,verifiedAt:'2026-09-23T12:00:01.000Z',factsHash:'fnv1a32:test',totalMinor,lines,
+    },
+  };
+}
 
 describe('CustomerRuntimeStore public contract',()=>{
   it('legacy cloud quote endpoints are retired',async()=>{
@@ -27,10 +45,10 @@ describe('CustomerRuntimeStore public contract',()=>{
     const store=runtime();
     const submissionId='CUSTOMER-00000000-0000-4000-8000-000000000001';
     const idempotencyKey='customer-order:'+submissionId;
-    const submit=await store.fetch(new Request('https://internal/public/orders/submit',{
+    const submit=await store.fetch(new Request('https://internal/internal/orders/submit',{
       method:'POST',
       headers:{'content-type':'application/json'},
-      body:JSON.stringify({
+      body:JSON.stringify(verifiedOrder({
         schema:MFK_CUSTOMER_ORDER_INTENT_SCHEMA,
         storeId:'MF01',
         submissionId,
@@ -39,10 +57,10 @@ describe('CustomerRuntimeStore public contract',()=>{
         createdAt:'2026-09-23T12:00:00.000Z',
         updatedAt:'2026-09-23T12:00:00.000Z',
         cart:[{
-          lineId:'L1',productId:'bento',productName:'肉燥便當',quantity:1,selections:[],
+          lineId:'L1',productId:'bento',productName:'肉燥便當',quantity:1,selections:[],publishedUnitPriceMinor:4200,
         }],
         checkout:{name:'測試顧客',phone:'91234567'},
-      }),
+      })),
     }));
     expect(submit.status).toBe(202);
 
@@ -81,16 +99,35 @@ describe('CustomerRuntimeStore public contract',()=>{
       updatedAt:'2026-09-23T12:00:00.000Z',
       checkout:{name:'',phone:'91234567'},
     } as const;
-    const first=await store.fetch(new Request('https://internal/public/orders/submit',{
+    const first=await store.fetch(new Request('https://internal/internal/orders/submit',{
       method:'POST',headers:{'content-type':'application/json'},
-      body:JSON.stringify({...base,cart:[{lineId:'L1',productId:'bento',productName:'肉燥便當',quantity:1,selections:[]}]}),
+      body:JSON.stringify(verifiedOrder({...base,cart:[{lineId:'L1',productId:'bento',productName:'肉燥便當',quantity:1,selections:[],publishedUnitPriceMinor:4200}]})),
     }));
     expect(first.status).toBe(202);
-    const conflict=await store.fetch(new Request('https://internal/public/orders/submit',{
+    const conflict=await store.fetch(new Request('https://internal/internal/orders/submit',{
       method:'POST',headers:{'content-type':'application/json'},
-      body:JSON.stringify({...base,cart:[{lineId:'L1',productId:'bento',productName:'肉燥便當',quantity:2,selections:[]}]}),
+      body:JSON.stringify(verifiedOrder({...base,cart:[{lineId:'L1',productId:'bento',productName:'肉燥便當',quantity:2,selections:[],publishedUnitPriceMinor:4200}]})),
     }));
     expect(conflict.status).toBe(409);
+  });
+
+  it('treats an identical duplicate submission as idempotent',async()=>{
+    const store=runtime();
+    const submissionId='CUSTOMER-00000000-0000-4000-8000-000000000003';
+    const envelope=verifiedOrder({
+      schema:MFK_CUSTOMER_ORDER_INTENT_SCHEMA,
+      storeId:'MF01',submissionId,menuRevision:'7',idempotencyKey:'customer-order:'+submissionId,
+      createdAt:'2026-09-23T12:00:00.000Z',updatedAt:'2026-09-23T12:00:00.000Z',
+      cart:[{lineId:'L1',productId:'bento',productName:'肉燥便當',quantity:1,selections:[],publishedUnitPriceMinor:4200}],
+      checkout:{name:'',phone:'91234567'},
+    });
+    const submit=()=>store.fetch(new Request('https://internal/internal/orders/submit',{
+      method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(envelope),
+    }));
+    expect((await submit()).status).toBe(202);
+    const duplicate=await submit();
+    expect(duplicate.status).toBe(200);
+    await expect(duplicate.json()).resolves.toMatchObject({state:'PENDING_SMT',submissionId});
   });
 
   it('stores SMM staff order intents in the same pending order bridge and ACK path',async()=>{

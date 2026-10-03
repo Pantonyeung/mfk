@@ -3,14 +3,73 @@ import {validateSmtProjectionBatch} from '../contracts/smt-projection-v1.ts';
 import {MFK_ADMIN_REFUND_SCHEMA,validateAdminRefundEvent} from '../contracts/admin-refund-v1.ts';
 import {KeetaRuntimeStore} from './keeta-runtime.ts';
 import {CustomerRuntimeStore} from './customer-runtime.ts';
+import {
+  MFK_CHECKPOINTED_DELTA_SYNC_PROTOCOL,
+  MFK_SYNC_SCHEMA_VERSION,
+  validateMfkSyncAppliedAck,
+  validateMfkSyncCheckpointPointer,
+} from '../contracts/checkpointed-delta-sync-v1.ts';
+import {
+  applyMfkSyncChanges,
+  buildCustomerSyncEntities,
+  buildKeetaSyncEntities,
+  buildSmmSyncEntities,
+  buildSmtSyncEntities,
+  createMfkSyncCheckpoint,
+  diffMfkSyncEntities,
+  entityMapFromCheckpoint,
+  projectionHashForEntities,
+} from '../sync/checkpointed-delta-sync.ts';
+import {putMfkSyncCheckpointObject,readMfkSyncCheckpointObject} from '../sync/immutable-checkpoint-store.ts';
+import {buildMfkAdminDistributionDiagnostics} from '../contracts/admin-distribution-diagnostics-v1.ts';
+import {buildKeetaMenuProjection} from './keeta-menu-projection.ts';
+import {projectAdminEnvelopeToSmmConfig} from '../sync/smm-admin-projection';
+import {validateMfkCustomerOrderIntent} from '../contracts/customer-cloud-v1.ts';
+import {
+  MFK_CUSTOMER_COMMERCIAL_GRANT_SCHEMA,
+  verifyCustomerCommercialCart,
+} from '../contracts/customer-commercial-freshness-v1.ts';
+import {
+  issueCustomerCommercialFreshnessProof,
+  parseCustomerCommercialProofKeyring,
+  verifyCustomerCommercialFreshnessProof,
+} from './customer-commercial-proof.ts';
 export {KeetaRuntimeStore,CustomerRuntimeStore};
 
 const JSON_HEADERS={'content-type':'application/json; charset=utf-8','cache-control':'no-store'};
 const ADMIN_ORIGIN='https://admin.morefunos.com';
 const SMT_ORIGIN='https://appassets.androidplatform.net';
 const CUSTOMER_ORIGIN='https://order.morefunos.com';
+const SMM_ORIGIN='https://smm.morefunos.com';
 const OWNER_ORIGIN='https://owner.morefunos.com';
-const CORS_ORIGINS=new Set([ADMIN_ORIGIN,SMT_ORIGIN,CUSTOMER_ORIGIN,OWNER_ORIGIN]);
+const CORS_ORIGINS=new Set([ADMIN_ORIGIN,SMT_ORIGIN,CUSTOMER_ORIGIN,SMM_ORIGIN,OWNER_ORIGIN]);
+const MFK_SYNC_PORTS=Object.freeze(['SMT','SMM','CUSTOMER','KEETA']);
+const MFK_SYNC_CHECKPOINT_EVENT_THRESHOLD=128;
+const MFK_SYNC_CHECKPOINT_MAX_AGE_MS=24*60*60*1000;
+function syncHeadKey(port){return 'sync:head:'+String(port);}
+function syncEventKey(port,seq){return 'sync:event:'+String(port)+':'+String(seq).padStart(16,'0');}
+function syncCheckpointKey(port,seq){return 'sync:checkpoint:'+String(port)+':'+String(seq).padStart(16,'0');}
+function syncCheckpointPointerKey(port){return 'sync:checkpoint-pointer:'+String(port);}
+function emptySyncHead(storeId,port){
+  return Object.freeze({
+    schema:'MFK_SYNC_HEAD_V1',
+    protocol:MFK_CHECKPOINTED_DELTA_SYNC_PROTOCOL,
+    schemaVersion:MFK_SYNC_SCHEMA_VERSION,
+    storeId:String(storeId||'MF01'),
+    port,
+    headSeq:0,
+    journalFloorSeq:1,
+    checkpointSeq:0,
+    checkpointHash:'',
+    projectionHash:projectionHashForEntities(Object.freeze({})),
+    sourceCommitSeq:0,
+    canonicalRevision:0,
+    canonicalFingerprint:'UNPUBLISHED',
+    canonicalPublishedAt:new Date(0).toISOString(),
+    adminFingerprint:'UNPUBLISHED',
+    observedAt:new Date(0).toISOString(),
+  });
+}
 
 function json(value,status=200,extra={}){
   return new Response(JSON.stringify(value),{status,headers:{...JSON_HEADERS,...extra}});
@@ -30,7 +89,7 @@ function cors(request){
 // that response drops the handle in Workers, so the events route must remain the
 // exact response returned by the Durable Object.
 export function adminSyncOuterResponse(pathname,response,request){
-  if(pathname==='/api/admin-sync/events')return response;
+  if(pathname==='/api/admin-sync/events'||pathname==='/api/admin-sync/sync/events')return response;
   const headers=new Headers(response.headers);
   for(const [key,value] of Object.entries(cors(request)))headers.set(key,value);
   return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
@@ -924,6 +983,11 @@ function customerPublicSnapshot(active,customerOrders=[],runtimeSellability=[]){
 export class AdminSyncStore{
   constructor(state,env){this.state=state;this.env=env;}
 
+  portSockets(port){
+    try{return this.state.getWebSockets('PORT:'+String(port));}
+    catch{return this.state.getWebSockets();}
+  }
+
   async authorizePublish(request){
     const origin=request.headers.get('origin');
     const site=request.headers.get('sec-fetch-site');
@@ -970,6 +1034,19 @@ export class AdminSyncStore{
     if(!deviceId)return false;
     const acks=await this.state.storage.get('acks')||{};
     return Boolean(acks[deviceId]);
+  }
+
+  async authorizeSmmSync(request){
+    if(request.headers.get('origin')!==SMM_ORIGIN)return false;
+    const url=new URL(request.url);
+    return Boolean(await resolveSmmStaffSession(request,storeIdFrom(url)));
+  }
+
+  async authorizeSyncRead(request,port){
+    if(port==='SMT')return this.authorizeSmtDevice(request);
+    if(port==='CUSTOMER')return request.headers.get('origin')===CUSTOMER_ORIGIN;
+    if(port==='SMM')return this.authorizeSmmSync(request);
+    return false;
   }
 
 
@@ -1021,100 +1098,634 @@ export class AdminSyncStore{
     const value={staffId:String(current.staff.staffId||''),loginId:String(current.loginId||''),displayName:String(current.staff.name||current.staff.staffId||''),role:String(current.staff.role||''),scope:String(current.staff.scope||'STORE'),permissions:rows(current.staff.permissions).map(String),sessionToken:token,createdAt:String(session.createdAt||''),expiresAt:String(session.expiresAt||''),lastSeenAt:new Date().toISOString()};
     await this.state.storage.put(key,{...session,staffId:value.staffId,lastSeenAt:value.lastSeenAt});return value;
   }
-  async publishEnvelope(envelope,expectedBase:{fingerprint:string;publishedAt:string}|null=null){
-    const initialCurrent=await this.state.storage.get('active');
-    const currentMeta=await this.state.storage.get('activeMeta')||{};
-    // Durable Object storage input gates serialize this final compare-before-write boundary.
-    const current=expectedBase?await this.state.storage.get('active'):initialCurrent;
-    if(expectedBase&&(!current||String(current.fingerprint||'')!==String(expectedBase.fingerprint||'')||String(current.publishedAt||'')!==String(expectedBase.publishedAt||''))){
-      return{status:409,body:{code:'ADMIN_DRAFT_BASE_CONFLICT'}};
-    }
+  async withStorageTransaction(work){
+    const storage=this.state.storage;
+    if(typeof storage.transaction==='function')return storage.transaction(work);
+    return work(storage);
+  }
 
-    // Exact retry of the same formal Admin publish is idempotent.
-    if(current&&String(currentMeta.publishRequestFingerprint||'')===String(envelope.fingerprint||'')){
+  syncEntitiesForActive(active,port){
+    if(!active)return Object.freeze({});
+    if(port==='SMT')return buildSmtSyncEntities(active.snapshot);
+    const customerSnapshot=customerPublicSnapshot(active,[],[]);
+    if(port==='CUSTOMER')return buildCustomerSyncEntities(customerSnapshot);
+    if(port==='SMM')return buildSmmSyncEntities(projectAdminEnvelopeToSmmConfig(active));
+    if(port==='KEETA'){
+      const projection=buildKeetaMenuProjection(active.snapshot);
+      return buildKeetaSyncEntities(projection.payload);
+    }
+    return Object.freeze({});
+  }
+
+  async readSyncHead(port,storage=this.state.storage){
+    return await storage.get(syncHeadKey(port))||emptySyncHead('MF01',port);
+  }
+
+  commercialProofKeyring(){
+    return parseCustomerCommercialProofKeyring(this.env.CUSTOMER_COMMERCIAL_PROOF_KEYRING);
+  }
+
+  async customerCommercialHead(head){
+    const active=await this.state.storage.get('active');
+    if(!active||String(active.fingerprint||'')!==String(head.canonicalFingerprint||''))throw new Error('CUSTOMER_COMMERCIAL_STATE_UNAVAILABLE');
+    const commercialFreshness=await issueCustomerCommercialFreshnessProof({
+      storeId:String(head.storeId||'MF01'),
+      customerPortSeq:Number(head.headSeq||0),
+      projectionHash:String(head.projectionHash||''),
+      canonicalRevision:Number(head.canonicalRevision||0),
+      canonicalFingerprint:String(head.canonicalFingerprint||''),
+    },this.commercialProofKeyring());
+    return Object.freeze({...head,commercialFreshness});
+  }
+
+  async verifyCustomerCommercialIntent(input,serverReceivedAtMs=Date.now()){
+    const intent=validateMfkCustomerOrderIntent(input);
+    const proof=await verifyCustomerCommercialFreshnessProof(intent.commercialProof,this.commercialProofKeyring(),{
+      storeId:intent.storeId,
+      customerPortSeq:intent.customerPortSeq,
+      projectionHash:intent.projectionHash,
+      canonicalRevision:intent.canonicalRevision,
+      canonicalFingerprint:intent.commercialProof.canonicalFingerprint,
+    },serverReceivedAtMs);
+    if(String(intent.menuRevision)!==String(proof.canonicalRevision))throw new Error('CUSTOMER_COMMERCIAL_MENU_REVISION_MISMATCH');
+    const current=await this.state.storage.get('active');
+    const active=current&&String(current.fingerprint||'')===proof.canonicalFingerprint
+      ?current
+      :await this.state.storage.get('admin-browser:version:'+proof.canonicalFingerprint);
+    if(!active||String(active.storeId||'')!==intent.storeId||Number(active.revision)!==proof.canonicalRevision)throw new Error('CUSTOMER_COMMERCIAL_HISTORY_UNAVAILABLE');
+    const projection=customerPublicSnapshot(active,[],[]);
+    const entities=buildCustomerSyncEntities(projection);
+    if(projectionHashForEntities(entities)!==proof.projectionHash)throw new Error('CUSTOMER_COMMERCIAL_HISTORY_HASH_MISMATCH');
+    const facts=verifyCustomerCommercialCart(intent.cart,projection);
+    return Object.freeze({
+      intent,
+      grant:Object.freeze({
+        schema:MFK_CUSTOMER_COMMERCIAL_GRANT_SCHEMA,
+        storeId:intent.storeId,
+        submissionId:intent.submissionId,
+        customerPortSeq:intent.customerPortSeq,
+        projectionHash:intent.projectionHash,
+        canonicalRevision:intent.canonicalRevision,
+        canonicalFingerprint:proof.canonicalFingerprint,
+        proofExpiresAt:proof.expiresAt,
+        verifiedAt:new Date(serverReceivedAtMs).toISOString(),
+        factsHash:facts.factsHash,
+        totalMinor:facts.totalMinor,
+        lines:facts.lines,
+      }),
+    });
+  }
+
+  async readSyncChanges(port,after){
+    const head=await this.readSyncHead(port);
+    if(!Number.isSafeInteger(after)||after<0)return{status:400,body:{code:'SYNC_AFTER_INVALID'}};
+    if(after>Number(head.headSeq||0))return{status:409,body:{code:'SYNC_CLIENT_AHEAD',head}};
+    if(after<Math.max(0,Number(head.journalFloorSeq||1)-1)){
+      return{status:409,body:{code:'SYNC_CHECKPOINT_REQUIRED',head}};
+    }
+    if(after===Number(head.headSeq||0)){
+      return{status:200,body:{
+        schema:'MFK_SYNC_CHANGE_BATCH_V1',
+        protocol:MFK_CHECKPOINTED_DELTA_SYNC_PROTOCOL,
+        storeId:String(head.storeId||'MF01'),
+        port,
+        fromExclusive:after,
+        toInclusive:after,
+        headSeq:Number(head.headSeq||0),
+        journalFloorSeq:Number(head.journalFloorSeq||1),
+        changes:[],
+        observedAt:new Date().toISOString(),
+      }};
+    }
+    const stored=await this.state.storage.list({prefix:'sync:event:'+port+':'});
+    const changes=[...stored.values()]
+      .filter(change=>Number(change?.portSeq)>after&&Number(change?.portSeq)<=Number(head.headSeq||0))
+      .sort((a,b)=>Number(a.portSeq)-Number(b.portSeq))
+      .slice(0,500);
+    if(!changes.length||Number(changes[0]?.portSeq)!==after+1){
+      return{status:409,body:{code:'SYNC_GAP_REQUIRES_CHECKPOINT',head}};
+    }
+    for(let index=1;index<changes.length;index++){
+      if(Number(changes[index]?.portSeq)!==Number(changes[index-1]?.portSeq)+1){
+        return{status:409,body:{code:'SYNC_JOURNAL_GAP_DETECTED',head}};
+      }
+    }
+    const toInclusive=Number(changes[changes.length-1]?.portSeq)||after;
+    return{status:200,body:{
+      schema:'MFK_SYNC_CHANGE_BATCH_V1',
+      protocol:MFK_CHECKPOINTED_DELTA_SYNC_PROTOCOL,
+      storeId:String(head.storeId||'MF01'),
+      port,
+      fromExclusive:after,
+      toInclusive,
+      headSeq:Number(head.headSeq||0),
+      journalFloorSeq:Number(head.journalFloorSeq||1),
+      changes,
+      observedAt:new Date().toISOString(),
+    }};
+  }
+
+  async readSyncCheckpoint(port,requestedSeq){
+    const head=await this.readSyncHead(port);
+    const seq=requestedSeq===undefined||requestedSeq===null||requestedSeq===''?Number(head.checkpointSeq||0):Number(requestedSeq);
+    if(!Number.isSafeInteger(seq)||seq<0)return{status:400,body:{code:'SYNC_CHECKPOINT_SEQ_INVALID'}};
+    if(!head.checkpointHash&&seq===0)return{status:404,body:{code:'SYNC_CHECKPOINT_NOT_AVAILABLE',head}};
+    const rawPointer=await this.state.storage.get(syncCheckpointPointerKey(port));
+    if(rawPointer){
+      try{
+        const pointer=validateMfkSyncCheckpointPointer(rawPointer);
+        const generation=pointer.current.checkpointSeq===seq?pointer.current:pointer.previous?.checkpointSeq===seq?pointer.previous:null;
+        if(generation){
+          try{
+            const value=await readMfkSyncCheckpointObject(this.env.SYNC_CHECKPOINTS,generation);
+            return{status:200,body:value.checkpoint};
+          }catch(error){
+            if(generation===pointer.current&&pointer.previous){
+              const checkpoint=await this.rebuildSyncCheckpointFromPrevious(pointer);
+              await this.recordCheckpointDiagnostic(port,'CHECKPOINT_CURRENT_FALLBACK_TO_PREVIOUS',error);
+              return{status:200,body:checkpoint};
+            }
+            throw error;
+          }
+        }
+      }catch(error){
+        await this.recordCheckpointDiagnostic(port,'CHECKPOINT_READ_FAILED',error);
+        return{status:503,body:{code:'SYNC_CHECKPOINT_READ_FAILED',head}};
+      }
+    }
+    const checkpoint=await this.state.storage.get(syncCheckpointKey(port,seq));
+    return checkpoint?{status:200,body:checkpoint}:{status:404,body:{code:'SYNC_CHECKPOINT_NOT_FOUND',head}};
+  }
+
+  async recordCheckpointDiagnostic(port,code,error){
+    await this.state.storage.put('sync:checkpoint-error:'+port,{
+      code,
+      reason:error instanceof Error?error.message:String(error||code),
+      observedAt:new Date().toISOString(),
+    }).catch(()=>{});
+  }
+
+  async rebuildSyncCheckpointFromPrevious(pointer){
+    const previous=(await readMfkSyncCheckpointObject(this.env.SYNC_CHECKPOINTS,pointer.previous)).checkpoint;
+    const stored=await this.state.storage.list({prefix:'sync:event:'+pointer.current.port+':'});
+    const changes=[...stored.values()]
+      .filter(change=>Number(change?.portSeq)>previous.checkpointSeq&&Number(change?.portSeq)<=pointer.current.checkpointSeq)
+      .sort((left,right)=>Number(left.portSeq)-Number(right.portSeq));
+    let expected=previous.checkpointSeq+1;
+    for(const change of changes){if(Number(change?.portSeq)!==expected++)throw new Error('SYNC_CHECKPOINT_PREVIOUS_TAIL_GAP');}
+    if(expected-1!==pointer.current.checkpointSeq)throw new Error('SYNC_CHECKPOINT_PREVIOUS_TAIL_INCOMPLETE');
+    const checkpoint=createMfkSyncCheckpoint({
+      storeId:pointer.current.storeId,
+      port:pointer.current.port,
+      checkpointSeq:pointer.current.checkpointSeq,
+      sourceCommitSeq:pointer.current.sourceCommitSeq,
+      entities:applyMfkSyncChanges(entityMapFromCheckpoint(previous),changes),
+      createdAt:pointer.current.createdAt,
+    });
+    if(checkpoint.projectionHash!==pointer.current.projectionHash||checkpoint.checkpointHash!==pointer.current.checkpointHash)throw new Error('SYNC_CHECKPOINT_PREVIOUS_RECOVERY_IDENTITY_MISMATCH');
+    return checkpoint;
+  }
+
+  async recordSyncApplied(input){
+    const ack=validateMfkSyncAppliedAck(input);
+    const head=await this.readSyncHead(ack.port);
+    if(ack.storeId!==String(head.storeId||''))return{status:403,body:{code:'SYNC_APPLIED_STORE_MISMATCH'}};
+    if(ack.appliedSeq>Number(head.headSeq||0))return{status:409,body:{code:'SYNC_APPLIED_AHEAD_OF_HEAD',head}};
+    if(ack.appliedSeq===Number(head.headSeq||0)&&ack.projectionHash!==String(head.projectionHash||'')){
+      return{status:409,body:{code:'SYNC_APPLIED_PROJECTION_HASH_MISMATCH',head}};
+    }
+    const key='sync:applied:'+ack.port+':'+ack.clientId;
+    const existing=await this.state.storage.get(key);
+    if(existing&&Number(existing.appliedSeq)>ack.appliedSeq){
+      return{status:409,body:{code:'SYNC_APPLIED_STALE_ACK',current:existing}};
+    }
+    await this.state.storage.put(key,ack);
+    return{status:200,body:{state:'ACKED',ack,head}};
+  }
+
+  async deliverKeetaProviderDelta(plan){
+    const targetHeadSeq=Number(plan.head?.headSeq||0);
+    try{
+      const id=this.env.KEETA_RUNTIME.idFromName(String(plan.head?.storeId||'MF01'));
+      const keeta=this.env.KEETA_RUNTIME.get(id);
+      const statusResponse=await keeta.fetch(new Request('https://keeta-runtime/internal/provider/status',{method:'GET'}));
+      if(!statusResponse.ok)throw new Error('KEETA_PROVIDER_STATUS_UNAVAILABLE');
+      const status=await statusResponse.json();
+      const providerAppliedSeq=Number(status.providerAppliedSeq)||0;
+      if(providerAppliedSeq>=targetHeadSeq)return status;
+      if(providerAppliedSeq<Number(plan.head?.checkpointSeq||0)){
+        return await this.markKeetaProviderRecovery(keeta,targetHeadSeq,'KEETA_PROVIDER_CHECKPOINT_REQUIRED');
+      }
+      const changes=[];
+      for(let seq=providerAppliedSeq+1;seq<=targetHeadSeq;seq++){
+        const change=await this.state.storage.get(syncEventKey('KEETA',seq));
+        if(!change)return await this.markKeetaProviderRecovery(keeta,targetHeadSeq,'KEETA_PROVIDER_JOURNAL_GAP');
+        changes.push(change);
+      }
+      const batch={
+        schema:'MFK_SYNC_CHANGE_BATCH_V1',
+        protocol:MFK_CHECKPOINTED_DELTA_SYNC_PROTOCOL,
+        schemaVersion:MFK_SYNC_SCHEMA_VERSION,
+        storeId:String(plan.head?.storeId||'MF01'),
+        port:'KEETA',
+        fromExclusive:providerAppliedSeq,
+        toInclusive:targetHeadSeq,
+        headSeq:targetHeadSeq,
+        journalFloorSeq:Number(plan.head?.journalFloorSeq||1),
+        changes,
+        observedAt:new Date().toISOString(),
+      };
+      const response=await keeta.fetch(new Request('https://keeta-runtime/internal/provider/delta',{
+        method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({batch,currentEntities:plan.entities}),
+      }));
+      const body=await response.json().catch(()=>({}));
+      if(!response.ok){
+        const code=String(body.code||'KEETA_PROVIDER_DELTA_FAILED');
+        await this.markKeetaProviderRecovery(keeta,targetHeadSeq,code);
+        throw new Error(code);
+      }
+      await this.state.storage.delete('sync:provider-error:KEETA');
+      return body;
+    }catch(error){
+      await this.state.storage.put('sync:provider-error:KEETA',{
+        code:error instanceof Error?error.message:'KEETA_PROVIDER_DELIVERY_FAILED',
+        headSeq:targetHeadSeq,observedAt:new Date().toISOString(),
+      });
+      return null;
+    }
+  }
+
+  async markKeetaProviderRecovery(keeta,headSeq,reason){
+    const response=await keeta.fetch(new Request('https://keeta-runtime/internal/provider/recovery-required',{
+      method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({headSeq,reason}),
+    }));
+    return response.json().catch(()=>({state:'UNKNOWN',headSeq,reason}));
+  }
+
+  async syncDistributionReadback(){
+    const observedAt=new Date().toISOString();
+    const heads={};
+    for(const port of MFK_SYNC_PORTS)heads[port]=await this.readSyncHead(port);
+    const appliedRows=await this.state.storage.list({prefix:'sync:applied:'});
+    const applied=[...appliedRows.values()].sort((a,b)=>String(a.port).localeCompare(String(b.port))||String(a.clientId).localeCompare(String(b.clientId)));
+    const errors=await this.state.storage.list({prefix:'sync:projection-error:'});
+    let keetaProvider=null;
+    try{
+      const id=this.env.KEETA_RUNTIME.idFromName('MF01');
+      const response=await this.env.KEETA_RUNTIME.get(id).fetch(new Request('https://keeta-runtime/internal/provider/status',{method:'GET'}));
+      if(response.ok)keetaProvider=await response.json();
+    }catch{}
+    const checkpoints={};
+    for(const port of MFK_SYNC_PORTS){
+      const [rawPointer,error,meta]=await Promise.all([
+        this.state.storage.get(syncCheckpointPointerKey(port)),
+        this.state.storage.get('sync:checkpoint-error:'+port),
+        this.state.storage.get('sync:checkpoint-meta:'+port),
+      ]);
+      let pointer=null,r2Readback=null;
+      if(rawPointer){
+        try{
+          pointer=validateMfkSyncCheckpointPointer(rawPointer);
+          if(!this.env.SYNC_CHECKPOINTS)throw new Error('SYNC_CHECKPOINT_R2_BINDING_UNAVAILABLE');
+          await readMfkSyncCheckpointObject(this.env.SYNC_CHECKPOINTS,pointer.current);
+          r2Readback={verified:true,observedAt:new Date().toISOString(),error:null};
+        }catch(readError){
+          r2Readback={verified:false,observedAt:new Date().toISOString(),error:readError instanceof Error?readError.message:'SYNC_CHECKPOINT_READBACK_FAILED'};
+        }
+      }
+      checkpoints[port]={pointer,meta:meta||null,error:error||null,r2Readback};
+    }
+    let commercialProof;
+    try{this.commercialProofKeyring();commercialProof={state:'HEALTHY',observedAt,error:null};}
+    catch(error){commercialProof={state:'ERROR',observedAt,error:error instanceof Error?error.message:'CUSTOMER_COMMERCIAL_PROOF_UNAVAILABLE'};}
+    const [active,activeMeta,providerError]=await Promise.all([
+      this.state.storage.get('active'),this.state.storage.get('activeMeta'),this.state.storage.get('sync:provider-error:KEETA'),
+    ]);
+    const staleAfterMs=Number(this.env.MFK_SYNC_DIAGNOSTICS_STALE_AFTER_MS);
+    return buildMfkAdminDistributionDiagnostics({
+      canonical:active?{
+        storeId:String(active.storeId||'MF01'),canonicalRevision:Number(active.revision)||0,
+        commitId:String(activeMeta?.syncCommitId||''),sourceCommitSeq:Number(activeMeta?.syncCommitSeq)||0,
+        canonicalFingerprint:String(active.fingerprint||''),publishedAt:String(active.publishedAt||''),
+      }:null,
+      heads,applied,provider:{status:keetaProvider,error:providerError||null},checkpoints,
+      projectionErrors:[...errors.values()],commercialProof,observedAt,
+      staleAfterMs:Number.isSafeInteger(staleAfterMs)&&staleAfterMs>0?staleAfterMs:null,
+      checkpointMaxAgeMs:MFK_SYNC_CHECKPOINT_MAX_AGE_MS,
+    });
+  }
+
+  async maybeBuildSyncCheckpoint(port,entities,targetHead){
+    try{
+      if(!this.env.SYNC_CHECKPOINTS)throw new Error('SYNC_CHECKPOINT_R2_BINDING_UNAVAILABLE');
+      const latest=await this.readSyncHead(port);
+      if(Number(latest.headSeq||0)<Number(targetHead.headSeq||0))return;
+      const rawPointer=await this.state.storage.get(syncCheckpointPointerKey(port));
+      const pointer=rawPointer?validateMfkSyncCheckpointPointer(rawPointer):null;
+      const targetSeq=Number(targetHead.headSeq||0);
+      if(pointer&&pointer.current.checkpointSeq>=targetSeq)return{state:'STALE',checkpointSeq:pointer.current.checkpointSeq};
+      const meta=pointer?.current||await this.state.storage.get('sync:checkpoint-meta:'+port)||{};
+      const checkpointSeq=Number(pointer?.current.checkpointSeq??latest.checkpointSeq??0);
+      const lastAt=Date.parse(String(meta.createdAt||''));
+      const ageDue=!Number.isFinite(lastAt)||Date.now()-lastAt>=MFK_SYNC_CHECKPOINT_MAX_AGE_MS;
+      const countDue=targetSeq-checkpointSeq>=MFK_SYNC_CHECKPOINT_EVENT_THRESHOLD;
+      const missing=!pointer;
+      if(!missing&&!countDue&&!ageDue)return;
+      if(projectionHashForEntities(entities)!==String(targetHead.projectionHash||''))throw new Error('SYNC_CHECKPOINT_TARGET_PROJECTION_MISMATCH');
+
+      const checkpoint=createMfkSyncCheckpoint({
+        storeId:String(targetHead.storeId||'MF01'),
+        port,
+        checkpointSeq:targetSeq,
+        sourceCommitSeq:Number(targetHead.sourceCommitSeq||0),
+        entities,
+        createdAt:String(targetHead.observedAt||targetHead.canonicalPublishedAt||new Date().toISOString()),
+      });
+      const immutable=await putMfkSyncCheckpointObject(this.env.SYNC_CHECKPOINTS,checkpoint);
+      let migratedPrevious=null;
+      if(!pointer&&String(latest.checkpointHash||'')&&Number(latest.checkpointSeq||0)<checkpoint.checkpointSeq){
+        const legacy=await this.state.storage.get(syncCheckpointKey(port,Number(latest.checkpointSeq||0)));
+        if(!legacy)throw new Error('SYNC_CHECKPOINT_LEGACY_PREVIOUS_NOT_FOUND');
+        migratedPrevious=(await putMfkSyncCheckpointObject(this.env.SYNC_CHECKPOINTS,legacy)).metadata;
+      }
+      const providerAppliedSeq=port==='KEETA'?await this.keetaProviderAppliedSeqForCompaction():null;
+      const result=await this.withStorageTransaction(async storage=>{
+        const current=await this.readSyncHead(port,storage);
+        if(Number(current.headSeq||0)<checkpoint.checkpointSeq)return{state:'STALE_HEAD'};
+        const currentRawPointer=await storage.get(syncCheckpointPointerKey(port));
+        const currentPointer=currentRawPointer?validateMfkSyncCheckpointPointer(currentRawPointer):null;
+        if(currentPointer&&currentPointer.current.checkpointSeq>=checkpoint.checkpointSeq)return{state:'STALE',checkpointSeq:currentPointer.current.checkpointSeq};
+        const previous=currentPointer?.current??migratedPrevious;
+        const recoveryFloor=previous?previous.checkpointSeq+1:checkpoint.checkpointSeq+1;
+        const floor=port==='KEETA'
+          ?providerAppliedSeq===null?Number(current.journalFloorSeq||1):Math.min(recoveryFloor,providerAppliedSeq+1)
+          :recoveryFloor;
+        const journalFloorSeq=Math.min(Number(current.headSeq||0)+1,floor);
+        if(journalFloorSeq<=checkpoint.checkpointSeq){
+          const retained=await storage.list({prefix:'sync:event:'+port+':'});
+          let expected=journalFloorSeq;
+          for(const event of [...retained.values()].filter(value=>Number(value?.portSeq)>=journalFloorSeq&&Number(value?.portSeq)<=checkpoint.checkpointSeq).sort((left,right)=>Number(left.portSeq)-Number(right.portSeq))){
+            if(Number(event?.portSeq)!==expected++)throw new Error('SYNC_CHECKPOINT_RETAINED_TAIL_GAP');
+          }
+          if(expected-1!==checkpoint.checkpointSeq)throw new Error('SYNC_CHECKPOINT_RETAINED_TAIL_INCOMPLETE');
+        }
+        const nextPointer=Object.freeze({
+          schema:'MFK_SYNC_CHECKPOINT_POINTER_V1',
+          current:immutable.metadata,
+          ...(previous?{previous}:{}),
+          updatedAt:new Date().toISOString(),
+        });
+        const nextHead=Object.freeze({
+          ...current,
+          checkpointSeq:checkpoint.checkpointSeq,
+          checkpointHash:checkpoint.checkpointHash,
+          checkpointObjectKey:immutable.metadata.objectKey,
+          checkpointObjectSha256:immutable.metadata.objectSha256,
+          checkpointCompression:immutable.metadata.compression,
+          checkpointSchemaVersion:immutable.metadata.schemaVersion,
+          checkpointCreatedAt:immutable.metadata.createdAt,
+          journalFloorSeq,
+        });
+        await storage.put(syncCheckpointPointerKey(port),nextPointer);
+        await storage.put(syncHeadKey(port),nextHead);
+        await storage.put('sync:checkpoint-meta:'+port,{...immutable.metadata,state:'READY'});
+        const stored=await storage.list({prefix:'sync:event:'+port+':'});
+        for(const [key,event] of stored.entries())if(Number(event?.portSeq)<journalFloorSeq)await storage.delete(key);
+        return{state:'READY',head:nextHead,pointer:nextPointer,reused:immutable.reused};
+      });
+      await this.state.storage.delete('sync:checkpoint-error:'+port);
+      return result;
+    }catch(error){
+      await this.recordCheckpointDiagnostic(port,'CHECKPOINT_BUILD_FAILED',error);
+      return{state:'FAILED',code:error instanceof Error?error.message:'SYNC_CHECKPOINT_FAILED'};
+    }
+  }
+
+  async keetaProviderAppliedSeqForCompaction(){
+    try{
+      const id=this.env.KEETA_RUNTIME.idFromName('MF01');
+      const response=await this.env.KEETA_RUNTIME.get(id).fetch(new Request('https://keeta-runtime/internal/provider/status',{method:'GET'}));
+      if(!response.ok)return null;
+      const status=await response.json();
+      const value=Number(status.providerAppliedSeq);
+      return Number.isSafeInteger(value)&&value>=0?value:null;
+    }catch{return null;}
+  }
+
+  async publishEnvelope(envelope,expectedBase:{fingerprint:string;publishedAt:string}|null=null){
+    const result=await this.withStorageTransaction(async storage=>{
+      const initialCurrent=await storage.get('active');
+      const currentMeta=await storage.get('activeMeta')||{};
+      // Re-read at the exact canonical write boundary so a racing publish can never
+      // be overwritten by a stale Draft, including inside the sync transaction.
+      const current=expectedBase?await storage.get('active'):initialCurrent;
+      if(expectedBase&&(!current||String(current.fingerprint||'')!==String(expectedBase.fingerprint||'')||String(current.publishedAt||'')!==String(expectedBase.publishedAt||''))){
+        return{status:409,body:{code:'ADMIN_DRAFT_BASE_CONFLICT'},doorbells:[],checkpointPlans:[]};
+      }
+
+      if(current&&String(currentMeta.publishRequestFingerprint||'')===String(envelope.fingerprint||'')){
+        return{
+          status:200,
+          body:{
+            state:'IDEMPOTENT',
+            active:current,
+            publishRequestFingerprint:envelope.fingerprint,
+            cloudPublishedAt:String(current.publishedAt||currentMeta.cloudPublishedAt||''),
+          },
+          doorbells:[],
+          checkpointPlans:[],
+        };
+      }
+
+      if(current){
+        const currentFingerprint=String(current.fingerprint||'');
+        const versionKey='admin-browser:version:'+currentFingerprint;
+        const recorded=await storage.get(versionKey);
+        if(!recorded&&currentFingerprint){
+          await storage.put(versionKey,{
+            schema:'MFK_ADMIN_VERSION_V1',
+            storeId:String(current.storeId||''),
+            revision:Number(current.revision),
+            publishedAt:String(current.publishedAt||''),
+            fingerprint:currentFingerprint,
+            adminFingerprint:String(current.adminFingerprint||''),
+            publishRequestFingerprint:String(currentMeta.publishRequestFingerprint||''),
+            snapshot:current.snapshot,
+            recordedAt:new Date().toISOString(),
+          });
+        }
+      }
+
+      const nowMs=Date.now();
+      const currentMs=current?Date.parse(String(current.publishedAt||'')):Number.NEGATIVE_INFINITY;
+      const canonicalMs=Number.isFinite(currentMs)?Math.max(nowMs,currentMs+1):nowMs;
+      const cloudPublishedAt=new Date(canonicalMs).toISOString();
+      const canonical=createMfkAdminConfigEnvelope({
+        storeId:envelope.storeId,
+        revision:envelope.revision,
+        publishedAt:cloudPublishedAt,
+        adminFingerprint:envelope.adminFingerprint,
+        snapshot:envelope.snapshot,
+      });
+
+      const previousCommitSeq=Number(await storage.get('sync:commit-seq')||0);
+      const commitSeq=previousCommitSeq+1;
+      const commitId='MFK-COMMIT-'+String(commitSeq)+'-'+canonical.fingerprint;
+      const doorbells=[];
+      const checkpointPlans=[];
+      const portSummaries={};
+
+      for(const port of MFK_SYNC_PORTS){
+        try{
+          const priorHead=await this.readSyncHead(port,storage);
+          const previousEntities=current?this.syncEntitiesForActive(current,port):Object.freeze({});
+          const nextEntities=this.syncEntitiesForActive(canonical,port);
+
+          const effectiveHead=priorHead;
+
+          const diff=diffMfkSyncEntities({
+            storeId:canonical.storeId,
+            port,
+            sourceCommitSeq:commitSeq,
+            commitId,
+            startingPortSeq:Number(effectiveHead.headSeq||0),
+            previous:previousEntities,
+            next:nextEntities,
+            createdAt:cloudPublishedAt,
+          });
+
+          for(const change of diff.changes)await storage.put(syncEventKey(port,change.portSeq),change);
+
+          const changed=diff.changes.length>0;
+          const nextHead=changed?Object.freeze({
+            schema:'MFK_SYNC_HEAD_V1',
+            protocol:MFK_CHECKPOINTED_DELTA_SYNC_PROTOCOL,
+            schemaVersion:MFK_SYNC_SCHEMA_VERSION,
+            storeId:canonical.storeId,
+            port,
+            headSeq:diff.headSeq,
+            journalFloorSeq:Number(effectiveHead.journalFloorSeq||1),
+            checkpointSeq:Number(effectiveHead.checkpointSeq||0),
+            checkpointHash:String(effectiveHead.checkpointHash||''),
+            projectionHash:diff.projectionHash,
+            sourceCommitSeq:commitSeq,
+            canonicalRevision:Number(canonical.revision),
+            canonicalFingerprint:String(canonical.fingerprint),
+            canonicalPublishedAt:String(canonical.publishedAt),
+            adminFingerprint:String(canonical.adminFingerprint),
+            observedAt:cloudPublishedAt,
+          }):effectiveHead;
+
+          if(changed||!await storage.get(syncHeadKey(port)))await storage.put(syncHeadKey(port),nextHead);
+          await storage.delete('sync:projection-error:'+port);
+          portSummaries[port]={changed,eventCount:diff.changes.length,headSeq:Number(nextHead.headSeq||0),projectionHash:String(nextHead.projectionHash||'')};
+          if(changed){
+            doorbells.push({type:'PORT_HEAD_AVAILABLE',storeId:canonical.storeId,port,headSeq:Number(nextHead.headSeq||0),sourceCommitSeq:commitSeq,projectionHash:String(nextHead.projectionHash||''),publishedAt:cloudPublishedAt});
+          }
+          checkpointPlans.push({port,entities:nextEntities,head:nextHead});
+        }catch(error){
+          const projectionError={port,sourceCommitSeq:commitSeq,code:error instanceof Error?error.message:'SYNC_PORT_PROJECTION_FAILED',observedAt:cloudPublishedAt};
+          await storage.put('sync:projection-error:'+port,projectionError);
+          portSummaries[port]={changed:false,error:projectionError.code};
+        }
+      }
+
+      await storage.put('active',canonical);
+      await storage.put('activeMeta',{
+        revision:canonical.revision,
+        fingerprint:canonical.fingerprint,
+        adminFingerprint:canonical.adminFingerprint,
+        publishRequestFingerprint:envelope.fingerprint,
+        sourcePublishedAt:envelope.publishedAt,
+        cloudPublishedAt,
+        syncCommitSeq:commitSeq,
+        syncCommitId:commitId,
+      });
+      await storage.put('admin:published:'+canonical.fingerprint,{
+        fingerprint:canonical.fingerprint,
+        publishedAt:canonical.publishedAt,
+        revision:canonical.revision,
+        adminFingerprint:canonical.adminFingerprint,
+        publishRequestFingerprint:envelope.fingerprint,
+        syncCommitSeq:commitSeq,
+        syncCommitId:commitId,
+      });
+      await storage.put('sync:commit-seq',commitSeq);
+      await storage.put('sync:commit:'+String(commitSeq).padStart(16,'0'),{
+        schema:'MFK_SYNC_COMMIT_V1',
+        commitSeq,
+        commitId,
+        canonicalRevision:Number(canonical.revision),
+        canonicalFingerprint:String(canonical.fingerprint),
+        publishedAt:cloudPublishedAt,
+        ports:portSummaries,
+      });
+
       return{
         status:200,
         body:{
-          state:'IDEMPOTENT',
-          active:current,
+          state:'PUBLISHED',
+          active:canonical,
           publishRequestFingerprint:envelope.fingerprint,
-          cloudPublishedAt:String(current.publishedAt||currentMeta.cloudPublishedAt||''),
+          cloudPublishedAt,
+          syncCommitSeq:commitSeq,
+          syncCommitId:commitId,
+          distribution:portSummaries,
         },
+        canonical,
+        cloudPublishedAt,
+        doorbells,
+        checkpointPlans,
       };
-    }
+    });
 
-    // Preserve the current canonical version before any distinct publish replaces it.
-    // The record is immutable and may safely exist while it is still active; the read model
-    // derives ACTIVE vs ARCHIVED by comparing fingerprints.
-    if(current){
-      const currentFingerprint=String(current.fingerprint||'');
-      const versionKey='admin-browser:version:'+currentFingerprint;
-      const recorded=await this.state.storage.get(versionKey);
-      if(!recorded&&currentFingerprint){
-        await this.state.storage.put(versionKey,{
-          schema:'MFK_ADMIN_VERSION_V1',
-          storeId:String(current.storeId||''),
-          revision:Number(current.revision),
-          publishedAt:String(current.publishedAt||''),
-          fingerprint:currentFingerprint,
-          adminFingerprint:String(current.adminFingerprint||''),
-          publishRequestFingerprint:String(currentMeta.publishRequestFingerprint||''),
-          snapshot:current.snapshot,
-          recordedAt:new Date().toISOString(),
-        });
+    if(result.body?.state==='PUBLISHED'){
+      const legacyDoorbell=JSON.stringify({
+        type:'ADMIN_CONFIG_AVAILABLE',
+        storeId:result.canonical.storeId,
+        revision:result.canonical.revision,
+        fingerprint:result.canonical.fingerprint,
+        publishedAt:result.canonical.publishedAt,
+        acceptedAt:result.cloudPublishedAt,
+        syncCommitSeq:result.body.syncCommitSeq,
+      });
+      for(const socket of this.portSockets('SMT')){try{socket.send(legacyDoorbell);}catch{}}
+      for(const event of result.doorbells){
+        if(event.port==='CUSTOMER'){
+          try{
+            const id=this.env.CUSTOMER_RUNTIME.idFromName(event.storeId||'MF01');
+            const stub=this.env.CUSTOMER_RUNTIME.get(id);
+            const task=stub.fetch(new Request('https://customer-runtime/internal/config-doorbell',{
+              method:'POST',
+              headers:{'content-type':'application/json'},
+              body:JSON.stringify(event),
+            }));
+            if(typeof this.state.waitUntil==='function')this.state.waitUntil(task);
+            else void task;
+          }catch{}
+          continue;
+        }
+        const message=JSON.stringify(event);
+        if(event.port==='KEETA'){
+          const plan=result.checkpointPlans.find(item=>item.port==='KEETA');
+          if(plan){
+            const task=this.deliverKeetaProviderDelta(plan);
+            if(typeof this.state.waitUntil==='function')this.state.waitUntil(task);
+            else void task;
+          }
+          continue;
+        }
+        const sockets=this.portSockets(event.port);
+        for(const socket of sockets){try{socket.send(message);}catch{}}
+      }
+      for(const plan of result.checkpointPlans){
+        const task=this.maybeBuildSyncCheckpoint(plan.port,plan.entities,plan.head);
+        if(typeof this.state.waitUntil==='function')this.state.waitUntil(task);
+        else void task;
       }
     }
 
-    // Cloudflare accepted time is the only delivery ordering clock.
-    // Every distinct formal publish receives a strictly increasing canonical time.
-    const nowMs=Date.now();
-    const currentMs=current?Date.parse(String(current.publishedAt||'')):Number.NEGATIVE_INFINITY;
-    const canonicalMs=Number.isFinite(currentMs)?Math.max(nowMs,currentMs+1):nowMs;
-    const cloudPublishedAt=new Date(canonicalMs).toISOString();
-    const canonical=createMfkAdminConfigEnvelope({
-      storeId:envelope.storeId,
-      revision:envelope.revision,
-      publishedAt:cloudPublishedAt,
-      adminFingerprint:envelope.adminFingerprint,
-      snapshot:envelope.snapshot,
-    });
-
-    await this.state.storage.put('active',canonical);
-    await this.state.storage.put('activeMeta',{
-      revision:canonical.revision,
-      fingerprint:canonical.fingerprint,
-      adminFingerprint:canonical.adminFingerprint,
-      publishRequestFingerprint:envelope.fingerprint,
-      sourcePublishedAt:envelope.publishedAt,
-      cloudPublishedAt,
-    });
-    await this.state.storage.put('admin:published:'+canonical.fingerprint,{
-      fingerprint:canonical.fingerprint,
-      publishedAt:canonical.publishedAt,
-      revision:canonical.revision,
-      adminFingerprint:canonical.adminFingerprint,
-      publishRequestFingerprint:envelope.fingerprint,
-    });
-
-    const doorbell=JSON.stringify({
-      type:'ADMIN_CONFIG_AVAILABLE',
-      storeId:canonical.storeId,
-      revision:canonical.revision,
-      fingerprint:canonical.fingerprint,
-      publishedAt:canonical.publishedAt,
-      acceptedAt:cloudPublishedAt,
-    });
-    for(const socket of this.state.getWebSockets()){try{socket.send(doorbell);}catch{}}
-
-    return{
-      status:200,
-      body:{
-        state:'PUBLISHED',
-        active:canonical,
-        publishRequestFingerprint:envelope.fingerprint,
-        cloudPublishedAt,
-      },
-    };
+    return{status:result.status,body:result.body};
   }
   async ownerChannels(active,observedAt=new Date().toISOString(),freshReadback=false){
     let keetaStatus=null,customerHealth=null;
@@ -1191,7 +1802,7 @@ export class AdminSyncStore{
     const result={state:'UNKNOWN',message:'已送往店舖執行；等待 SMT Runtime readback',targets:Object.freeze([...rejected,...resolved.map(target=>({...target,state:'UNKNOWN'}))])};
     await this.state.storage.put(operationKey,{result,createdAt});
     const doorbell=JSON.stringify({type:'OWNER_SELLABILITY_COMMAND_AVAILABLE',storeId:String(active.storeId||'MF01'),operationId,receivedAt:createdAt});
-    for(const socket of this.state.getWebSockets()){try{socket.send(doorbell);}catch{}}
+    for(const socket of this.portSockets('SMT')){try{socket.send(doorbell);}catch{}}
     await this.appendOwnerActivity(session,{operationId,title:'售罄／恢復',target:resolved.map(item=>item.name).join('、'),result:'PENDING_SMT',readback:'等待 SMT Runtime'});
     return result;
   }
@@ -1425,7 +2036,7 @@ export class AdminSyncStore{
       executionAt,
       executionBusinessDate,
     });
-    for(const socket of this.state.getWebSockets()){
+    for(const socket of this.portSockets('SMT')){
       try{socket.send(doorbell);}catch{}
     }
     return {event,addendum};
@@ -1509,6 +2120,11 @@ export class AdminSyncStore{
 
   async fetch(request){
     const url=new URL(request.url);
+    if(url.pathname==='/internal/sync/head'&&request.method==='GET'){
+      const port=String(url.searchParams.get('port')||'').toUpperCase();
+      if(!MFK_SYNC_PORTS.includes(port))return json({code:'SYNC_PORT_INVALID'},400);
+      return json(await this.readSyncHead(port));
+    }
     if(url.pathname==='/authorize-admin'){
       if(!await this.authorizeAdminRead(request))return json({code:'ADMIN_READ_UNAUTHORIZED'},401);
       return json({ok:true});
@@ -1933,7 +2549,7 @@ export class AdminSyncStore{
         submissionId:body.submissionId?String(body.submissionId):undefined,
         receivedAt:new Date().toISOString(),
       });
-      for(const socket of this.state.getWebSockets()){
+      for(const socket of this.portSockets('SMT')){
         try{socket.send(message);}catch{}
       }
       return json({state:'DOORBELL_SENT'});
@@ -1950,10 +2566,66 @@ export class AdminSyncStore{
         providerMessageId:String(body.providerMessageId||''),
         receivedAt:new Date().toISOString(),
       });
-      for(const socket of this.state.getWebSockets()){
+      for(const socket of this.portSockets('SMT')){
         try{socket.send(message);}catch{}
       }
       return json({state:'DOORBELL_SENT'});
+    }
+    if(url.pathname==='/sync/head'){
+      if(request.method!=='GET')return json({code:'METHOD_NOT_ALLOWED'},405);
+      const port=String(url.searchParams.get('port')||'').toUpperCase();
+      if(!MFK_SYNC_PORTS.includes(port))return json({code:'SYNC_PORT_INVALID'},400);
+      if(port==='KEETA')return json({code:'SYNC_PORT_DIRECT_READ_FORBIDDEN'},403);
+      if(!await this.authorizeSyncRead(request,port))return json({code:'SYNC_PORT_UNAUTHORIZED'},401);
+      const head=await this.readSyncHead(port);
+      if(port!=='CUSTOMER')return json(head);
+      try{return json(await this.customerCommercialHead(head));}
+      catch(error){return json({code:error instanceof Error?error.message:'CUSTOMER_COMMERCIAL_PROOF_UNAVAILABLE'},503);}
+    }
+
+    if(url.pathname==='/customer-commercial/verify'){
+      if(request.method!=='POST')return json({code:'METHOD_NOT_ALLOWED'},405);
+      let input;try{input=await request.json();}catch{return json({code:'CUSTOMER_ORDER_INTENT_INVALID'},400);}
+      try{
+        const verified=await this.verifyCustomerCommercialIntent(input,Date.now());
+        return json({grant:verified.grant});
+      }catch(error){return json({code:error instanceof Error?error.message:'CUSTOMER_COMMERCIAL_VERIFICATION_FAILED'},409);}
+    }
+    if(url.pathname==='/sync/changes'){
+      if(request.method!=='GET')return json({code:'METHOD_NOT_ALLOWED'},405);
+      const port=String(url.searchParams.get('port')||'').toUpperCase();
+      if(!MFK_SYNC_PORTS.includes(port))return json({code:'SYNC_PORT_INVALID'},400);
+      if(port==='KEETA')return json({code:'SYNC_PORT_DIRECT_READ_FORBIDDEN'},403);
+      if(!await this.authorizeSyncRead(request,port))return json({code:'SYNC_PORT_UNAUTHORIZED'},401);
+      const result=await this.readSyncChanges(port,Number(url.searchParams.get('after')||0));
+      return json(result.body,result.status);
+    }
+    if(url.pathname==='/sync/checkpoint'){
+      if(request.method!=='GET')return json({code:'METHOD_NOT_ALLOWED'},405);
+      const port=String(url.searchParams.get('port')||'').toUpperCase();
+      if(!MFK_SYNC_PORTS.includes(port))return json({code:'SYNC_PORT_INVALID'},400);
+      if(port==='KEETA')return json({code:'SYNC_PORT_DIRECT_READ_FORBIDDEN'},403);
+      if(!await this.authorizeSyncRead(request,port))return json({code:'SYNC_PORT_UNAUTHORIZED'},401);
+      const result=await this.readSyncCheckpoint(port,url.searchParams.get('seq'));
+      return json(result.body,result.status);
+    }
+    if(url.pathname==='/sync/applied'){
+      if(request.method!=='POST')return json({code:'METHOD_NOT_ALLOWED'},405);
+      let body;try{body=await request.json();}catch{return json({code:'SYNC_APPLIED_ACK_INVALID'},400);}
+      const port=String(body?.port||'').toUpperCase();
+      if(port==='SMT'&&!await this.authorizeSmtDevice(request))return json({code:'SYNC_PORT_UNAUTHORIZED'},401);
+      if(port==='CUSTOMER')return json({code:'SYNC_CUSTOMER_ACK_NOT_TRACKED'},403);
+      if(port==='SMM'&&!await this.authorizeSmmSync(request))return json({code:'SYNC_PORT_UNAUTHORIZED'},401);
+      if(port==='KEETA')return json({code:'SYNC_PORT_DIRECT_WRITE_FORBIDDEN'},403);
+      try{
+        const result=await this.recordSyncApplied(body);
+        return json(result.body,result.status);
+      }catch(error){return json({code:error instanceof Error?error.message:'SYNC_APPLIED_ACK_INVALID'},400);}
+    }
+    if(url.pathname==='/sync/readback'){
+      if(request.method!=='GET')return json({code:'METHOD_NOT_ALLOWED'},405);
+      if(!await this.authorizeAdminRead(request))return json({code:'SYNC_READBACK_UNAUTHORIZED'},401);
+      return json(await this.syncDistributionReadback());
     }
     if(url.pathname==='/active'){
       const active=await this.state.storage.get('active');
@@ -2010,14 +2682,24 @@ export class AdminSyncStore{
     }
     if(url.pathname==='/events'){
       if(request.headers.get('upgrade')!=='websocket')return json({code:'WEBSOCKET_REQUIRED'},426);
+      const requestedPort=String(url.searchParams.get('port')||'SMT').toUpperCase();
+      if(requestedPort!=='SMT'&&requestedPort!=='SMM')return json({code:'SYNC_EVENT_PORT_INVALID'},400);
+      const port=requestedPort;
+      if(port==='SMM'&&!await this.authorizeSmmSync(request))return json({code:'SYNC_EVENT_UNAUTHORIZED'},401);
       const pair=new WebSocketPair();
       const client=pair[0],server=pair[1];
-      this.state.acceptWebSocket(server);
+      this.state.acceptWebSocket(server,['PORT:'+port]);
       const active=await this.state.storage.get('active');
       if(active){
-        server.send(JSON.stringify({type:'ADMIN_CONFIG_AVAILABLE',storeId:active.storeId,revision:active.revision,fingerprint:active.fingerprint,publishedAt:active.publishedAt}));
+        const head=await this.readSyncHead(port);
+        if(port==='SMT')server.send(JSON.stringify({type:'ADMIN_CONFIG_AVAILABLE',storeId:active.storeId,revision:active.revision,fingerprint:active.fingerprint,publishedAt:active.publishedAt}));
+        server.send(JSON.stringify({type:'PORT_HEAD_AVAILABLE',storeId:active.storeId,port,headSeq:Number(head.headSeq||0),sourceCommitSeq:Number(head.sourceCommitSeq||0),projectionHash:String(head.projectionHash||''),publishedAt:String(head.observedAt||active.publishedAt)}));
       }
-      return new Response(null,{status:101,webSocket:client});
+      return new Response(null,{
+        status:101,
+        webSocket:client,
+        ...(port==='SMM'?{headers:{'sec-websocket-protocol':'mfk-smm-sync-v1'}}:{}),
+      });
     }
 
     if(url.pathname==='/refunds'){
@@ -2143,7 +2825,7 @@ export class AdminSyncStore{
           eventTypes:[...eventTypes],
           receivedAt:new Date().toISOString(),
         });
-        for(const socket of this.state.getWebSockets()){
+        for(const socket of this.portSockets('SMT')){
           try{socket.send(doorbell);}catch{}
         }
       }
@@ -2226,6 +2908,27 @@ export default {
       const adminId=env.ADMIN_SYNC.idFromName(storeId);
       const admin=env.ADMIN_SYNC.get(adminId);
 
+      if(url.pathname.startsWith('/api/customer/sync/')){
+        if(request.method!=='GET')return json({code:'METHOD_NOT_ALLOWED'},405,cors(request));
+        if(request.headers.get('origin')!==CUSTOMER_ORIGIN)return json({code:'CUSTOMER_SYNC_ORIGIN_FORBIDDEN'},403,cors(request));
+        const action=url.pathname.slice('/api/customer/sync/'.length);
+        if(!['head','changes','checkpoint'].includes(action))return json({code:'NOT_FOUND'},404,cors(request));
+        const target=new URL(request.url);
+        target.pathname='/sync/'+action;
+        target.searchParams.set('storeId',storeId);
+        target.searchParams.set('port','CUSTOMER');
+        const response=await admin.fetch(new Request(target.toString(),{method:'GET',headers:new Headers(request.headers)}));
+        const headers=new Headers(response.headers);
+        for(const [key,value] of Object.entries(cors(request)))headers.set(key,value);
+        return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
+      }
+
+      if(url.pathname==='/api/customer/events'){
+        if(request.headers.get('upgrade')!=='websocket')return json({code:'WEBSOCKET_REQUIRED'},426,cors(request));
+        if(request.headers.get('origin')!==CUSTOMER_ORIGIN)return json({code:'CUSTOMER_EVENT_ORIGIN_FORBIDDEN'},403,cors(request));
+        return customer.fetch(new Request('https://customer-runtime/public/events',{method:'GET',headers:new Headers(request.headers)}));
+      }
+
       if(url.pathname==='/api/customer/channel-health'){
         if(request.method!=='GET')return json({code:'METHOD_NOT_ALLOWED'},405,cors(request));
         const response=await customer.fetch(new Request('https://internal/public/channel-health',{method:'GET'}));
@@ -2246,7 +2949,17 @@ export default {
         const orderBody=orderResponse.ok?await orderResponse.json():{orders:[]};
         const sellabilityResponse=await admin.fetch(new Request('https://internal/runtime-sellability-readback',{method:'GET'}));
         const sellabilityBody=sellabilityResponse.ok?await sellabilityResponse.json():{sellability:[]};
-        return json(customerPublicSnapshot(active,Array.isArray(orderBody.orders)?orderBody.orders:[],Array.isArray(sellabilityBody.sellability)?sellabilityBody.sellability:[]),200,cors(request));
+        const sellability=Array.isArray(sellabilityBody.sellability)?sellabilityBody.sellability:[];
+        const projected=customerPublicSnapshot(active,Array.isArray(orderBody.orders)?orderBody.orders:[],sellability);
+        if(url.searchParams.get('config')==='0'){
+          return json({
+            activeOrders:projected.activeOrders,
+            history:projected.history,
+            runtimeSellability:sellability,
+            observedAt:projected.observedAt,
+          },200,cors(request));
+        }
+        return json(projected,200,cors(request));
       }
 
       if(url.pathname==='/api/customer/payment-qr'){
@@ -2379,11 +3092,12 @@ export default {
       }
 
       const publicMap={
-        '/api/customer/orders/submit':'/public/orders/submit',
+        '/api/customer/orders/submit':'/internal/orders/submit',
         '/api/customer/orders/readback':'/public/orders/readback',
       };
       const targetPath=publicMap[url.pathname];
       let normalizedCustomerOrderBody=null;
+      let verifiedCustomerOrder=null;
       if(targetPath&&url.pathname==='/api/customer/orders/submit'){
         const activeResponse=await admin.fetch(new Request('https://internal/active',{method:'GET'}));
         if(!activeResponse.ok)return json({code:'CUSTOMER_CONFIG_NOT_PUBLISHED'},503,cors(request));
@@ -2393,10 +3107,10 @@ export default {
         if(policy.enabled!==true)return json({code:'CUSTOMER_CHANNEL_DISABLED'},503,cors(request));
         if(url.pathname==='/api/customer/orders/submit'){
           const intent=await request.clone().json().catch(()=>null);
+          if(!intent)return json({code:'CUSTOMER_ORDER_INTENT_INVALID'},400,cors(request));
           const checkout=row(row(intent).checkout);
           if(checkout.paymentMethod==='ELECTRONIC'){
             const channelId=String(checkout.paymentChannelId||'').trim().toUpperCase();
-            const channelLabel=String(checkout.paymentChannelLabel||'').trim();
             const settings=row(activeSnapshot.storeSettings);
             const configured=Array.isArray(settings.customerPaymentChannels)?settings.customerPaymentChannels:[
               {id:'ALIPAY',name:'AlipayHK',enabled:true,qrImageUrl:'',sortOrder:1},
@@ -2408,12 +3122,17 @@ export default {
             const qr=channel?String(channel.qrImageUrl||'').trim():'';
             const currentLabel=channel?String(channel.name||'').trim():'';
             if(!channel||!currentLabel||!qr)return json({code:'CUSTOMER_PAYMENT_CHANNEL_UNAVAILABLE'},409,cors(request));
-            if(channelLabel&&channelLabel!==currentLabel)return json({code:'CUSTOMER_PAYMENT_CHANNEL_CHANGED'},409,cors(request));
             normalizedCustomerOrderBody={
               ...row(intent),
               checkout:{...checkout,paymentChannelId:channelId,paymentChannelLabel:currentLabel},
             };
           }
+          const verification=await admin.fetch(new Request('https://internal/customer-commercial/verify',{
+            method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(normalizedCustomerOrderBody??intent),
+          }));
+          const verificationBody=await verification.json().catch(()=>({}));
+          if(!verification.ok)return json({code:String(verificationBody.code||'CUSTOMER_COMMERCIAL_VERIFICATION_FAILED')},verification.status,cors(request));
+          verifiedCustomerOrder={intent:normalizedCustomerOrderBody??intent,commercialGrant:verificationBody.grant};
         }
       }
       if(targetPath){
@@ -2421,8 +3140,13 @@ export default {
         target.pathname=targetPath;
         const init={method:request.method,headers:new Headers(request.headers)};
         if(request.method!=='GET'&&request.method!=='HEAD'){
-          const body=await request.arrayBuffer();
-          if(body.byteLength)init.body=body;
+          if(url.pathname==='/api/customer/orders/submit'&&verifiedCustomerOrder){
+            init.headers.set('content-type','application/json');
+            init.body=JSON.stringify(verifiedCustomerOrder);
+          }else{
+            const body=await request.arrayBuffer();
+            if(body.byteLength)init.body=body;
+          }
         }
         const response=await customer.fetch(new Request(target.toString(),init));
         if(response.status===202&&url.pathname==='/api/customer/orders/submit'){
@@ -2502,6 +3226,9 @@ export default {
           'store/preview','store/hours/sync',
         ]);
         if(activeConfigSubpaths.has(adminSubpath)&&request.method==='POST'){
+          const operatorInput=adminSubpath==='menu/sync'
+            ?await request.clone().json().catch(()=>({}))
+            :{};
           const activeResponse=await admin.fetch(new Request('https://internal/active',{method:'GET'}));
           if(!activeResponse.ok)return json({code:'KEETA_ADMIN_CONFIG_NOT_PUBLISHED'},409,cors(request));
           const active=await activeResponse.json();
@@ -2512,11 +3239,19 @@ export default {
             const runtimeBody=runtimeResponse.ok?await runtimeResponse.json():{sellability:[]};
             runtimeSellability=Array.isArray(runtimeBody.sellability)?runtimeBody.sellability:[];
           }
+          let recovery={};
+          if(adminSubpath==='menu/sync'){
+            const headResponse=await admin.fetch(new Request('https://admin-sync/internal/sync/head?port=KEETA',{method:'GET'}));
+            if(!headResponse.ok)return json({code:'KEETA_SYNC_HEAD_UNAVAILABLE'},409,cors(request));
+            const head=await headResponse.json();
+            recovery={reason:operatorInput.reason,sourceToSeq:Number(head.headSeq)||0};
+          }
           init.body=JSON.stringify({
             revision:active.revision,
             adminFingerprint:active.fingerprint,
             snapshot:active.snapshot,
             ...(runtimeSellability.length?{runtimeSellability}:{}),
+            ...recovery,
           });
         }else if(request.method!=='GET'&&request.method!=='HEAD'){
           const body=await request.arrayBuffer();
@@ -2605,7 +3340,25 @@ export default {
       for(const [key,value] of Object.entries(cors(request)))headers.set(key,value);
       return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
     }
-    if(url.pathname==='/api/admin-sync/provider-doorbell'||url.pathname==='/api/admin-sync/customer-doorbell'||url.pathname==='/api/admin-sync/customer-orders'||url.pathname==='/api/admin-sync/authorize-smt-device'){
+    if(url.pathname==='/api/admin-sync/sync/events'){
+      if(request.headers.get('upgrade')!=='websocket')return json({code:'WEBSOCKET_REQUIRED'},426);
+      if(request.headers.get('origin')!==SMM_ORIGIN)return json({code:'SYNC_EVENT_ORIGIN_FORBIDDEN'},403);
+      const protocols=String(request.headers.get('sec-websocket-protocol')||'').split(',').map(value=>value.trim()).filter(Boolean);
+      const sessionProtocol=protocols.find(value=>value.startsWith('mfk-smm-session.'));
+      const token=sessionProtocol?sessionProtocol.slice('mfk-smm-session.'.length):'';
+      if(!protocols.includes('mfk-smm-sync-v1')||!token)return json({code:'SYNC_EVENT_SESSION_REQUIRED'},401);
+      const authHeaders=new Headers(request.headers);
+      authHeaders.set('x-mfk-smm-session',token);
+      const authRequest=new Request(request.url,{method:'GET',headers:authHeaders});
+      if(!await resolveSmmStaffSession(authRequest,storeIdFrom(url)))return json({code:'SYNC_EVENT_SESSION_UNAUTHORIZED'},401);
+      const storeId=storeIdFrom(url),id=env.ADMIN_SYNC.idFromName(storeId),stub=env.ADMIN_SYNC.get(id),target=new URL(request.url);
+      target.pathname='/events';
+      target.search='?storeId='+encodeURIComponent(storeId)+'&port=SMM';
+      const forwardedHeaders=new Headers(request.headers);
+      forwardedHeaders.set('x-mfk-smm-session',token);
+      return stub.fetch(new Request(target.toString(),{method:'GET',headers:forwardedHeaders}));
+    }
+    if(url.pathname==='/api/admin-sync/provider-doorbell'||url.pathname==='/api/admin-sync/customer-doorbell'||url.pathname==='/api/admin-sync/customer-orders'||url.pathname==='/api/admin-sync/authorize-smt-device'||url.pathname==='/api/admin-sync/customer-commercial/verify'){
       return json({code:'NOT_FOUND'},404,cors(request));
     }
     if(url.pathname.startsWith('/api/admin-sync/')||url.pathname.startsWith('/api/projection/')){
@@ -2618,7 +3371,7 @@ export default {
         :url.pathname.replace('/api/admin-sync','')||'/active';
       const target=new URL(request.url);
       target.pathname=targetPath;
-      target.search='';
+      target.search=targetPath.startsWith('/sync/')?url.search:'';
       const forwarded=new Request(target.toString(),request);
       const response=await stub.fetch(forwarded);
       return adminSyncOuterResponse(url.pathname,response,request);

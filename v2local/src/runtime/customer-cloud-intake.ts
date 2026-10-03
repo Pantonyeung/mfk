@@ -20,6 +20,10 @@ import {createSmmLanIngress} from './smm-lan-ingress.ts';
 import {assertCapacityChannelAdmission} from './capacity-pool-state.ts';
 import {validateSmmLanOrderRequest,type SmmLanLineIntent,type SmmLanOrderRequest} from '../../../contracts/smm-lan-v1.ts';
 import {revalidateSmmComboLine} from './smm-combo-revalidation.ts';
+import {
+  validateMfkCustomerCommercialGrant,
+  type MfkCustomerCommercialGrantLine,
+} from '../../../contracts/customer-commercial-freshness-v1.ts';
 
 const ENDPOINT='https://admin.morefunos.com';
 const ATTENTION_KEY='mfk.customer.cloud-intake.attention.v1';
@@ -72,12 +76,16 @@ export function priceCustomerCart(
   products:readonly SyncedOrderingProduct[],
   combos:readonly SyncedCombo[]=Object.freeze([]),
   pools:readonly SyncedComboPool[]=Object.freeze([]),
+  honouredLines:readonly MfkCustomerCommercialGrantLine[]=Object.freeze([]),
 ):CustomerPricedCart{
   const byId=new Map(products.map(product=>[product.id,product] as const));
+  const honouredById=new Map(honouredLines.map(line=>[line.lineId,line] as const));
   const items:CustomerPricedLine[]=[];
   let totalMinor=0;
 
   for(const line of cart){
+    const honoured=honouredById.get(line.lineId);
+    if(honoured&&(honoured.productId!==line.productId||honoured.quantity!==line.quantity||honoured.publishedUnitPriceMinor!==line.publishedUnitPriceMinor))throw new Error('CUSTOMER_COMMERCIAL_GRANT_CART_MISMATCH:'+line.lineId);
     if(line.selectedVariationId)throw new Error('CUSTOMER_VARIATION_NOT_SUPPORTED_BY_PUBLISHED_CATALOG:'+line.productId);
     const product=byId.get(line.productId);
     if(!product||!product.sellable)throw new Error('CUSTOMER_PRODUCT_UNAVAILABLE:'+line.productId);
@@ -116,22 +124,25 @@ export function priceCustomerCart(
         combos,
         pools,
         standaloneUnitMinor,
+        Boolean(honoured),
       );
       const published=Number(line.publishedUnitPriceMinor);
-      if(!Number.isSafeInteger(published)||published<0||published!==comboResult.unitMinor){
+      if(!Number.isSafeInteger(published)||published<0||!honoured&&published!==comboResult.unitMinor){
         throw new Error('SMM_PUBLISHED_PRICE_CHANGED');
       }
-      totalMinor+=comboResult.unitMinor*qty;
+      const unitMinor=honoured?.publishedUnitPriceMinor??comboResult.unitMinor;
+      totalMinor+=unitMinor*qty;
       const note=String(line.note||'').trim();
       items.push(...comboResult.items.map((item,index)=>Object.freeze({
         ...item,
+        ...(honoured?{unitMinor:index===0?unitMinor:0}:{}),
         serviceMode:'takeaway' as const,
         ...(index===0&&note?{detail:[item.detail,note].filter(Boolean).join(' · ')}:{}),
       })));
       continue;
     }
 
-    const unitMinor=standaloneUnitMinor;
+    const unitMinor=honoured?.publishedUnitPriceMinor??standaloneUnitMinor;
     totalMinor+=unitMinor*qty;
     const detail=[optionNames.join('、'),String(line.note||'').trim()].filter(Boolean).join(' · ');
     items.push(Object.freeze({
@@ -143,6 +154,8 @@ export function priceCustomerCart(
       ...(detail?{detail}:{}),
     }));
   }
+
+  if(honouredById.size&&honouredById.size!==cart.length)throw new Error('CUSTOMER_COMMERCIAL_GRANT_CART_MISMATCH');
 
   if(!Number.isSafeInteger(totalMinor)||totalMinor<0)throw new Error('CUSTOMER_TOTAL_INVALID');
   return Object.freeze({items:Object.freeze(items),totalMinor});
@@ -347,7 +360,7 @@ async function reconcileOrders(){
       continue;
     }
 
-    const intent=raw as MfkCustomerOrderIntent&{state?:string};
+    const intent=raw as MfkCustomerOrderIntent&{state?:string;commercialGrant?:unknown};
     const ticket=smmBridgeTicket(intent);
     if(ticket){
       try{
@@ -366,12 +379,21 @@ async function reconcileOrders(){
       continue;
     }
     try{
-      if(String(intent.menuRevision)!==String(envelope.revision))throw new Error('CUSTOMER_MENU_REVISION_CHANGED');
+      const commercialGrant=validateMfkCustomerCommercialGrant(intent.commercialGrant);
+      if(commercialGrant.storeId!==intent.storeId||commercialGrant.submissionId!==intent.submissionId||commercialGrant.customerPortSeq!==intent.customerPortSeq||commercialGrant.projectionHash!==intent.projectionHash||commercialGrant.canonicalRevision!==intent.canonicalRevision)throw new Error('CUSTOMER_COMMERCIAL_GRANT_IDENTITY_MISMATCH');
+      if(Date.parse(commercialGrant.verifiedAt)>=Date.parse(commercialGrant.proofExpiresAt))throw new Error('CUSTOMER_COMMERCIAL_GRANT_EXPIRED_AT_RECEIPT');
+      const activeSnapshot=envelope.snapshot as Record<string,unknown>;
+      const channelPolicy=activeSnapshot.customerChannelPolicy as Record<string,unknown>|undefined;
+      if(channelPolicy?.enabled!==true)throw new Error('CUSTOMER_CHANNEL_HARD_CLOSED');
+      if(intent.checkout.paymentMethod==='ELECTRONIC'){
+        const settings=activeSnapshot.storeSettings as Record<string,unknown>|undefined;
+        const channels=Array.isArray(settings?.customerPaymentChannels)?settings.customerPaymentChannels:[];
+        const selected=channels.find(value=>Boolean(value)&&typeof value==='object'&&String((value as Record<string,unknown>).id||'').trim().toUpperCase()===String(intent.checkout.paymentChannelId||'').trim().toUpperCase()) as Record<string,unknown>|undefined;
+        if(!selected||selected.enabled===false||!String(selected.qrImageUrl||'').trim())throw new Error('CUSTOMER_PAYMENT_CHANNEL_HARD_UNAVAILABLE');
+      }
       const comboData=projectSyncedCombos(envelope);
-      const priced=priceCustomerCart(intent.cart,catalog.products,comboData.combos,comboData.pools);
-      const publishedTotal=intent.cart.reduce((sum,line)=>sum+(Number.isSafeInteger(Number(line.publishedUnitPriceMinor))?Number(line.publishedUnitPriceMinor)*line.quantity:0),0);
-      const hasPublishedTotal=intent.cart.every(line=>Number.isSafeInteger(Number(line.publishedUnitPriceMinor))&&Number(line.publishedUnitPriceMinor)>=0);
-      if(hasPublishedTotal&&publishedTotal!==priced.totalMinor)throw new Error('CUSTOMER_MENU_PRICE_CHANGED');
+      const priced=priceCustomerCart(intent.cart,catalog.products,comboData.combos,comboData.pools,commercialGrant.lines);
+      if(priced.totalMinor!==commercialGrant.totalMinor)throw new Error('CUSTOMER_COMMERCIAL_GRANT_TOTAL_MISMATCH');
       const providerRef='CUSTOMER:'+intent.submissionId;
       const existing=localRuntime.orders().find(order=>order.providerRef===providerRef);
       if(!existing){

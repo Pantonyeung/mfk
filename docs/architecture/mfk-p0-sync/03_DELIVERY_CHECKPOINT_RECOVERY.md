@@ -78,6 +78,49 @@ Checkpoint failure：
 - 唔移動 checkpoint pointer
 - 永遠唔阻 Admin Publish
 
+## Immutable R2 Checkpoint Store
+
+正式 ownership：
+
+- Durable Object = publish coordination、Port Head/Seq、recent transport Journal、checkpoint pointer、AppliedSeq/provider readback metadata。
+- private `SYNC_CHECKPOINTS` R2 binding = immutable recovery blobs；唔係 Canonical Authority，Client無bucket credential/URL。
+- `CUSTOMER_PAYMENT_EVIDENCE` 係另一個R2 authority boundary，完全唔共用。
+
+Object key：
+
+`checkpoints/v{schemaVersion}/{storeId}/{port}/{checkpointSeq-16-digit}/{objectSha256}.json.gz`
+
+Logical payload保持 `MFK_SYNC_CHECKPOINT_V1`。Canonical JSON使用遞迴sorted object keys、原array order、UTF-8；`createdAt`固定取Projection@N嘅Head observed time。同一Projection@N重建會產生相同bytes/object identity。
+
+Hash分工：
+
+- `projectionHash` / `checkpointHash` = deterministic application fingerprint，供change/identity validation；`checkpointHash` preimage明確排除自己，保持V1 consumer compatibility。
+- `objectSha256` = gzip compressed exact bytes嘅cryptographic SHA-256，供R2 readback/content address；唔寫入logical payload，避免circular preimage。
+
+Write chain：
+
+Projection@N -> canonical JSON -> native `CompressionStream('gzip')` -> SHA-256 -> conditional immutable R2 PUT -> R2 GET -> metadata/byte length/SHA/decompress/JSON/contract/store/port/seq/schema/projection validation -> DO monotonic pointer transaction -> journal compaction。
+
+R2 PUT/GET/timeout、compression、SHA、gzip、JSON或identity任何一步失敗：pointer/head/journal不變，只記 `CHECKPOINT_BUILD_FAILED` / read diagnostics。Canonical Publish已先commit，唔等待亦唔rollback。
+
+## Pointer, Previous Generation and Journal Floor
+
+DO pointer保留 `current + previous` R2 generation。新pointer只可增加 `checkpointSeq`；遲到嘅舊compactor可以留低immutable orphan blob，但不得rewind pointer/head、改current projectionHash或刪新tail。
+
+若Current object missing/corrupt，Admin Sync API以Previous object + retained contiguous tail重建同一Current logical checkpoint；identity唔完全相同即fail closed，Client保留LKG。Endpoint仍然係 `/sync/checkpoint`。
+
+Compaction只刪 `sync:event:{PORT}:*` transport rows：
+
+- 有Previous時，`journalFloorSeq <= previous.checkpointSeq + 1`，確保Previous真係可recover到Current。
+- SMT/SMM tracked client低過floor時，protocol明確要求跳Current checkpoint；floor內仍只拉delta。
+- Customer無per-browser AppliedSeq；以Current/Previous recovery invariant保留tail。
+- KEETA額外取 `min(recovery floor, ProviderAppliedSeq + 1)`；provider未APPLIED/UNKNOWN delta不得刪。Provider readback unavailable時唔提高KEETA floor。
+- Admin version/audit、Customer commercial proof/history、provider operation evidence唔係Sync Journal，compactor禁止觸碰。
+
+Migration係non-flag-day：有R2 pointer先讀R2；未有pointer仍可讀舊 `sync:checkpoint:{PORT}:{SEQ}` DO payload。新build只寫R2；legacy payload清理要等獨立deployment/acceptance gate。
+
+`mfk-sync-checkpoints` bucket name只係code binding contract；Production bucket provisioning/deploy係後續gate，唔屬本Seam。
+
 ## Atomic Apply
 
 Client禁止更新一半。

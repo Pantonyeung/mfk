@@ -18,8 +18,9 @@ describe('Customer Cloud Edge authority gate',()=>{
   it('keeps Customer on its own public namespace and preserves privileged Admin separation',()=>{
     expect(worker).toContain("url.pathname.startsWith('/api/customer/')");
     expect(worker).toContain("url.pathname.startsWith('/api/customer/smt/')");
-    expect(worker).toContain("'/api/customer/orders/submit':'/public/orders/submit'");
+    expect(worker).toContain("'/api/customer/orders/submit':'/internal/orders/submit'");
     expect(worker).not.toContain("'/api/customer/admin/");
+    expect(worker).toContain("url.pathname==='/api/admin-sync/customer-commercial/verify'");
   });
 
   it('does not introduce D1 business authority and limits R2 to payment media only',()=>{
@@ -36,10 +37,11 @@ describe('Customer Cloud Edge authority gate',()=>{
     expect(worker).toContain("'/api/customer/payment-qr'");
   });
 
-  it('canonicalizes Customer electronic payment channel from the current Admin release',()=>{
+  it('requires the payment channel to remain available without making a label change a price override',()=>{
     expect(worker).toContain("normalizedCustomerOrderBody");
     expect(worker).toContain("paymentChannelId:channelId,paymentChannelLabel:currentLabel");
-    expect(worker).toContain("if(channelLabel&&channelLabel!==currentLabel)return json({code:'CUSTOMER_PAYMENT_CHANNEL_CHANGED'}");
+    expect(worker).toContain("if(!channel||!currentLabel||!qr)return json({code:'CUSTOMER_PAYMENT_CHANNEL_UNAVAILABLE'}");
+    expect(worker).not.toContain("CUSTOMER_PAYMENT_CHANNEL_CHANGED");
   });
 
   it('routes SMM staff orders into the existing Customer Runtime bridge without a second cloud order queue',()=>{

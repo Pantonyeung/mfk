@@ -30,7 +30,9 @@ test('customer production network is isolated to the authorized cloud runtime an
   assert.match(cloud,/https:\/\/admin\.morefunos\.com/);
   assert.match(cloud,/\/api\/customer\//);
   assert.match(cloud,/\bfetch\s*\(/);
-  assert.doesNotMatch(cloud,/\bWebSocket\b|\bXMLHttpRequest\b|\baxios\b|\bsetInterval\s*\(|new\s+Worker\s*\(/);
+  assert.match(cloud,/\bWebSocket\b/);
+  assert.match(cloud,/PORT_HEAD_AVAILABLE/);
+  assert.doesNotMatch(cloud,/\bXMLHttpRequest\b|\baxios\b|\bsetInterval\s*\(|new\s+Worker\s*\(/);
   assert.doesNotMatch(nonCloud,/\bfetch\s*\(|\bWebSocket\b|\bXMLHttpRequest\b|\baxios\b/);
   for(const pattern of[
     /from\s+['"][^'"]*v2local/,

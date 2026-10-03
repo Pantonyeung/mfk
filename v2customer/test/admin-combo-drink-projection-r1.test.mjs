@@ -45,9 +45,13 @@ test('Existing Admin option-center projection continues to carry ordinary drink 
   assert.match(worker,/publishedAdjustmentMinor:minorFromMoney\(option\.priceAdjustment\)/);
 });
 
-test('Visible Customer app re-reads current Admin projection while open',()=>{
-  assert.match(app,/window\.setInterval\(\(\)=>void poll\(\),3000\)/);
+test('Visible Customer app follows config doorbell and resume reconciliation without full-config polling',()=>{
+  assert.match(app,/port\.subscribeConfigChanges\?\.\(\(\)=>void reconcile\(\)\)/);
   assert.match(app,/document\.addEventListener\('visibilitychange',visible\)/);
   assert.match(app,/window\.addEventListener\('focus',focused\)/);
+  assert.match(app,/window\.addEventListener\('pageshow',pageShown\)/);
+  assert.match(app,/window\.addEventListener\('online',online\)/);
   assert.match(app,/const next=await port\.readSnapshot\(\)/);
+  assert.doesNotMatch(app,/setInterval\(\(\)=>void poll\(\),3000\)/);
+  assert.match(app,/snapshot\?\.activeOrders\.length/);
 });

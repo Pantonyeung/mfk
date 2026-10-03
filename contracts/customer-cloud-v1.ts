@@ -1,11 +1,17 @@
+import {
+  validateMfkCustomerCommercialFreshnessProof,
+  type MfkCustomerCommercialFreshnessProof,
+} from './customer-commercial-freshness-v1';
+
 export const MFK_CUSTOMER_QUOTE_REQUEST_SCHEMA='MFK_CUSTOMER_QUOTE_REQUEST_V1' as const;
-export const MFK_CUSTOMER_ORDER_INTENT_SCHEMA='MFK_CUSTOMER_ORDER_INTENT_V1' as const;
+export const MFK_CUSTOMER_ORDER_INTENT_SCHEMA='MFK_CUSTOMER_ORDER_INTENT_V2' as const;
 export const MFK_CUSTOMER_ORDER_ACK_SCHEMA='MFK_CUSTOMER_ORDER_ACK_V1' as const;
 
 export interface CustomerCloudSelection{
   readonly optionGroupId:string;
   readonly optionId:string;
   readonly optionName:string;
+  readonly publishedAdjustmentMinor:number;
 }
 
 export type CustomerCloudComboChoiceType='PRODUCT'|'LABEL'|'NONE';
@@ -140,6 +146,10 @@ export interface MfkCustomerOrderIntent{
   readonly storeId:'MF01';
   readonly submissionId:string;
   readonly menuRevision:string;
+  readonly customerPortSeq:number;
+  readonly projectionHash:string;
+  readonly canonicalRevision:number;
+  readonly commercialProof:MfkCustomerCommercialFreshnessProof;
   readonly idempotencyKey:string;
   readonly createdAt:string;
   readonly updatedAt:string;
@@ -191,6 +201,7 @@ function selection(value:unknown,index:number):CustomerCloudSelection{
     optionGroupId:text(row.optionGroupId,'CUSTOMER_SELECTION_GROUP_INVALID_'+index,120),
     optionId:text(row.optionId,'CUSTOMER_SELECTION_ID_INVALID_'+index,120),
     optionName:text(row.optionName,'CUSTOMER_SELECTION_NAME_INVALID_'+index,160),
+    publishedAdjustmentMinor:signedMoney(row.publishedAdjustmentMinor,'CUSTOMER_SELECTION_ADJUSTMENT_INVALID_'+index),
   });
 }
 
@@ -268,6 +279,13 @@ export function validateMfkCustomerOrderIntent(input:unknown):MfkCustomerOrderIn
   const row=object(input,'CUSTOMER_ORDER_INTENT_INVALID');
   if(row.schema!==MFK_CUSTOMER_ORDER_INTENT_SCHEMA)throw new Error('CUSTOMER_ORDER_SCHEMA_INVALID');
   if(row.storeId!=='MF01')throw new Error('CUSTOMER_STORE_INVALID');
+  const commercialProof=validateMfkCustomerCommercialFreshnessProof(row.commercialProof);
+  const customerPortSeq=Number(row.customerPortSeq);
+  const canonicalRevision=Number(row.canonicalRevision);
+  const projectionHash=text(row.projectionHash,'CUSTOMER_PROJECTION_HASH_REQUIRED',180);
+  if(!Number.isSafeInteger(customerPortSeq)||customerPortSeq<0)throw new Error('CUSTOMER_PORT_SEQ_INVALID');
+  if(!Number.isSafeInteger(canonicalRevision)||canonicalRevision<0)throw new Error('CUSTOMER_CANONICAL_REVISION_INVALID');
+  if(commercialProof.storeId!==row.storeId||commercialProof.customerPortSeq!==customerPortSeq||commercialProof.projectionHash!==projectionHash||commercialProof.canonicalRevision!==canonicalRevision)throw new Error('CUSTOMER_COMMERCIAL_IDENTITY_MISMATCH');
   const checkout=object(row.checkout,'CUSTOMER_CHECKOUT_INVALID');
   const phone=text(checkout.phone,'CUSTOMER_PHONE_INVALID',40);
   const paymentChannelId=checkout.paymentMethod==='ELECTRONIC'?String(checkout.paymentChannelId||'').trim().toUpperCase():'';
@@ -280,6 +298,10 @@ export function validateMfkCustomerOrderIntent(input:unknown):MfkCustomerOrderIn
     storeId:'MF01',
     submissionId:text(row.submissionId,'CUSTOMER_SUBMISSION_ID_INVALID',180),
     menuRevision:text(row.menuRevision,'CUSTOMER_MENU_REVISION_REQUIRED',180),
+    customerPortSeq,
+    projectionHash,
+    canonicalRevision,
+    commercialProof,
     idempotencyKey:text(row.idempotencyKey,'CUSTOMER_IDEMPOTENCY_KEY_INVALID',220),
     createdAt:instant(row.createdAt,'CUSTOMER_CREATED_AT_INVALID'),
     updatedAt:instant(row.updatedAt,'CUSTOMER_UPDATED_AT_INVALID'),

@@ -619,9 +619,19 @@ export default{
       if(request.method!=='GET')return json({code:'METHOD_NOT_ALLOWED'},405);
       const staff=await readStaffSession(request,storeId,env);
       if(!staff)return json({code:'SMM_STAFF_UNAUTHORIZED',message:'請先使用同一個員工帳戶登入'},401);
-      let active;
-      try{active=await fetchActive(storeId);}catch{return json({code:'SMM_CONFIG_NOT_PUBLISHED'},503);}
-      const base=mapPublishedSnapshot(active);
+      const dynamicOnly=url.searchParams.get('config')==='0';
+      const emptyBase=()=>({
+        connectionPath:'INTERNET',
+        orders:[],work:[],channels:[],dineSessions:[],printHealth:[],refundRequests:[],
+        observedAt:new Date().toISOString(),
+      });
+      let base;
+      if(dynamicOnly)base=emptyBase();
+      else{
+        let active;
+        try{active=await fetchActive(storeId);}catch{return json({code:'SMM_CONFIG_NOT_PUBLISHED'},503);}
+        base=mapPublishedSnapshot(active);
+      }
       const id=env.SMM_INTENT_STORE.idFromName(storeId);
       const stub=env.SMM_INTENT_STORE.get(id);
       const projectionResponse=await stub.fetch(new Request('https://internal/acceptance/smt/projection',{method:'GET'}));
@@ -643,9 +653,19 @@ export default{
 
     if(url.pathname==='/api/smm/snapshot'){
       if(request.method!=='GET')return json({code:'METHOD_NOT_ALLOWED'},405);
-      let active;
-      try{active=await fetchActive(storeId);}catch{return json({code:'SMM_CONFIG_NOT_PUBLISHED'},503);}
-      const base=mapPublishedSnapshot(active);
+      const dynamicOnly=url.searchParams.get('config')==='0';
+      const emptyBase=()=>({
+        connectionPath:'INTERNET',
+        orders:[],work:[],channels:[],dineSessions:[],printHealth:[],refundRequests:[],
+        observedAt:new Date().toISOString(),
+      });
+      let base;
+      if(dynamicOnly)base=emptyBase();
+      else{
+        let active;
+        try{active=await fetchActive(storeId);}catch{return json({code:'SMM_CONFIG_NOT_PUBLISHED'},503);}
+        base=mapPublishedSnapshot(active);
+      }
       const id=env.SMM_INTENT_STORE.idFromName(storeId);
       const stub=env.SMM_INTENT_STORE.get(id);
       const projectionResponse=await stub.fetch(new Request('https://internal/acceptance/smt/projection',{method:'GET'}));
