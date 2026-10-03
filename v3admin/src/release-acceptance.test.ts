@@ -18,7 +18,9 @@ describe('Admin V3 acceptance release boundary',()=>{
   });
   it('retains the same service, assets binding, Durable Objects and migration identities',()=>{
     const old=json('../../v2admin/wrangler.jsonc'),release=json('../wrangler.release.jsonc');
-    expect(release).toEqual(old);
+    const {observability,...unchangedRelease}=release;
+    expect(unchangedRelease).toEqual(old);
+    expect(observability).toEqual({enabled:false,head_sampling_rate:1,logs:{enabled:true,invocation_logs:true,head_sampling_rate:1}});
     expect(release.name).toBe('mfk-admin');
     expect(release.main).toBe('./worker.ts');
     expect(release.assets.directory).toBe('./dist');

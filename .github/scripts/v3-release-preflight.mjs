@@ -6,6 +6,7 @@ import {resolve,join,dirname} from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 export const RELEASE=Object.freeze({repository:'Pantonyeung/mfk',owner:'Pantonyeung',ref:'refs/heads/release/MFP-V3-ACCEPTANCE-2026-10-03',account:'314abfde9f49e752cf8f67c79d83dd7c',wrangler:'4.146.0'});
+export const ADMIN_OBSERVABILITY=Object.freeze({enabled:false,head_sampling_rate:1,logs:Object.freeze({enabled:true,invocation_logs:true,head_sampling_rate:1})});
 const TARGETS=Object.freeze({
  admin:{service:'mfk-admin',host:'admin.morefunos.com',directory:'v3admin',identity:'release.json',migration:'customer-runtime-v1',r2:{CUSTOMER_PAYMENT_EVIDENCE:'mfk-customer-payment-evidence'},dos:{ADMIN_SYNC:'AdminSyncStore',KEETA_RUNTIME:'KeetaRuntimeStore',CUSTOMER_RUNTIME:'CustomerRuntimeStore'},secrets:['KEETA_APP_SECRET','KEETA_TOKEN_ENCRYPTION_KEY']},
  pos:{service:'mfk-mfp-v3-acceptance',host:'mfk-mfp-v3-acceptance.yeungyi88.workers.dev',directory:'v3smt',identity:'build-identity.json',migration:null,r2:{},dos:{},secrets:[]},
@@ -15,19 +16,50 @@ const fail=(code)=>{throw new Error(code);};
 const requireThat=(condition,code)=>{if(!condition)fail(code);};
 const exactSHA=(sha)=>typeof sha==='string'&&/^[a-f0-9]{40}$/.test(sha);
 const sorted=(items)=>items.sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b)));
-const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+const canonical=(value)=>Array.isArray(value)?value.map(canonical):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().map(key=>[key,canonical(value[key])])):value;
+const same=(a,b)=>JSON.stringify(canonical(a))===JSON.stringify(canonical(b));
 function targetInfo(target){requireThat(Object.hasOwn(TARGETS,target),'TARGET_INVALID');return TARGETS[target];}
 function metadataString(value,code){requireThat(typeof value==='string'&&/^[a-zA-Z0-9_.:@/-]{1,256}$/.test(value),code);return value;}
 
+function exactKeys(value,keys,code){requireThat(value&&typeof value==='object'&&!Array.isArray(value)&&same(Object.keys(value).sort(),[...keys].sort()),code);}
+export function validateConnectorEvidence(input,{sourceSha,target,now=Date.now()}={}){
+ let evidence=input;
+ if(typeof input==='string'){
+  requireThat(input.length>0&&input.length<=8000,'CONNECTOR_EVIDENCE_SIZE_INVALID');
+  try{evidence=JSON.parse(input);}catch{fail('CONNECTOR_EVIDENCE_JSON_INVALID');}
+ }
+ exactKeys(evidence,['schemaVersion','source','sourceSha','accountId','observedAt','target','targets'],'CONNECTOR_EVIDENCE_FIELDS_INVALID');
+ requireThat(evidence.schemaVersion===1&&evidence.source==='verified-cloudflare-connector','CONNECTOR_EVIDENCE_SOURCE_INVALID');
+ requireThat(exactSHA(sourceSha)&&evidence.sourceSha===sourceSha&&evidence.accountId===RELEASE.account,'CONNECTOR_EVIDENCE_IDENTITY_MISMATCH');
+ requireThat(['all',...Object.keys(TARGETS)].includes(target)&&evidence.target===target,'CONNECTOR_EVIDENCE_TARGET_MISMATCH');
+ requireThat(typeof evidence.observedAt==='string'&&/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(evidence.observedAt),'CONNECTOR_EVIDENCE_TIME_INVALID');
+ const observed=Date.parse(evidence.observedAt);
+ requireThat(Number.isFinite(observed)&&new Date(observed).toISOString()===evidence.observedAt&&Number.isFinite(now),'CONNECTOR_EVIDENCE_TIME_INVALID');
+ requireThat(observed<=now,'CONNECTOR_EVIDENCE_FROM_FUTURE');requireThat(now-observed<=20*60*1000,'CONNECTOR_EVIDENCE_EXPIRED');
+ const selected=target==='all'?Object.keys(TARGETS):[target];
+ exactKeys(evidence.targets,selected,'CONNECTOR_EVIDENCE_TARGET_FIELDS_INVALID');
+ for(const key of selected){
+  const record=evidence.targets[key],info=targetInfo(key);
+  exactKeys(record,['service','hostname','predeployVersionId',key==='pos'?'assetsOnly':'environment'],'CONNECTOR_EVIDENCE_SERVICE_FIELDS_INVALID');
+  requireThat(record.service===info.service&&record.hostname===info.host,'CONNECTOR_EVIDENCE_SERVICE_MISMATCH');
+  requireThat(typeof record.predeployVersionId==='string'&&/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(record.predeployVersionId),'CONNECTOR_EVIDENCE_VERSION_INVALID');
+  if(key==='pos'){
+   exactKeys(record.assetsOnly,['hasAssets','hasModules','scriptEtag','settingsBindingsCount','versionBindingsCount'],'CONNECTOR_ASSETS_EVIDENCE_FIELDS_INVALID');
+   requireThat(same(record.assetsOnly,{hasAssets:true,hasModules:false,scriptEtag:'',settingsBindingsCount:0,versionBindingsCount:0}),'CONNECTOR_ASSETS_EVIDENCE_MISMATCH');
+  }else requireThat(record.environment==='production','CONNECTOR_EVIDENCE_ENVIRONMENT_MISMATCH');
+ }
+ return evidence;
+}
 export function guardContext(ctx){
  requireThat(ctx.repository===RELEASE.repository&&ctx.repositoryOwner===RELEASE.owner,'REPOSITORY_NOT_TRUSTED');
  requireThat(ctx.eventName==='workflow_dispatch'&&ctx.ref===RELEASE.ref,'MANUAL_RELEASE_REF_REQUIRED');
- requireThat(ctx.inputs&&same(Object.keys(ctx.inputs).sort(),['expected_sha','operation','target']),'INPUTS_UNEXPECTED');
+ requireThat(ctx.inputs&&same(Object.keys(ctx.inputs).sort(),['connector_evidence','expected_sha','operation','target']),'INPUTS_UNEXPECTED');
  const {expected_sha:expectedSha,target,operation}=ctx.inputs;
  requireThat(exactSHA(expectedSha)&&ctx.sha===expectedSha&&ctx.localHead===expectedSha,'SOURCE_SHA_MISMATCH');
  requireThat(['all',...Object.keys(TARGETS)].includes(target),'TARGET_INVALID');
  requireThat(['preflight','deploy'].includes(operation),'OPERATION_INVALID');
- return {expectedSha,target,operation,targets:target==='all'?Object.keys(TARGETS):[target]};
+ const connectorEvidence=validateConnectorEvidence(ctx.inputs.connector_evidence,{sourceSha:expectedSha,target,now:ctx.now??Date.now()});
+ return {expectedSha,target,operation,targets:target==='all'?Object.keys(TARGETS):[target],connectorEvidence};
 }
 export async function verifyRemoteHead(expectedSha,{fetchImpl=fetch,token}={}){
  requireThat(exactSHA(expectedSha)&&typeof token==='string'&&token.length>0,'GITHUB_READ_TOKEN_REQUIRED');
@@ -54,12 +86,15 @@ function safeBinding(binding){
  // Never inspect text/value/json for secret_text or unspecified plain_text bindings.
  return result;
 }
-export async function readSnapshot(target,{api,declaredVars={},expectedSha,config,root,onDiagnostic=()=>{}}={}){
+export async function readSnapshot(target,{api,declaredVars={},expectedSha,config,root,connectorEvidence,sourceSha,phase='before',onDiagnostic=()=>{}}={}){
+ requireThat(['before','after'].includes(phase),'SNAPSHOT_PHASE_INVALID');
+ validateConnectorEvidence(connectorEvidence,{sourceSha,target:connectorEvidence?.target});
+ requireThat(Object.hasOwn(connectorEvidence.targets,target),'CONNECTOR_EVIDENCE_TARGET_MISMATCH');
  const info=targetInfo(target);const base=`/accounts/${RELEASE.account}/workers`;
  const script=`${base}/scripts/${info.service}`;
  const settings=await api(`${script}/settings`);
  requireThat(Array.isArray(settings?.bindings),'BINDINGS_MISSING');
- assertMonitoringPreserved(settings,onDiagnostic);
+ const monitoring=assertMonitoringPreserved(target,settings,config,onDiagnostic);
  const bindings=sorted(settings.bindings.map(safeBinding));
  requireThat(new Set(bindings.map(b=>b.name)).size===bindings.length,'DUPLICATE_BINDING');
  for(const binding of bindings){
@@ -92,21 +127,24 @@ export async function readSnapshot(target,{api,declaredVars={},expectedSha,confi
  const deployment=deploymentResult?.deployments?.[0];
  requireThat(deployment&&Array.isArray(deployment.versions)&&deployment.versions.length===1&&deployment.versions[0].percentage===100,'SINGLE_FULL_DEPLOYMENT_REQUIRED');
  const versionId=metadataString(deployment.versions[0].version_id,'VERSION_ID_MISSING');
+ if(phase==='before')requireThat(versionId===connectorEvidence.targets[target].predeployVersionId,'CONNECTOR_PREDEPLOY_VERSION_MISMATCH');
  const version=await api(`${script}/versions/${encodeURIComponent(versionId)}`);
  requireThat(version?.id===versionId,'VERSION_ID_MISMATCH');
  const migrationTag=version?.resources?.script_runtime?.migration_tag||null;
  requireThat(migrationTag===info.migration,'MIGRATION_TAG_MISMATCH');
  const resources=version?.resources;
  onDiagnostic({endpoint:'version',stage:'shape',resourcesPresent:!!resources&&typeof resources==='object',scriptPresent:!!resources?.script&&typeof resources.script==='object',etagType:typeof resources?.script?.etag,versionBindingsCount:Array.isArray(resources?.bindings)?resources.bindings.length:null,...scriptShape(resources?.script),scriptRuntimePresent:!!resources?.script_runtime&&typeof resources.script_runtime==='object'});
- if(target==='pos'&&resources?.script?.etag===undefined){
-  // Optional script/etag is documented, but absence does not prove an assets-only Worker.
-  // None of the approved GET schemas supplies a positive assets-only discriminator.
-  // Preserve the block until a reviewed diagnostic response establishes one.
+ let scriptEtag,assetsOnlyVerification;
+ if(target==='pos'){
+  requireThat(resources?.script?.etag==='','SCRIPT_ETAG_MISSING');
   requireThat(config&&root,'POS_ASSETS_ONLY_CONFIG_REQUIRED');validateConfig('pos',config,root);
   requireThat(bindings.length===0&&Array.isArray(resources?.bindings)&&resources.bindings.length===0,'POS_ASSETS_ONLY_BINDINGS_UNVERIFIED');
-  fail('POS_ASSETS_ONLY_EVIDENCE_REQUIRED');
- }
- const scriptEtag=metadataString(resources?.script?.etag,'SCRIPT_ETAG_MISSING');
+  requireThat(resources.script.handlers===null&&resources.script.named_handlers===undefined,'POS_ASSETS_ONLY_HANDLERS_MISMATCH');
+  // The unsigned, root-verified connector attestation supplies the independent Script
+  // has_assets/has_modules observation. CI still checks exact current version/bindings.
+  requireThat(same(connectorEvidence.targets.pos.assetsOnly,{hasAssets:true,hasModules:false,scriptEtag:'',settingsBindingsCount:0,versionBindingsCount:0}),'CONNECTOR_ASSETS_EVIDENCE_MISMATCH');
+  scriptEtag='';assetsOnlyVerification=phase==='before'?'connector-evidence-and-current-ci-metadata':'pending-connector-postflight';
+ }else scriptEtag=metadataString(resources?.script?.etag,'SCRIPT_ETAG_MISSING');
  const scriptSubdomain=await api(`${script}/subdomain`);
  requireThat(typeof scriptSubdomain?.enabled==='boolean'&&typeof scriptSubdomain?.previews_enabled==='boolean','SCRIPT_SUBDOMAIN_STATE_MISSING');
  let domain;
@@ -116,17 +154,16 @@ export async function readSnapshot(target,{api,declaredVars={},expectedSha,confi
   requireThat(scriptSubdomain.previews_enabled===false,'PREVIEW_URLS_MISMATCH');
   domain={hostname:info.host,service:info.service,workersDev:true};
  }else{
-  const domains=await api(`${base}/domains`);
-  requireThat(Array.isArray(domains),'CUSTOM_DOMAINS_MISSING');
-  const matches=domains.filter(d=>d.hostname===info.host);
-  requireThat(matches.length===1&&matches[0].service===info.service&&matches[0].environment==='production','CUSTOM_DOMAIN_MISMATCH');
-  domain={hostname:info.host,service:info.service,environment:'production'};
+  // The existing CI token has a verified domains 403. Do not retry it or imply
+  // access was granted. This is external predeployment evidence, not CI readback.
+  const verified=connectorEvidence.targets[target];
+  domain={hostname:verified.hostname,service:verified.service,environment:verified.environment,verificationSource:'verified-connector-predeployment',observedAt:connectorEvidence.observedAt};
   requireThat(scriptSubdomain.enabled&&scriptSubdomain.previews_enabled,'SUBDOMAIN_CONFIG_MISMATCH');
  }
- return {target,service:info.service,accountId:RELEASE.account,domain,subdomain:{enabled:scriptSubdomain.enabled,previewsEnabled:scriptSubdomain.previews_enabled},deploymentId:metadataString(deployment.id,'DEPLOYMENT_ID_MISSING'),versionId,scriptEtag,migrationTag,bindings,publicReleaseVars};
+ return {target,service:info.service,accountId:RELEASE.account,domain,subdomain:{enabled:scriptSubdomain.enabled,previewsEnabled:scriptSubdomain.previews_enabled},deploymentId:metadataString(deployment.id,'DEPLOYMENT_ID_MISSING'),versionId,scriptEtag,migrationTag,bindings,publicReleaseVars,monitoring,...(assetsOnlyVerification?{assetsOnlyVerification}:{})};
 }
 export function assertPreserved(before,after){
- const stable=(snapshot)=>({target:snapshot.target,service:snapshot.service,accountId:snapshot.accountId,domain:snapshot.domain,subdomain:snapshot.subdomain,migrationTag:snapshot.migrationTag,bindings:snapshot.bindings.filter(b=>snapshot.target!=='admin'||!['MFK_SOURCE_SHA','MFP_V3_CONFIG_WRITES_ENABLED'].includes(b.name))});
+ const stable=(snapshot)=>({target:snapshot.target,service:snapshot.service,accountId:snapshot.accountId,domain:snapshot.domain,subdomain:snapshot.subdomain,migrationTag:snapshot.migrationTag,monitoring:snapshot.monitoring,bindings:snapshot.bindings.filter(b=>snapshot.target!=='admin'||!['MFK_SOURCE_SHA','MFP_V3_CONFIG_WRITES_ENABLED'].includes(b.name))});
  requireThat(same(stable(before),stable(after)),'PERSISTENT_METADATA_CHANGED');
 }
 export function validateBuildIdentity(target,identity,sha){
@@ -140,7 +177,7 @@ export function validateConfig(target,config,root){
  const info=targetInfo(target);const dir=join(root,info.directory);
  requireThat(config.name===info.service,'CONFIG_SERVICE_MISMATCH');
  requireThat(config.workers_dev===true&&config.preview_urls===(target!=='pos'),'CONFIG_SUBDOMAIN_MISMATCH');
- const allowed=['$schema','name','main','compatibility_date','workers_dev','preview_urls','assets',...(target==='admin'?['vars','secrets','r2_buckets','durable_objects','migrations']:target==='customer'?['r2_buckets']:[])];
+ const allowed=['$schema','name','main','compatibility_date','workers_dev','preview_urls','assets',...(target==='admin'?['vars','secrets','r2_buckets','durable_objects','migrations','observability']:target==='customer'?['r2_buckets']:[])];
  requireThat(Object.keys(config).every(key=>allowed.includes(key)),'CONFIG_KEY_NOT_APPROVED');
  requireThat(config.compatibility_date===(target==='admin'?'2026-09-22':target==='customer'?'2026-09-29':'2026-10-03'),'CONFIG_COMPATIBILITY_MISMATCH');
  requireThat(resolve(dir,config.assets?.directory||'')===join(dir,'dist'),'CONFIG_ASSET_PATH_MISMATCH');
@@ -150,6 +187,7 @@ export function validateConfig(target,config,root){
  if(target!=='pos')requireThat(config.main===(target==='admin'?'./worker.ts':'./worker.js'),'CONFIG_MAIN_MISMATCH');
  if(target!=='pos')requireThat(same(sorted(config.r2_buckets||[]),sorted(Object.entries(info.r2).map(([binding,bucket_name])=>({binding,bucket_name})))),'CONFIG_R2_MISMATCH');
  if(target==='admin'){
+  requireThat(same(config.observability,ADMIN_OBSERVABILITY),'CONFIG_OBSERVABILITY_MISMATCH');
   requireThat(same(sorted(config.durable_objects?.bindings||[]),sorted(Object.entries(info.dos).map(([name,class_name])=>({name,class_name})))),'CONFIG_DO_MISMATCH');
   requireThat(same(config.migrations,[{tag:'admin-sync-v1',new_sqlite_classes:['AdminSyncStore']},{tag:'keeta-runtime-v1',new_sqlite_classes:['KeetaRuntimeStore']},{tag:'customer-runtime-v1',new_sqlite_classes:['CustomerRuntimeStore']}]),'CONFIG_MIGRATION_MISMATCH');
   requireThat(same(Object.keys(config.vars||{}).sort(),['KEETA_APP_ID','KEETA_OAUTH_REDIRECT_URI','KEETA_PROVIDER_SHOP_ID']),'CONFIG_VARS_MISMATCH');
@@ -174,14 +212,16 @@ export async function createWranglerEnvironment(tempRoot,baseEnv=process.env){
  delete env.GH_TOKEN;delete env.GITHUB_TOKEN;
  return env;
 }
-function assertMonitoringPreserved(settings,onDiagnostic){
+function assertMonitoringPreserved(target,settings,config,onDiagnostic){
  const observation=settings.observability;const tails=settings.tail_consumers;
  const observationAbsent=observation===undefined||observation===null;
  const observationDisabled=observation&&typeof observation==='object'&&!Array.isArray(observation)&&observation.enabled===false&&Object.keys(observation).length===1;
- onDiagnostic({endpoint:'settings',stage:'monitoring',observabilityState:observationAbsent?'absent':observationDisabled?'disabled':'active-or-custom',logpushState:settings.logpush===true?'enabled':settings.logpush===false||settings.logpush===undefined?'disabled-or-absent':'invalid',tailConsumerCount:Array.isArray(tails)?tails.length:tails===undefined||tails===null?0:null});
- requireThat(observationAbsent||observationDisabled,'MONITORING_OBSERVABILITY_REVIEW_REQUIRED');
+ onDiagnostic({endpoint:'settings',stage:'monitoring',observabilityState:target==='admin'&&same(observation,config?.observability)?'matched-declared':observationAbsent?'absent':observationDisabled?'disabled':'active-or-custom',logpushState:settings.logpush===true?'enabled':settings.logpush===false||settings.logpush===undefined?'disabled-or-absent':'invalid',tailConsumerCount:Array.isArray(tails)?tails.length:tails===undefined||tails===null?0:null});
+ if(target==='admin')requireThat(same(config?.observability,ADMIN_OBSERVABILITY)&&same(observation,config.observability),'MONITORING_OBSERVABILITY_MISMATCH');
+ else requireThat(observationAbsent||observationDisabled,'MONITORING_OBSERVABILITY_REVIEW_REQUIRED');
  requireThat(settings.logpush===undefined||settings.logpush===false,'MONITORING_LOGPUSH_REVIEW_REQUIRED');
  requireThat(tails===undefined||tails===null||Array.isArray(tails)&&tails.length===0,'MONITORING_TAIL_CONSUMERS_REVIEW_REQUIRED');
+ return {observability:target==='admin'?structuredClone(ADMIN_OBSERVABILITY):{enabled:false},logpush:false,tailConsumersCount:0};
 }
 const PAGINATION_KEYS=['count','page','per_page','total_count','total_pages'];
 const MAX_DEPLOYMENT_PAGES=25,DEPLOYMENTS_PER_PAGE=100,MAX_DOMAIN_RECORDS=2500;
@@ -309,6 +349,10 @@ async function publicReadback(target,sha){
   }catch{if(attempt===11)fail('PUBLIC_IDENTITY_READBACK_FAILED');await new Promise(r=>setTimeout(r,5000));}
  }
 }
+export function completeLocalReadback(receipt,readback){
+ receipt.readback=readback;receipt.status='DEPLOYED_AWAITING_CONNECTOR_POSTFLIGHT';
+ receipt.connectorPostflight={status:'REQUIRED',ciDomainsAccess:'NOT_GRANTED',checks:['fixed-domains','current-versions','bindings','observability','pos-assets-only','public-build-identity']};
+}
 async function main(){
  const [command,target]=process.argv.slice(2);const root=process.cwd();
  if(command==='guard'){
@@ -322,7 +366,7 @@ async function main(){
  if(command==='init'){await writeFile(receiptPath,JSON.stringify(receipt,null,2)+'\n');return;}
  if(command==='finalize'){
   try{receipt=JSON.parse(await readFile(receiptPath,'utf8'));}catch{}
-  if(!['PREFLIGHT_PASSED','DEPLOYED_VERIFIED','FAILED'].includes(receipt.status))receipt.status='FAILED';
+  if(!['PREFLIGHT_PASSED','DEPLOYED_AWAITING_CONNECTOR_POSTFLIGHT','FAILED'].includes(receipt.status))receipt.status='FAILED';
   receipt.jobStatus=process.env.RELEASE_JOB_STATUS||'unknown';
   if(receipt.jobStatus!=='success'&&receipt.status!=='FAILED'){receipt.previousStatus=receipt.status;receipt.status='FAILED';}
   await writeFile(receiptPath,JSON.stringify(receipt,null,2)+'\n');return;
@@ -338,27 +382,30 @@ async function main(){
   receipt.metadataDiagnostics=[];
   const onDiagnostic=(entry)=>{receipt.failureStage=entry.endpoint+':'+entry.stage;if(receipt.metadataDiagnostics.length<240)receipt.metadataDiagnostics.push(entry);};
   const api=apiClient(onDiagnostic);const declaredVars=config.vars||{};
-  const before=await readSnapshot(target,{api,declaredVars,config,root,onDiagnostic});receipt.before=before;receipt.status='PREFLIGHT_PASSED';
+  const before=await readSnapshot(target,{api,declaredVars,config,root,onDiagnostic,connectorEvidence:ctx.connectorEvidence,sourceSha:ctx.expectedSha});receipt.before=before;receipt.connectorEvidence=ctx.connectorEvidence;receipt.status='PREFLIGHT_PASSED';
   await writeFile(receiptPath,JSON.stringify(receipt,null,2)+'\n');
   if(ctx.operation==='preflight'){console.log('EXISTING_TARGET_PREFLIGHT_PASSED');return;}
   // Recheck target metadata immediately before mutation. No automatic service creation.
-  const latest=await readSnapshot(target,{api,declaredVars,config,root,onDiagnostic});
+  const latest=await readSnapshot(target,{api,declaredVars,config,root,onDiagnostic,connectorEvidence:ctx.connectorEvidence,sourceSha:ctx.expectedSha});
   requireThat(same(before,latest),'PREDEPLOY_METADATA_CHANGED');
   await verifyRemoteHead(ctx.expectedSha,{token:process.env.GH_TOKEN});
   const configPath=target==='pos'?join(process.env.RUNNER_TEMP||'/tmp',`mfp-v3-pos-release-${process.env.GITHUB_RUN_ID||'run'}.json`):join(root,targetInfo(target).directory,'wrangler.release.jsonc');
   if(target==='pos')await writeFile(configPath,JSON.stringify(config,null,2)+'\n');
-  receipt.status='DEPLOYMENT_ATTEMPTED';receipt.attemptedDeployment=true;await writeFile(receiptPath,JSON.stringify(receipt,null,2)+'\n');
   const wranglerPath=join(process.env.RUNNER_TEMP||'/tmp','v3-release-tools/node_modules/wrangler/bin/wrangler.js');
   const wranglerPackage=JSON.parse(await readFile(join(dirname(wranglerPath),'../package.json'),'utf8'));
   requireThat(wranglerPackage.version===RELEASE.wrangler,'WRANGLER_VERSION_MISMATCH');
   const args=[wranglerPath,'deploy','--config',configPath,'--keep-vars','--no-autoconfig',...(target==='admin'?['--var',`MFK_SOURCE_SHA:${ctx.expectedSha}`,'--var','MFP_V3_CONFIG_WRITES_ENABLED:0']:[])];
-  const commandResult=await runQuiet(process.execPath,args,{cwd:root,env:await createWranglerEnvironment(process.env.RUNNER_TEMP||'/tmp')});
+  const wranglerEnv=await createWranglerEnvironment(process.env.RUNNER_TEMP||'/tmp');
+  // Fresh wall-clock check after all network/build/preparation work, immediately before mutation.
+  validateConnectorEvidence(ctx.connectorEvidence,{sourceSha:ctx.expectedSha,target:ctx.target,now:Date.now()});
+  receipt.status='DEPLOYMENT_ATTEMPTED';receipt.attemptedDeployment=true;await writeFile(receiptPath,JSON.stringify(receipt,null,2)+'\n');
+  const commandResult=await runQuiet(process.execPath,args,{cwd:root,env:wranglerEnv});
   receipt.wrangler={version:RELEASE.wrangler,exitCode:commandResult.exitCode};
   // Read back even after a nonzero command exit: upload could have partially succeeded.
-  try{receipt.after=await readSnapshot(target,{api,declaredVars,expectedSha:ctx.expectedSha,config,root,onDiagnostic});assertPreserved(before,receipt.after);}catch{receipt.postflight='FAILED';fail('POSTDEPLOY_METADATA_UNVERIFIED');}
+  try{receipt.after=await readSnapshot(target,{api,declaredVars,expectedSha:ctx.expectedSha,config,root,onDiagnostic,connectorEvidence:ctx.connectorEvidence,sourceSha:ctx.expectedSha,phase:'after'});assertPreserved(before,receipt.after);}catch{receipt.postflight='FAILED';fail('POSTDEPLOY_METADATA_UNVERIFIED');}
   requireThat(commandResult.exitCode===0,'WRANGLER_DEPLOY_FAILED');
-  receipt.readback=await publicReadback(target,ctx.expectedSha);receipt.status='DEPLOYED_VERIFIED';
-  await writeFile(receiptPath,JSON.stringify(receipt,null,2)+'\n');console.log('DEPLOYED_AND_PRESERVATION_VERIFIED');
+  completeLocalReadback(receipt,await publicReadback(target,ctx.expectedSha));
+  await writeFile(receiptPath,JSON.stringify(receipt,null,2)+'\n');console.log('DEPLOYED_AWAITING_CONNECTOR_POSTFLIGHT');
  }catch(error){
   receipt.status='FAILED';receipt.failureCode=/^[A-Z0-9_]+$/.test(error?.message||'')?error.message:'UNEXPECTED_FAILURE';
   await writeFile(receiptPath,JSON.stringify(receipt,null,2)+'\n');

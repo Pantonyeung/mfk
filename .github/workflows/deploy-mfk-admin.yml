@@ -7,6 +7,10 @@ on:
         description: Exact reviewed 40-character release branch HEAD
         type: string
         required: true
+      connector_evidence:
+        description: Fresh root-verified Cloudflare connector JSON attestation for this exact source and target
+        type: string
+        required: true
       target:
         description: Existing V3 service to verify or deploy
         type: choice
