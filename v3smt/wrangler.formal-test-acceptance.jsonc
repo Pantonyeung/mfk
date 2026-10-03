@@ -1,0 +1,21 @@
+{
+  "$schema": "https://raw.githubusercontent.com/cloudflare/workers-sdk/main/packages/wrangler/config-schema.json",
+  "name": "mfk-smt-web",
+  "main": "./src/formal-test-acceptance-worker.ts",
+  "compatibility_date": "2026-09-25",
+  "workers_dev": true,
+  "preview_urls": true,
+  "keep_vars": true,
+  "vars": {
+    "MFK_BUILD_ID": "mfp-v3-test-acceptance"
+  },
+  "version_metadata": {
+    "binding": "MFK_VERSION"
+  },
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": true
+  }
+}
