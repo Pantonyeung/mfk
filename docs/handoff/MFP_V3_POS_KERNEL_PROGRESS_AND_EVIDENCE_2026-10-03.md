@@ -1,6 +1,6 @@
 # MFP V3 POS Kernel Progress and Evidence — 2026-10-03
 
-Status: `SOURCE_AND_ROOM_VERIFIED` for the bounded non-Student `CHECKOUT_PAYMENT_CONFIRM` assembler, Room producers, high-level Android runtime bridge, and canonical Admin-to-Room POS-tender publication. Production admission and public/native runtime binding remain absent and fail closed.
+Status: `SOURCE_AND_ROOM_VERIFIED` for the bounded non-Student `CHECKOUT_PAYMENT_CONFIRM` assembler, Room producers, high-level Android runtime bridge, and generic canonical-envelope/POS-tender Room projection. The local V2 publisher is reference-only; Admin V3 production publication, admission, and public/native runtime binding remain absent and fail closed.
 
 This document records the latest Owner direction, the first verified native slice, the overnight candidate artifacts, and the OTA/source-binding evidence in one project. It does not authorize publish, deployment, OTA activation, live payment, merge, or replacement of the accepted production UI.
 
@@ -9,7 +9,7 @@ This document records the latest Owner direction, the first verified native slic
 - Original reviewed checkout: `48c7eca6c051e72562ea9974bc2c6465b8584a7b`
 - Isolated branch: `feat/MFP-V3-A9R-POS-KERNEL-R1-2026-10-03`
 - Verified prerequisite commit: `8c52b155fb75edd39e4018853ca3c4144682e179`
-- Latest verified code commit: `863974f633199821caedb6ffbe09032cc3bcf383` (`CHECKOUT_PAYMENT_CONFIRM` mapping: `3e53a26`; outbox fence: `3c0cd77`; Order read: `2cfe244`; security: `8f9f228`; quote: `ce6769b`; tender/Business Day: `bfff335`; Print: `29e9716`; OTA: `359b8c6`; Dining read: `fe6316f`; Admin tender publication: `df260fd`; unregistered Dining planner/evidence: `ffe04cd` + `863974f`)
+- Latest verified code commit: `5056b737d5d734019115c5e5fbaf88e234cd4d93` (`CHECKOUT_PAYMENT_CONFIRM` mapping: `3e53a26`; outbox fence: `3c0cd77`; Order read: `2cfe244`; security: `8f9f228`; quote: `ce6769b`; tender/Business Day: `bfff335`; Print: `29e9716`; OTA: `359b8c6`; Dining read: `fe6316f`; V2-reference tender publication: `df260fd`; unregistered Dining planner/evidence: `ffe04cd` + `863974f`; Print/OTA fixture regression: `5056b73`)
 - Existing Draft PR reference: `#651`; this branch has not been pushed to it.
 - Existing A9 base authority: `69adb11215677d506545c5428f8deea4b89e7db2`
 
@@ -26,6 +26,8 @@ This document records the latest Owner direction, the first verified native slic
 - Runtime assets and configuration remain updateable; no menu, price, tender, or runtime content is compiled as native truth.
 - Owner account/password authorization is the device-bound parent of staff account/PIN sessions; a missing, changed, unknown, or revoked parent authorization removes staff access on that device. Owner logout is device-local and does not revoke independently authorized store devices.
 - Electronic tender becomes canonical from explicit staff visual review recorded as `STAFF_CONFIRMED`, not provider verification. No screenshot is uploaded or stored, and reconnect/session change must not create a duplicate payment.
+
+Admin V3 source identity is Draft PR `#605`, branch `feat/MFK-V3ADMIN-ONE-SHOT-R1`, exact audited SHA `5954f301c684e795453d622790ca11acae8dfe79`. It uses the shared canonical envelope plus formal server draft/publish/version clients, but remains `ZERO PRODUCTION ROUTING`; preview mode intentionally uses fixtures, and `posTenders` is absent. The checked-out A0 `v3admin` folder is stale. V2 is migration/reference only. Exact mapping and dry-run gates are recorded in `docs/architecture/MFP_ADMIN_V2_TO_V3_CONFIGURATION_MIGRATION_MAP_2026-10-03.md`.
 
 ## Completed bounded slice
 
@@ -47,7 +49,7 @@ The high-level Android bridge is now source-bound. A quote request first revalid
 
 Channel changes invalidate the current quote immediately. Both quote state and the mutable canonical tender snapshot use generation fencing, so an older native response cannot overwrite a newer channel validation. A VALID native quote without its same-response tender snapshot fails closed.
 
-Production checkout is still not usable because no approved device-enrollment, Owner-password, or staff-PIN/session writer populates the required security aggregates, the browser security authority is deliberately unbound, and no registered public/native catalog plus checkout capability exposes the host core. Admin now has an explicit canonical POS-tender publication field and same-Room projector. The bridge integration tests still seed test-only security records; they are not production authentication evidence.
+Production checkout is still not usable because the Admin V3 deployment/non-browser consumer route and POS-tender publication are unproven, no approved device-enrollment, Owner-password, or staff-PIN/session writer populates the required security aggregates, the browser security authority is deliberately unbound, and no registered public/native catalog plus checkout capability exposes the host core. The same-Room projector exists; the local V2 `posTenders` publisher does not prove V3 publication. The bridge integration tests still seed test-only security records; they are not production authentication evidence.
 
 ## Test evidence
 
@@ -77,10 +79,10 @@ Latest scoped command:
 gradle.bat -p carrier/android :app:testDebugUnitTest -x verifySmtWebBundle --tests com.morefunos.smt.storekernel.business.* --tests com.morefunos.smt.storekernel.StoreKernelFormalReceiptTest --tests com.morefunos.smt.storekernel.FormalAdminConfigSourceIntegrationTest --no-daemon
 ```
 
-Latest full native result at `863974f`:
+Latest full native result at `5056b73`:
 
-- 24 suites
-- 144 tests passed
+- 26 suites
+- 156 tests passed
 - 0 failures, 0 errors, 0 skipped
 - 12 dedicated `FormalCheckoutPaymentConfirmIntegrationTest` cases using real Room
 - 25 `StoreKernelFormalReceiptTest` cases, including same-worker stale ACK/release lease races
@@ -88,7 +90,7 @@ Latest full native result at `863974f`:
 - `:app:lintDebug`: successful
 - `:app:assembleDebug -x verifySmtWebBundle --no-daemon`: successful, including desugaring, DEX, and APK packaging
 
-Latest Admin result at the same code commit:
+Latest V2-reference Admin result at `df260fd`:
 
 - 40 test files
 - 284 tests passed
@@ -154,10 +156,11 @@ No live endpoint is changed by this branch.
 
 ## Actual remaining blockers
 
+- Admin V3 #605 is source-audited but explicitly unrouted. Production needs the deployed V3 backend identity, authenticated canonical publish/read endpoint, approved MFP non-browser consumer route, revision/fingerprint readback semantics, and a formal `posTenders` field before native Admin binding can be activated.
 - Device admission needs an MFK-native enrollment/authorization record. Admin ACK membership is only config-delivery evidence and is not authorization.
 - Staff authentication can consume the canonical `MFK_STAFF_AUTH_V1` verifier projection, and the value contract now enforces the 12-hour maximum; the real native verifier, session issuer/revoker, and persisted producer remain unbound and must expose no PINs to persistence or logs.
 - Owner-parent authorization is now device-local. The real account/password verifier, persisted authorization/session issuer, and revocation producer remain unbound and must not create or expose credentials.
-- `storeSettings.customerPaymentChannels` is a Customer electronic-channel configuration and remains insufficient for all-POS tender eligibility or settlement. The explicit canonical `posTenders` publication and same-Room projector are now bound separately.
+- `storeSettings.customerPaymentChannels` is a Customer electronic-channel configuration and remains insufficient for all-POS tender eligibility or settlement. The same-Room `POS_TENDER_POLICY` projector is implemented, but Admin V3 #605 has no `posTenders` field; local V2 publication is reference-only.
 - Admin `businessDay.cutoff` classifies the business date for reporting/history. Current accepted behavior does not establish an old-V2-style OPEN-only trading gate; no such gate may be invented.
 - The canonical source of `studentDiscountEligible` is not present in the published Admin contract. This is a money-policy/data decision; checkout must fail closed for Student Discount until the Owner selects a canonical eligibility field or publication rule.
 - Student discount still needs exact option/surcharge basis, odd-minor rounding, and stacking behavior against `riceballDrink`; the mapper does not invent those answers.
@@ -168,4 +171,4 @@ No live endpoint is changed by this branch.
 
 ## Next engineering action
 
-Register the smallest authenticated native catalog-read plus checkout capability over the existing host core, and obtain the approved device-enrollment and Owner/staff credential path before implementing security population writers. Then wire canonical Admin startup/doorbell convergence and run non-production bridge acceptance without a live charge. Keep the Dining planner unregistered until the complete Order index and every membership writer share the same Dining CAS/bump; `DINING_FORMAL_ADMIT`, `DINING_ITEMS_ADD`, and empty-wait seating remain fail-closed. Update each outbox dispatcher to echo the claimed attempt token. Do not claim production checkout, live payment, printer, or OTA acceptance from test-only security records.
+Pause further native binding at this checkpoint. First reconcile the deployed Admin V3 backend, formal canonical endpoint, approved MFP consumer route, readback semantics, and POS-tender field against exact SHA `5954f301c684e795453d622790ca11acae8dfe79`; run the documented V2-to-V3 map as a no-write dry run. Only then register the smallest authenticated native catalog-read plus checkout capability and obtain the approved device-enrollment and Owner/staff credential path. Keep the Dining planner unregistered until the complete Order index and every membership writer share the same Dining CAS/bump. Do not claim production checkout, live payment, printer, or OTA acceptance from test-only records.

@@ -3,7 +3,7 @@
 Status: CURRENT / CONTROLLING HANDOFF
 
 Current:
-`A9R — POS KERNEL R1 SOURCE_AND_ROOM_VERIFIED / PRODUCTION SOURCE BINDING IN PROGRESS`
+`A9R — POS KERNEL R1 SOURCE_AND_ROOM_VERIFIED / ADMIN V3 PRODUCTION BINDING FROZEN`
 
 Branch:
 `feat/MFP-V3-A9R-POS-KERNEL-R1-2026-10-03`
@@ -24,6 +24,8 @@ Engineering plan:
 
 POS functionality is the priority and UI work remains paused. Continue bounded engineering through the existing native Store Kernel and consume the existing Admin canonical publication. Do not create another authority or revive old V2 transaction code. Stop only for genuine money-policy decisions, credentials/access expansion, destructive/sensitive operations, or ambiguous authority conflicts.
 
+Admin V3 is Draft PR `#605`, branch `feat/MFK-V3ADMIN-ONE-SHOT-R1`, audited at `5954f301c684e795453d622790ca11acae8dfe79`. It uses the shared canonical envelope and formal server-draft/publish clients, but remains `ZERO PRODUCTION ROUTING`; its preview mode intentionally uses fixtures, and the audited source does not publish `posTenders`. The checked-out A0 `v3admin` folder is stale. V2 is migration/reference only.
+
 ## Implemented and verified
 
 `CHECKOUT_PAYMENT_CONFIRM` now has a trusted-native non-Student assembler, exact same-Room transaction mapping, and a high-level Android runtime quote/submit/readback bridge. It fresh-validates seven revisioned dependencies and the earliest freshness deadline, then atomically commits:
@@ -42,31 +44,32 @@ Commit `1e94181` encodes the Owner's resolved policy without inventing provider 
 
 Commits `2cfe244`, `8f9f228`, `ce6769b`, and `bfff335` add canonical Order readback plus Room-backed security, formal quote, canonical tender, Business Day, and display-allocation producers. Commit `0d5c18e33b6d4aee59ddd66f69973c82e9196b28` binds them to the high-level Android bridge, rejects browser raw aggregate/receipt/inbox/outbox operations, and fences stale quote and tender responses after a channel change.
 
-At code commit `863974f633199821caedb6ffbe09032cc3bcf383`:
+At code commit `5056b737d5d734019115c5e5fbaf88e234cd4d93`:
 
-- 24 Android unit-test suites;
-- 144 tests passed;
+- 26 Android unit-test suites;
+- 156 tests passed;
 - 0 failures, 0 errors, 0 skipped;
 - `:app:lintDebug` passed;
 - `:app:assembleDebug -x verifySmtWebBundle --no-daemon` passed.
 - Admin: 40 test files / 284 tests passed;
 - Admin production build and isolated strict tender-contract typecheck passed. The broad legacy Admin/Worker typecheck remains non-green from pre-existing Worker/Keeta typing debt.
 
-The end-to-end Room bridge test seeds explicit test-only security records. The Admin-to-Room POS tender publication path is source/Room verified, but this does not prove production device enrollment, Owner/staff authentication, provider settlement, physical printing, OTA activation, or live routing.
+The end-to-end Room bridge test seeds explicit test-only security records. Native canonical-envelope and POS-tender projection behavior is source/Room verified, but local `df260fd` publishes from V2-reference code and is not Admin V3 production proof. None of this proves Admin V3 routing, production device enrollment, Owner/staff authentication, provider settlement, physical printing, OTA activation, or live routing.
 
 ## Still fail-closed in production
 
-The high-level formal checkout bridge exists, and Admin now publishes the explicit canonical `posTenders` field into the same Room `POS_TENDER_POLICY`. Production still has no approved device-enrollment, Owner-password, or staff-PIN/session issuer/revoker, and no registered public/native catalog plus checkout capability. Those missing records/bindings cause the runtime to fail closed. Student checkout also remains fail-closed until canonical eligibility and the remaining money-policy rules are published.
+The high-level formal checkout bridge and same-Room `POS_TENDER_POLICY` projector exist. The local V2-reference publisher proposes explicit `posTenders`, but Admin V3 #605 does not yet publish that field and the native V3 consumer route is not proven. Production also has no approved device-enrollment, Owner-password, or staff-PIN/session issuer/revoker, and no registered public/native catalog plus checkout capability. Those missing records/bindings cause the runtime to fail closed. Student checkout also remains fail-closed until canonical eligibility and the remaining money-policy rules are published.
 
 Every outbox dispatcher must echo the claim item's positive `attemptCount`. Missing or stale tokens must fail closed.
 
 ## Current bounded work
 
-1. Obtain the approved enrollment/login/session path and credential provenance before implementing production device/Owner/staff population.
-2. Register one authenticated native catalog-read plus checkout capability over the existing host core; do not create browser aggregate authority or a second desktop confirmation.
-3. Wire canonical Admin startup/doorbell convergence, then verify bridge acceptance with non-production credentials and no live charge.
-4. Keep the Dining planner unregistered until every `Order.dining` membership/lifecycle writer CASes and bumps the same Dining revision.
-5. Continue dispatcher integration and physical Print/OTA acceptance separately; the crash-recovery source slices do not authorize activation or physical-proof claims.
+1. Reconcile the deployed Admin V3 backend, formal canonical endpoint, approved MFP consumer route, readback semantics, and POS-tender target field against exact SHA `5954f301c684e795453d622790ca11acae8dfe79`.
+2. Run the documented V2-to-V3 configuration mapping as a no-write dry run; do not bulk copy browser storage, credentials, permissions, or runtime/transaction state.
+3. Only after V3 source alignment, register one authenticated native catalog-read plus checkout capability and wire canonical startup/doorbell convergence.
+4. Obtain the approved enrollment/login/session path and credential provenance before implementing production device/Owner/staff population.
+5. Keep the Dining planner unregistered until every `Order.dining` membership/lifecycle writer CASes and bumps the same Dining revision.
+6. Continue dispatcher integration and physical Print/OTA acceptance separately; the crash-recovery source slices do not authorize activation or physical-proof claims.
 
 ## Resolved Owner policy
 
@@ -77,7 +80,7 @@ No remaining policy question blocks ordinary producer/read/adapter engineering. 
 
 ## Release boundary
 
-Source branch and Draft PR publication are now Owner-authorized. No merge, deploy, Builder request change, Candidate Publish, OTA activation, endpoint mutation, cutover, SMM decommission, live financial transaction, or physical acceptance has been performed by this branch. Only explicit Owner `PROMOTE` can open those release gates.
+This native branch's push/Draft-PR publication is frozen while the Admin V3 source target is reconciled. No push, merge, deploy, Builder request change, Candidate Publish, OTA activation, endpoint mutation, cutover, SMM decommission, live financial transaction, or physical acceptance has been performed by this branch. Only explicit Owner `PROMOTE` can open release gates after the source conflict is cleared.
 
 MILESTONE:
 `MFP_V3_A9R_POS_KERNEL_CURRENT_HANDOFF_2026_10_03`

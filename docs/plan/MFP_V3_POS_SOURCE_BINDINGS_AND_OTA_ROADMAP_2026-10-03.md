@@ -20,7 +20,9 @@ Commit `8c52b155fb75edd39e4018853ca3c4144682e179` adds native-only aggregate rev
 
 ## Stage 1 — Canonical Admin configuration producer
 
-Source of truth: the existing `AdminSyncStore` active `MFK_ADMIN_CONFIG_SYNC_V1` envelope served by `/api/admin-sync/active`, including `storeId`, positive source revision, `publishedAt`, `adminFingerprint`, snapshot, and envelope fingerprint.
+Target source of truth: Admin V3 Draft PR `#605`, branch `feat/MFK-V3ADMIN-ONE-SHOT-R1`, audited at `5954f301c684e795453d622790ca11acae8dfe79`. It uses the shared `MFK_ADMIN_CONFIG_SYNC_V1` envelope and authenticated `/api/admin-browser/...` canonical/draft/publish clients. The shared envelope, revision, published time, admin fingerprint, snapshot, and envelope fingerprint remain reusable.
+
+Production binding correction: PR #605 explicitly remains `ZERO PRODUCTION ROUTING`; its preview mode intentionally disables canonical reads, and it does not publish `posTenders`. The native `/api/admin-sync/active` reader and local V2 publisher are therefore source/Room-tested compatibility pieces, not proof of the deployed Admin V3 MFP route. V2 `AdminSyncStore` is migration/reference only unless the deployed V3 backend contract explicitly retains that service role. See `docs/architecture/MFP_ADMIN_V2_TO_V3_CONFIGURATION_MIGRATION_MAP_2026-10-03.md`.
 
 Required native behavior:
 
@@ -31,7 +33,7 @@ Required native behavior:
 5. Preserve last-known-good state on network, parse, validation, or apply failure; expose exact source freshness and error without claiming convergence.
 6. Bind the existing v3 sync transport or provide a compatibility adapter from this same canonical envelope. Do not create a parallel polling authority.
 
-Implemented source slices: `521158dda13711c6ac3d7d4fb62e2181bb2d63ce` validates and projects the canonical envelope into the Store Kernel; `d87ad51` performs one explicit HTTPS-only `/api/admin-sync/active` read with redirects disabled, bounded time/body, 404 LKG preservation, and no automatic retry or polling. Runtime startup/doorbell wiring remains intentionally unbound until the device/session authority is integrated. Commit `a2a3194732ee10b136eb488dad408d0442e6546a` adds a native read-only adapter from the accepted Room envelope to immutable checkout source facts while leaving POS tender and Student eligibility explicitly unbound. Current scoped native regression: 62/62, including 24 real Room tests and HTTP-response-to-LKG integration.
+Implemented reusable source slices: `521158dda13711c6ac3d7d4fb62e2181bb2d63ce` validates and projects the shared canonical envelope into the Store Kernel; `d87ad51` performs one explicit HTTPS-only `/api/admin-sync/active` read with redirects disabled, bounded time/body, 404 LKG preservation, and no automatic retry or polling. That endpoint remains unbound for Admin V3 production until deployment and consumer-route provenance are proven. Commit `a2a3194732ee10b136eb488dad408d0442e6546a` adds a native read-only adapter from the accepted Room envelope to immutable checkout source facts while leaving POS tender and Student eligibility explicitly unbound.
 
 Acceptance: publish/sync convergence, idempotent same fingerprint, rollback/conflict rejection, offline LKG, restart recovery, and Store Kernel readback.
 
@@ -78,7 +80,7 @@ Commit `a2a3194732ee10b136eb488dad408d0442e6546a` also freezes exact decimal-to-
 
 Commit `ce6769bb088c5d3bcf4df5270e204b1868eb54ee` adds the bounded Room-backed non-Student quote producer. It fresh-reads `ADMIN_ACTIVE_CONFIGURATION` and explicit `POS_TENDER_POLICY`, re-resolves supported PRODUCT/no-option/no-combo `WALK_IN` intent, ignores browser preview money, applies the current takeaway adjustment, and writes `FORMAL_QUOTE` with source revisions and expiry. Commit `bfff335004ea26972a3b721b99c78ce48e30bff1` adds the tender and Business Day readers/classifier. Cash maps to `CASH_COUNTED`; electronic tender maps to `STAFF_CONFIRMED`; neither path claims provider verification. The Business Day uses Admin timezone/cutoff without inventing an OPEN gate.
 
-Commit `df260fd12807e87ff83f20def57ee879f2bb98f2` completes the explicit Admin POS-tender publication field and same-Room projector. The typed initial policy enables stable IDs `CASH`, `ALIPAY`, `WECHAT_PAY`, `FPS`, and `PAYME`; Octopus and credit card are absent. Admin policy revision rollback or same-revision content conflict rejects, a valid publication atomically writes `ADMIN_ACTIVE_CONFIGURATION` plus `POS_TENDER_POLICY`, and removing a tender never deletes historical Payment references. `customerPaymentChannels` and `paymentRefs` remain insufficient and are not promoted.
+Commit `df260fd12807e87ff83f20def57ee879f2bb98f2` proves a V2-reference `posTenders` schema and same-Room projector. The typed proposal enables stable IDs `CASH`, `ALIPAY`, `WECHAT_PAY`, `FPS`, and `PAYME`; Octopus and credit card are absent. Policy revision rollback or same-revision content conflict rejects, a valid envelope atomically writes `ADMIN_ACTIVE_CONFIGURATION` plus `POS_TENDER_POLICY`, and removing a tender never deletes historical Payment references. `customerPaymentChannels` and `paymentRefs` remain insufficient and are not promoted. This is not Admin V3 completion: audited PR #605 has no `posTenders` field, so V3 publication/readback remains fail-closed.
 
 ## Stage 4 — One `CHECKOUT_PAYMENT_CONFIRM` handler
 
@@ -150,4 +152,4 @@ Progress one command family at a time through the existing formal router: order 
 3. Built V3 runtime bundle and Carrier packaging test without V2 fallback regression.
 4. Device/security/config-sync test using non-production credentials and no live charge.
 5. Physical printer/device acceptance as a separate gate.
-6. Source branch and Draft PR publication are authorized. Explicit Owner release authorization remains required before Candidate Publish, deploy, OTA activation, cutover, or merge.
+6. This native branch's source/Draft-PR publication is frozen until Admin V3 source/deployment alignment is reconciled. Explicit Owner release authorization remains required before Candidate Publish, deploy, OTA activation, cutover, or merge.
