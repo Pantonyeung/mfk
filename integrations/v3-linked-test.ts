@@ -99,6 +99,7 @@ export async function linkedGateway(request:Request,env:LinkedEnv,surface:'admin
   const allowed=publicReads.includes(path)||(surface==='admin'&&(path==='/session'||path==='/api/health'||adminRoutes.includes(path)))||(surface==='customer'&&['/submit','/readback'].includes(path))||(['admin','pos'].includes(surface)&&['/requests','/review'].includes(path));
   if(!allowed)return linkedJson({code:'LINKED_ROUTE_NOT_ALLOWED'},403);
   try{
+    if(surface==='admin'&&path==='/api/health'){if(request.method!=='GET')return linkedJson({code:'METHOD_NOT_ALLOWED'},405);return stub(env,'ADMIN_SYNC').fetch(internal('/linked-test/preservation-proof'));}
     if(path==='/health'||path==='/api/health')return linkedJson({ok:true,service:'mfk-admin',scope:LINKED_SCOPE,configurationWritesEnabled:surface==='admin',mode:'CONNECTED_TEST',catalogConnected:true,requestInboxConnected:true,formalCheckoutConnected:false,physicalPrintConnected:false});
     const admin=await ensureLinked(env);
     if(path==='/catalog'&&request.method==='GET')return admin.fetch(internal('/linked-test/catalog'));

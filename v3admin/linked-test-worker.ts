@@ -1,10 +1,34 @@
 import original,{AdminSyncStore as BaseAdmin,CustomerRuntimeStore as BaseCustomer,KeetaRuntimeStore} from './worker.ts';
 import {createMfkAdminConfigEnvelope} from '../contracts/admin-config-sync-v1.ts';
-import {LINKED_SCOPE,LINKED_HEADER,businessSnapshot,catalogProjection,linkedGateway,linkedJson,record,bodyJson,internal} from '../integrations/v3-linked-test.ts';
+import {LINKED_SCOPE,LINKED_HEADER,businessSnapshot,catalogProjection,linkedGateway,linkedJson,record,bodyJson,internal,stub} from '../integrations/v3-linked-test.ts';
 export {KeetaRuntimeStore};
 declare const WebSocketPair:any;
 async function hash(value:string){return [...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value)))].map(v=>v.toString(16).padStart(2,'0')).join('');}
 function publicState(row:any){const rejected=row.state==='REJECTED';return {submissionId:row.submissionId,state:row.state,reviewState:rejected?'REJECTED':row.linkedReviewState??'UNSEEN',reviewedAt:row.linkedReviewedAt??null,message:rejected?'店舖未能接受呢個要求':row.linkedReviewState==='SEEN'?'POS 已查看點餐要求；尚未成交或收款':'已送達共用待處理單；等候 POS 查看',formalOrderCreated:false,paymentConfirmed:false};}
+function evidenceMetadata(active:any,observedAt:string){
+  if(active?.storeId!=='MF01'||!/^fnv1a32:[0-9a-f]{8}$/.test(active.fingerprint??'')||!Number.isSafeInteger(active.revision)||active.revision<1||typeof active.publishedAt!=='string'||!Number.isFinite(Date.parse(active.publishedAt)))return null;
+  return {storeId:'MF01',fingerprint:active.fingerprint,revision:active.revision,publishedAt:active.publishedAt,observedAt};
+}
+async function preservationProof(target:any){
+  const observedAt=new Date().toISOString(),unavailableReasons:string[]=[];
+  let original:any=null;
+  try{const response=await stub(target.env,'ADMIN_SYNC','MF01').fetch(internal('/linked-test/source-metadata'));if(response.ok){const body=await response.json();if(typeof body.observedAt==='string'&&Number.isFinite(Date.parse(body.observedAt)))original=evidenceMetadata(body,body.observedAt);}}catch{}
+  if(!original)unavailableReasons.push('ORIGINAL_METADATA_UNAVAILABLE');
+  const initialized=await target.state.storage.get('linked-test:scope')===LINKED_SCOPE;
+  const source=initialized?await target.state.storage.get('linked-test:source'):null;
+  const bootstrap=source&&/^fnv1a32:[0-9a-f]{8}$/.test(source.fingerprint??'')&&typeof source.publishedAt==='string'&&Number.isFinite(Date.parse(source.publishedAt))?{fingerprint:source.fingerprint,publishedAt:source.publishedAt,revision:null}:null;
+  if(!bootstrap)unavailableReasons.push('BOOTSTRAP_METADATA_UNAVAILABLE');
+  const linked=initialized?evidenceMetadata(await target.state.storage.get('active'),observedAt):null;
+  if(!linked)unavailableReasons.push('LINKED_METADATA_UNAVAILABLE');
+  let isolatedCounts:any=null;
+  if(initialized&&linked){try{
+    const response=await stub(target.env,'CUSTOMER_RUNTIME').fetch(internal('/linked-test/counts'));
+    if(response.ok){const counts=await response.json();if(!counts||['requestRecords','unseenPending','seenPending','rejected','other'].some(key=>!Number.isSafeInteger(counts[key])||counts[key]<0)||counts.unseenPending+counts.seenPending+counts.rejected+counts.other!==counts.requestRecords)throw Error('ISOLATED_COUNTS_INVALID');const rows=await target.state.storage.list({prefix:'projection:order:'});isolatedCounts={requestRecords:counts.requestRecords,unseenPending:counts.unseenPending,seenPending:counts.seenPending,rejected:counts.rejected,other:counts.other,adminOrderProjectionRecords:rows.size};}
+  }catch{}}
+  if(!isolatedCounts)unavailableReasons.push('ISOLATED_COUNTS_UNAVAILABLE');
+  const state=unavailableReasons.length?'UNAVAILABLE':original.fingerprint===bootstrap.fingerprint&&original.publishedAt===bootstrap.publishedAt?'MATCH':'CHANGED';
+  return {scope:LINKED_SCOPE,evidenceKind:'CANONICAL_IDENTITY_COMPARISON',fingerprintAlgorithm:'fnv1a32',observedAt,state,original,bootstrap,linked,isolatedCounts,unavailableReasons};
+}
 function socket(state:any){const pair=new WebSocketPair();state.acceptWebSocket(pair[1]);pair[1].send(JSON.stringify({type:'REFRESH_REQUIRED'}));return new Response(null,{status:101,webSocket:pair[0]} as any);}
 function notify(state:any){for(const ws of state.getWebSockets()){try{ws.send(JSON.stringify({type:'REFRESH_REQUIRED'}));}catch{}}}
 /** Same published Admin authority and namespace; only an explicitly isolated test instance gets anonymous sessions. */
@@ -21,12 +45,22 @@ export class AdminSyncStore extends BaseAdmin{
     const path=new URL(request.url).pathname;
     if(!path.startsWith('/linked-test/'))return super.fetch(request);
     if(this.env.MFP_V3_LINKED_TEST_ENABLED!=='1'||request.headers.get(LINKED_HEADER)!==LINKED_SCOPE)return linkedJson({code:'LINKED_INTERNAL_ADMISSION_REQUIRED'},403);
+    if(path==='/linked-test/source-metadata'){
+      if(request.method!=='GET')return linkedJson({code:'METHOD_NOT_ALLOWED'},405);
+      if(String(this.state.id)!==String(this.env.ADMIN_SYNC.idFromName('MF01')))return linkedJson({code:'LINKED_SOURCE_SCOPE_INVALID'},403);
+      const metadata=evidenceMetadata(await this.state.storage.get('active'),new Date().toISOString());
+      return metadata?linkedJson(metadata):linkedJson({code:'ORIGINAL_METADATA_UNAVAILABLE'},503);
+    }
     if(path==='/linked-test/source'&&request.method==='GET'){
       if(String(this.state.id)!==String(this.env.ADMIN_SYNC.idFromName('MF01')))return linkedJson({code:'LINKED_SOURCE_SCOPE_INVALID'},403);
       const active=await this.state.storage.get('active');if(!active)return linkedJson({code:'SOURCE_NOT_PUBLISHED'},404);
       try{return linkedJson({snapshot:businessSnapshot(active.snapshot),sourceFingerprint:active.fingerprint,sourcePublishedAt:active.publishedAt});}catch{return linkedJson({code:'LINKED_SOURCE_PRIVACY_PROJECTION_FAILED'},503);}
     }
     if(String(this.state.id)!==String(this.env.ADMIN_SYNC.idFromName(LINKED_SCOPE)))return linkedJson({code:'LINKED_TARGET_SCOPE_INVALID'},403);
+    if(path==='/linked-test/preservation-proof'){
+      if(request.method!=='GET')return linkedJson({code:'METHOD_NOT_ALLOWED'},405);
+      return linkedJson({ok:true,service:'mfk-admin',scope:LINKED_SCOPE,mode:'CONNECTED_TEST',configurationWritesEnabled:true,catalogConnected:true,requestInboxConnected:true,formalCheckoutConnected:false,physicalPrintConnected:false,preservationProof:await preservationProof(this)});
+    }
     if(path==='/linked-test/bootstrap'&&request.method==='POST'){
       const input=await bodyJson(request);
       return this.state.blockConcurrencyWhile(async()=>{
@@ -70,6 +104,12 @@ export class CustomerRuntimeStore extends BaseCustomer{
     const path=new URL(request.url).pathname;if(!path.startsWith('/linked-test/'))return super.fetch(request);
     if(this.env.MFP_V3_LINKED_TEST_ENABLED!=='1'||request.headers.get(LINKED_HEADER)!==LINKED_SCOPE||String(this.state.id)!==String(this.env.CUSTOMER_RUNTIME.idFromName(LINKED_SCOPE)))return linkedJson({code:'LINKED_INTERNAL_ADMISSION_REQUIRED'},403);
     if(path==='/linked-test/events'){if(this.state.getWebSockets().length>=100)return linkedJson({code:'LINKED_SOCKET_LIMIT'},429);return socket(this.state);}
+    if(path==='/linked-test/counts'){
+      if(request.method!=='GET')return linkedJson({code:'METHOD_NOT_ALLOWED'},405);
+      const rows=await this.state.storage.list({prefix:'order:'}),counts={requestRecords:rows.size,unseenPending:0,seenPending:0,rejected:0,other:0};
+      for(const row of rows.values()){if(row?.state==='REJECTED')counts.rejected++;else if(row?.state==='PENDING_SMT'){if(row.linkedReviewState==='SEEN')counts.seenPending++;else counts.unseenPending++;}else counts.other++;}
+      return linkedJson(counts);
+    }
     if(path==='/linked-test/list'&&request.method==='GET'){
       const found=await this.state.storage.list({prefix:'order:',limit:200});
       return linkedJson({scope:LINKED_SCOPE,requests:[...found.values()].map((r:any)=>({...publicState(r),cart:r.cart,checkout:r.checkout,receivedAt:r.receivedAt,idempotencyKey:r.idempotencyKey})),formalOrders:false});

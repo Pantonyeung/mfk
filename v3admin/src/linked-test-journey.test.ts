@@ -5,9 +5,10 @@ import * as loaded from '../linked-test-worker.ts';
 const worker=loaded.default;
 class Storage{
   data=new Map<string,any>();
+  writes=0;
   async get(k:string){return structuredClone(this.data.get(k));}
-  async put(k:string,v:any){this.data.set(k,structuredClone(v));}
-  async delete(k:string){return this.data.delete(k);}
+  async put(k:string,v:any){this.writes++;this.data.set(k,structuredClone(v));}
+  async delete(k:string){this.writes++;return this.data.delete(k);}
   async list({prefix='',limit=1000}:any={}){return new Map([...this.data].filter(([k])=>k.startsWith(prefix)).slice(0,limit).map(([k,v])=>[k,structuredClone(v)]));}
 }
 function fixture(){
@@ -74,4 +75,45 @@ describe('cross-surface real persistence contract',()=>{
   it('fails closed when linked mode is disabled',async()=>{const {env}=fixture();env.MFP_V3_LINKED_TEST_ENABLED='0';expect((await gateway(env,'customer','/catalog')).status).toBe(503);});
   it('rejects cross-site browser writes before state access',async()=>{const {env}=fixture();const r=await linkedGateway(new Request('https://admin.morefunos.com/api/v3-test/session',{method:'POST',headers:{origin:'https://attacker.invalid'}}),env,'admin');expect(r?.status).toBe(403);});
   it('does not bootstrap into the original MF01 instance even with internal headers',async()=>{const {env,active}=await start();const r=await env.ADMIN_SYNC.get('MF01').fetch(internal('/linked-test/bootstrap','POST',{snapshot:active.snapshot}));expect(r.status).toBe(403);});
+});
+
+
+describe('read-only linked Admin preservation evidence',()=>{
+  it('reads real MF01 identity without bootstrap or any storage writes when isolated baseline is absent',async()=>{
+    const {env,source,req}=fixture(),before=await source.state.storage.get('active');
+    const result=await req('/api/v3-test/api/health');expect(result.status).toBe(200);const proof=(await result.json()).preservationProof;
+    expect(proof.state).toBe('UNAVAILABLE');expect(proof.original).toMatchObject({storeId:'MF01',fingerprint:before.fingerprint,revision:before.revision,publishedAt:before.publishedAt});
+    expect(proof.bootstrap).toBeNull();expect(proof.linked).toBeNull();expect(proof.isolatedCounts).toBeNull();
+    expect(env.ADMIN_SYNC.get(LINKED_SCOPE).state.storage.data.size).toBe(0);expect(env.ADMIN_SYNC.get(LINKED_SCOPE).state.storage.writes).toBe(0);expect(source.state.storage.writes).toBe(0);expect(await source.state.storage.get('active')).toEqual(before);expect(JSON.stringify(proof)).not.toMatch(/NEVER_EXPORT|staffAuth|snapshot|sessionToken|pinVerifier/);
+  });
+  it('compares live original metadata with stored bootstrap identity and reports only scoped measured counts',async()=>{
+    const {env,source,req,active}=await start(),input=intent(active.fingerprint);const before=await source.state.storage.get('active');
+    await gateway(env,'customer','/submit','POST',input);await gateway(env,'pos','/review','POST',{...input,reviewState:'SEEN'});
+    const read=async()=>(await(await req('/api/v3-test/api/health')).json()).preservationProof;
+    const stores=[source.state.storage,env.ADMIN_SYNC.get(LINKED_SCOPE).state.storage,env.CUSTOMER_RUNTIME.get(LINKED_SCOPE).state.storage],writesBefore=stores.map(s=>s.writes);
+    const first=await read();expect(stores.map(s=>s.writes)).toEqual(writesBefore);expect(first.state).toBe('MATCH');expect(first.bootstrap).toEqual({fingerprint:before.fingerprint,publishedAt:before.publishedAt,revision:null});expect(first.original.revision).toBe(before.revision);expect(first.linked.fingerprint).toBe(active.fingerprint);
+    expect(first.isolatedCounts).toEqual({requestRecords:1,unseenPending:0,seenPending:1,rejected:0,other:0,adminOrderProjectionRecords:0});
+    env.ADMIN_SYNC.get(LINKED_SCOPE).state.storage.data.set('projection:order:synthetic',{payload:{id:'test-only'}});
+    await gateway(env,'pos','/review','POST',{...input,reviewState:'REJECTED'});const next=await read();expect(next.isolatedCounts.rejected).toBe(1);expect(next.isolatedCounts.seenPending).toBe(0);expect(next.isolatedCounts.adminOrderProjectionRecords).toBe(1);
+    const changed=createMfkAdminConfigEnvelope({...before,revision:before.revision+1,publishedAt:'2026-10-03T02:00:00Z',snapshot:{...before.snapshot,catalog:{...before.snapshot.catalog,products:before.snapshot.catalog.products.map((p:any)=>({...p,basePrice:'99.00'}))}}});source.state.storage.data.set('active',changed);
+    expect((await read()).state).toBe('CHANGED');expect((await read()).original.fingerprint).toBe(changed.fingerprint);
+    expect(await source.state.storage.get('active')).toEqual(changed);expect(JSON.stringify(next)).not.toMatch(/NEVER_EXPORT|snapshot|staffAuth|sessionToken|pinVerifier/);
+  });
+  it('never invents a match or zero counts when source, baseline or a namespace is unavailable',async()=>{
+    const {env,source,req}=await start();source.state.storage.data.delete('active');
+    let proof=(await(await req('/api/v3-test/api/health')).json()).preservationProof;expect(proof.state).toBe('UNAVAILABLE');expect(proof.original).toBeNull();
+    env.ADMIN_SYNC.get(LINKED_SCOPE).state.storage.data.set('linked-test:source',{fingerprint:'',publishedAt:'bad'});proof=(await(await req('/api/v3-test/api/health')).json()).preservationProof;expect(proof.bootstrap).toBeNull();expect(proof.state).toBe('UNAVAILABLE');
+    delete env.CUSTOMER_RUNTIME;proof=(await(await req('/api/v3-test/api/health')).json()).preservationProof;expect(proof.isolatedCounts).toBeNull();expect(proof.unavailableReasons).toContain('ISOLATED_COUNTS_UNAVAILABLE');
+  });
+  it.each([{},{requestRecords:-1,unseenPending:0,seenPending:0,rejected:0,other:0},{requestRecords:2,unseenPending:0,seenPending:1,rejected:0,other:0}])('marks malformed isolated counts unavailable rather than claiming a match: %j',async counts=>{
+    const {env,req}=await start();env.CUSTOMER_RUNTIME={idFromName:(name:string)=>name,get:()=>({fetch:async()=>new Response(JSON.stringify(counts),{headers:{'content-type':'application/json'}})})};
+    const proof=(await(await req('/api/v3-test/api/health')).json()).preservationProof;expect(proof.state).toBe('UNAVAILABLE');expect(proof.isolatedCounts).toBeNull();expect(proof.unavailableReasons).toContain('ISOLATED_COUNTS_UNAVAILABLE');
+  });
+  it('exposes proof only on read-only Admin health and refuses direct wrong-instance metadata reads',async()=>{
+    const {env,req}=await start();expect((await req('/api/v3-test/api/health','POST',{})).status).toBe(405);
+    for(const surface of ['customer','pos'] as const){expect((await gateway(env,surface,'/api/health')).status).toBe(403);expect((await(await gateway(env,surface,'/health')).json()).preservationProof).toBeUndefined();}
+    expect((await env.ADMIN_SYNC.get(LINKED_SCOPE).fetch(internal('/linked-test/source-metadata'))).status).toBe(403);
+    expect((await env.ADMIN_SYNC.get('MF01').fetch(internal('/linked-test/preservation-proof'))).status).toBe(403);
+    env.MFP_V3_LINKED_TEST_ENABLED='0';expect((await req('/api/v3-test/api/health')).status).toBe(503);
+  });
 });

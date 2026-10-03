@@ -1,6 +1,7 @@
 import {useEffect,useRef,useState} from 'react';
 import {useQuery,useQueryClient} from '@tanstack/react-query';
 import {AdminShell} from './admin-shell.tsx';
+import {LinkedPreservationDisclosure} from './linked-preservation-proof.tsx';
 import {V3FormalDraftProvider,useV3FormalDraft,v3FormalDraftQueryKey} from './formal-draft.tsx';
 import {V3ReadModelProvider} from './formal-read-model.tsx';
 import {readV3CanonicalAdminActive,v3AdminCanonicalQueryKey} from './canonical.ts';
@@ -19,7 +20,7 @@ function RequestInbox(){
 }
 function Workspace({session,canonical,onRefresh}:{session:V3AdminSession;canonical:MfkAdminConfigEnvelope;onRefresh:()=>void}){
   const draft=useV3FormalDraft();
-  return <AdminShell storeId="MF01 · 共用測試資料" displayName="免登入連線測試" releaseStatus={<section className="v3-preview-release"><strong>商品設定及客戶待處理單已接駁</strong><p>修改後先儲存草稿，再到「發佈中心」發佈，客戶端同 POS 先會更新。原有員工身份及平台憑證唔喺呢個工作區。收款及實體打印仍未接通。</p><small>{V3_CLIENT_RELEASE.releaseId} · 已發佈 {canonical.publishedAt}</small><RequestInbox/></section>} canonicalState="fresh" canonicalSnapshot={draft.workingSnapshot} formalDraftEnabled initialPath="/admin/catalog/products" onRefresh={onRefresh} onDiagnostics={onRefresh} onSignOut={()=>window.location.reload()}/>;
+  return <AdminShell storeId="MF01 · 共用測試資料" displayName="免登入連線測試" releaseStatus={<section className="v3-preview-release"><strong>商品設定及客戶待處理單已接駁</strong><p>修改後先儲存草稿，再到「發佈中心」發佈，客戶端同 POS 先會更新。原有員工身份及平台憑證唔喺呢個工作區。收款及實體打印仍未接通。</p><small>{V3_CLIENT_RELEASE.releaseId} · 已發佈 {canonical.publishedAt}</small><RequestInbox/><LinkedPreservationDisclosure/></section>} canonicalState="fresh" canonicalSnapshot={draft.workingSnapshot} formalDraftEnabled initialPath="/admin/catalog/products" onRefresh={onRefresh} onDiagnostics={onRefresh} onSignOut={()=>window.location.reload()}/>;
 }
 export function LinkedAdminApp(){
   const client=useQueryClient();const [auth,setAuth]=useState<V3AdminSession|null>(null);const [error,setError]=useState('');const mounted=useRef(true);

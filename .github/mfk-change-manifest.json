@@ -280,6 +280,8 @@
     "v3admin/src/full-preview-route-coverage.test.tsx",
     "v3admin/src/gate1-foundation.test.ts",
     "v3admin/src/linked-admin.tsx",
+    "v3admin/src/linked-preservation-proof.test.tsx",
+    "v3admin/src/linked-preservation-proof.tsx",
     "v3admin/src/linked-test-journey.test.ts",
     "v3admin/src/main.tsx",
     "v3admin/src/mobile-grouped-list.tsx",
@@ -545,6 +547,18 @@
     },
     "bounded_shared_correction": "Canonical REJECTED takes precedence over prior SEEN in public state projection; no schema or persistence change",
     "customer_recovery": "Explicit new test request requires fresh canonical SEEN/REJECTED and atomically archives prior immutable intent; unknown/pending/persistence conflict keeps current identity",
-    "browser_acceptance": "LOCAL_BROWSER_BLOCKED; SIX_CUSTOMER_BROWSER_REGRESSIONS_REQUIRED_IN_BRANCH_CI; PUBLIC_E2E_PARENT_OWNED"
+    "browser_acceptance": "LOCAL_BROWSER_BLOCKED; SIX_CUSTOMER_BROWSER_REGRESSIONS_REQUIRED_IN_BRANCH_CI; PUBLIC_E2E_PARENT_OWNED",
+    "preservation_evidence": {
+      "execution_base_sha": "1808bda83d935e1161329c4f07aeeb9187bc51c7",
+      "mode": "READ_ONLY_EXISTING_ADMIN_HEALTH_METADATA_PROJECTION",
+      "source_scope": "EXACT_MF01_ACTIVE_CANONICAL_IDENTITY_ONLY; NO_RAW_SNAPSHOT_PRIVATE_DATA_OR_CREDENTIALS",
+      "writes": "NONE; NO_ENSURE_LINKED_BOOTSTRAP_SESSION_OR_PUBLISH",
+      "missing_data": "UNAVAILABLE; HISTORICAL_BOOTSTRAP_REVISION_NULL",
+      "fingerprint_algorithm": "fnv1a32; NOT_CRYPTOGRAPHIC_OR_WHOLE_DATABASE_AUDIT",
+      "counts": "OBSERVED_ISOLATED_REQUEST_AND_ADMIN_ORDER_PROJECTION_RECORDS_ONLY",
+      "ui": "EXPLICIT_REFRESH_ONLY; NO_BACKGROUND_POLLING",
+      "consumer_source_changes": "NONE",
+      "acceptance": "PARENT_LIVE_BEFORE_AFTER_CAPTURE_REQUIRED"
+    }
   }
 }
