@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {mkdtemp,readlink,readdir,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {guardContext, readSnapshot, assertPreserved, validateBuildIdentity, validateConfig, makePosConfig, RELEASE, runQuiet, verifyRemoteHead, createWranglerEnvironment} from './v3-release-preflight.mjs';
+import {guardContext, readSnapshot, assertPreserved, validateBuildIdentity, validateConfig, makePosConfig, RELEASE, runQuiet, verifyRemoteHead, createWranglerEnvironment, createMetadataClient} from './v3-release-preflight.mjs';
 const sha='a'.repeat(40);
 const context={repository:'Pantonyeung/mfk',repositoryOwner:'Pantonyeung',eventName:'workflow_dispatch',ref:RELEASE.ref,sha,localHead:sha,inputs:{expected_sha:sha,target:'all',operation:'preflight'}};
 const secret=()=>new Proxy({name:'KEETA_APP_SECRET',type:'secret_text'},{get(o,k){if(['text','value','json'].includes(k))throw Error('secret value read');return o[k];}});
@@ -76,4 +76,81 @@ test('asset-only POS and Customer metadata have bounded topology without Admin r
  const c=fakeApi({settings:{bindings:[{name:'ASSETS',type:'assets'},{name:'CUSTOMER_ASSETS',type:'r2_bucket',bucket_name:'mfk-customer-assets'}]},version:{id:'version-old',resources:{script_runtime:{},script:{etag:'old'}}},domains:[{hostname:'order.morefunos.com',service:'mfk-customer',environment:'production'}]});
  assert.equal((await readSnapshot('customer',{api:c.api})).service,'mfk-customer');
  await assert.rejects(readSnapshot('pos',{api:fakeApi({settings:{bindings:[]},version:{id:'version-old',resources:{script_runtime:{},script:{etag:'old'}}},scriptSubdomain:{enabled:false,previews_enabled:false}}).api}),/WORKERS_DEV/);
+});
+
+const accountPath=`/accounts/${RELEASE.account}/workers`;
+const deploymentPath=`${accountPath}/scripts/mfk-admin/deployments`;
+const domainPath=`${accountPath}/domains`;
+const deployment=(id)=>({id,versions:[{version_id:`version-${id}`,percentage:100}]});
+const pageBody=(rows,page,total,perPage=100)=>({success:true,result:{deployments:rows},result_info:{page,per_page:perPage,count:rows.length,total_count:total,total_pages:Math.ceil(total/perPage)}});
+function mockMetadata(bodies){
+ const calls=[],diagnostics=[];let index=0;
+ const api=createMetadataClient({accountId:RELEASE.account,token:'synthetic-token',onDiagnostic:d=>diagnostics.push(d),fetchImpl:async(url,options)=>{
+  calls.push({url,options});const body=typeof bodies==='function'?bodies(index++,url):bodies[index++];assert(body,'mock exhausted');return {ok:true,status:200,json:async()=>body};
+ }});
+ return {api,calls,diagnostics};
+}
+test('deployment pagination preserves active-first ordering and validates all bounded pages',async()=>{
+ const first=Array.from({length:100},(_,i)=>deployment(`d${i}`));const last=[deployment('d100')];
+ const mock=mockMetadata([pageBody(first,1,101),pageBody(last,2,101),pageBody(first,1,101)]);
+ const result=await mock.api(deploymentPath);assert.equal(result.deployments.length,101);assert.equal(result.deployments[0].id,'d0');
+ assert.deepEqual(mock.calls.map(c=>new URL(c.url).search),['?page=1&per_page=100','?page=2&per_page=100','?page=1&per_page=100']);
+ assert(mock.calls.every(c=>c.options.method==='GET'));
+});
+test('deployment pagination rejects missing/unknown/inconsistent metadata, duplicates, truncation and excessive bounds',async()=>{
+ const row=deployment('d0');
+ const bad=[{success:true,result:{deployments:[row]}},pageBody([row],2,1),pageBody([row],1,1,20),pageBody([row],1,101),pageBody([row],1,2501),{...pageBody([row],1,1),result_info:{...pageBody([row],1,1).result_info,cursor:'secret-cursor'}},{...pageBody([row],1,1),result_info:{page:1,count:1}},pageBody([row,row],1,2)];
+ for(const body of bad)await assert.rejects(mockMetadata([body]).api(deploymentPath));
+ const first=Array.from({length:100},(_,i)=>deployment(`d${i}`));
+ for(const body of [pageBody([row],2,101),pageBody([],2,101),pageBody([deployment('d100')],2,102),pageBody([deployment('d100')],1,101)])await assert.rejects(mockMetadata([pageBody(first,1,101),body]).api(deploymentPath));
+ const changed=[...first];changed[0]=deployment('new');await assert.rejects(mockMetadata([pageBody(first,1,101),pageBody([deployment('d100')],2,101),pageBody(changed,1,101)]).api(deploymentPath),/PAGINATION_CHANGED/);
+});
+test('repeated pages terminate with failure and do not request an unbounded next page',async()=>{
+ const first=Array.from({length:100},(_,i)=>deployment(`d${i}`));const mock=mockMetadata(()=>pageBody(first,1,200));
+ await assert.rejects(mock.api(deploymentPath));assert.equal(mock.calls.length,2);
+});
+test('domain list uses no undocumented paging parameters and rejects ambiguous completeness and duplicates',async()=>{
+ const domain={id:'domain-admin',hostname:'admin.morefunos.com',service:'mfk-admin',environment:'production'};
+ const one={success:true,result:[domain]};const mock=mockMetadata([one]);assert.deepEqual(await mock.api(domainPath),[domain]);assert.equal(new URL(mock.calls[0].url).search,'');
+ const validInfo={page:1,per_page:100,count:1,total_count:1,total_pages:1};assert.equal((await mockMetadata([{...one,result_info:validInfo}]).api(domainPath)).length,1);
+ for(const body of [{...one,result:[domain,domain]},{...one,result_info:{...validInfo,total_pages:2,total_count:200}},{...one,result_info:{...validInfo,count:2}},{...one,result_info:{page:1}},{...one,result_info:{...validInfo,cursors:{after:'secret'}}}])await assert.rejects(mockMetadata([body]).api(domainPath));
+});
+test('safe diagnostics preserve endpoint/stage and numeric shape without unknown strings or binding values',async()=>{
+ const body={...pageBody([deployment('d0')],1,1),result_info:{page:'SENSITIVE_PAGE',count:1,cursor:'SECRET_CURSOR'}};
+ const mock=mockMetadata([body]);await assert.rejects(mock.api(deploymentPath));
+ const serialized=JSON.stringify(mock.diagnostics);assert(serialized.includes('deployments'));assert(!serialized.includes('SENSITIVE_PAGE'));assert(!serialized.includes('SECRET_CURSOR'));assert(!serialized.includes('synthetic-token'));
+ const secretValue=new Proxy({name:'SECRET',type:'secret_text'},{get(o,k){if(k==='text'||k==='value')throw Error('value inspected');return o[k];}});
+ const safe=mockMetadata([{success:true,result:{bindings:[secretValue]}}]);await safe.api(`${accountPath}/scripts/mfk-admin/settings`);assert(!JSON.stringify(safe.diagnostics).includes('SECRET'));
+});
+test('missing POS ETag is diagnostic-blocked until positive assets-only proof exists; Admin and Customer stay strict',async()=>{
+ const shapes=[];const pos=fakeApi({settings:{bindings:[]},version:{id:'version-old',resources:{bindings:[]}},scriptSubdomain:{enabled:true,previews_enabled:false}});
+ await assert.rejects(readSnapshot('pos',{api:pos.api,config:makePosConfig('/work/repo'),root:'/work/repo',onDiagnostic:d=>shapes.push(d)}),/POS_ASSETS_ONLY_EVIDENCE_REQUIRED/);
+ assert(shapes.some(d=>d.endpoint==='version'&&d.scriptPresent===false&&d.versionBindingsCount===0));
+ for(const target of ['admin','customer']){
+  const changes=target==='admin'?{}:{settings:{bindings:[{name:'ASSETS',type:'assets'},{name:'CUSTOMER_ASSETS',type:'r2_bucket',bucket_name:'mfk-customer-assets'}]}};
+  await assert.rejects(readSnapshot(target,{api:fakeApi({...changes,version:{id:'version-old',resources:{script_runtime:{migration_tag:target==='admin'?'customer-runtime-v1':null}}}}).api}),/SCRIPT_ETAG_MISSING/);
+ }
+});
+test('POS exact assets-only config cannot contain an undeclared script entrypoint',()=>{
+ assert.throws(()=>validateConfig('pos',{...makePosConfig('/work/repo'),main:'./unexpected.js'},'/work/repo'),/CONFIG_MAIN/);
+});
+
+test('active or custom monitoring settings fail before deploy and diagnostics omit destinations',async()=>{
+ for(const monitor of [{observability:{enabled:true}},{observability:{enabled:false,head_sampling_rate:0.2}},{logpush:true},{tail_consumers:[new Proxy({service:'PRIVATE_DESTINATION'},{get(){throw Error('tail destination read');}})]},{observability:'PRIVATE_VALUE'}]){
+  const diagnostics=[];await assert.rejects(readSnapshot('admin',{api:fakeApi({settings:{bindings:bindings(),...monitor}}).api,onDiagnostic:d=>diagnostics.push(d)}),/MONITORING_/);
+  const json=JSON.stringify(diagnostics);assert(!json.includes('PRIVATE_DESTINATION'));assert(!json.includes('PRIVATE_VALUE'));assert(!json.includes('0.2'));
+ }
+ await readSnapshot('admin',{api:fakeApi({settings:{bindings:bindings(),observability:{enabled:false},logpush:false,tail_consumers:[]}}).api});
+});
+
+test('metadata client rejects unapproved endpoints or caller-controlled queries without a request',async()=>{
+ const mock=mockMetadata([]);
+ for(const path of [`${accountPath}/scripts/other/settings`,`${deploymentPath}?page=8`,`${accountPath}/scripts/mfk-admin/secrets`,`${accountPath}/scripts/mfk-admin/versions/../../other`])await assert.rejects(mock.api(path),/API_ROUTE_NOT_APPROVED/);
+ assert.equal(mock.calls.length,0);
+});
+test('optional structural flags never serialize arbitrary values or handler names',async()=>{
+ const mock=mockMetadata([{success:true,result:{has_assets:true,has_modules:'PRIVATE_VALUE',handlers:['PRIVATE_HANDLER'],named_handlers:[{name:'PRIVATE_CLASS'}],bindings:[]}}]);
+ await mock.api(`${accountPath}/scripts/mfk-mfp-v3-acceptance/settings`);
+ const response=mock.diagnostics.find(d=>d.stage==='response');assert.equal(response.hasAssets,true);assert.equal(response.hasModules,'invalid');assert.equal(response.handlersCount,1);
+ assert(!JSON.stringify(mock.diagnostics).includes('PRIVATE'));
 });

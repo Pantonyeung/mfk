@@ -54,11 +54,12 @@ function safeBinding(binding){
  // Never inspect text/value/json for secret_text or unspecified plain_text bindings.
  return result;
 }
-export async function readSnapshot(target,{api,declaredVars={},expectedSha}={}){
+export async function readSnapshot(target,{api,declaredVars={},expectedSha,config,root,onDiagnostic=()=>{}}={}){
  const info=targetInfo(target);const base=`/accounts/${RELEASE.account}/workers`;
  const script=`${base}/scripts/${info.service}`;
  const settings=await api(`${script}/settings`);
  requireThat(Array.isArray(settings?.bindings),'BINDINGS_MISSING');
+ assertMonitoringPreserved(settings,onDiagnostic);
  const bindings=sorted(settings.bindings.map(safeBinding));
  requireThat(new Set(bindings.map(b=>b.name)).size===bindings.length,'DUPLICATE_BINDING');
  for(const binding of bindings){
@@ -95,7 +96,17 @@ export async function readSnapshot(target,{api,declaredVars={},expectedSha}={}){
  requireThat(version?.id===versionId,'VERSION_ID_MISMATCH');
  const migrationTag=version?.resources?.script_runtime?.migration_tag||null;
  requireThat(migrationTag===info.migration,'MIGRATION_TAG_MISMATCH');
- const scriptEtag=metadataString(version?.resources?.script?.etag,'SCRIPT_ETAG_MISSING');
+ const resources=version?.resources;
+ onDiagnostic({endpoint:'version',stage:'shape',resourcesPresent:!!resources&&typeof resources==='object',scriptPresent:!!resources?.script&&typeof resources.script==='object',etagType:typeof resources?.script?.etag,versionBindingsCount:Array.isArray(resources?.bindings)?resources.bindings.length:null,...scriptShape(resources?.script),scriptRuntimePresent:!!resources?.script_runtime&&typeof resources.script_runtime==='object'});
+ if(target==='pos'&&resources?.script?.etag===undefined){
+  // Optional script/etag is documented, but absence does not prove an assets-only Worker.
+  // None of the approved GET schemas supplies a positive assets-only discriminator.
+  // Preserve the block until a reviewed diagnostic response establishes one.
+  requireThat(config&&root,'POS_ASSETS_ONLY_CONFIG_REQUIRED');validateConfig('pos',config,root);
+  requireThat(bindings.length===0&&Array.isArray(resources?.bindings)&&resources.bindings.length===0,'POS_ASSETS_ONLY_BINDINGS_UNVERIFIED');
+  fail('POS_ASSETS_ONLY_EVIDENCE_REQUIRED');
+ }
+ const scriptEtag=metadataString(resources?.script?.etag,'SCRIPT_ETAG_MISSING');
  const scriptSubdomain=await api(`${script}/subdomain`);
  requireThat(typeof scriptSubdomain?.enabled==='boolean'&&typeof scriptSubdomain?.previews_enabled==='boolean','SCRIPT_SUBDOMAIN_STATE_MISSING');
  let domain;
@@ -135,6 +146,7 @@ export function validateConfig(target,config,root){
  requireThat(resolve(dir,config.assets?.directory||'')===join(dir,'dist'),'CONFIG_ASSET_PATH_MISMATCH');
  const expectedAssets={directory:config.assets.directory,not_found_handling:'single-page-application',...(target==='pos'?{}:{binding:'ASSETS',run_worker_first:target==='admin'?['/*','!/assets/*']:['/media/*']})};
  requireThat(same(sorted(Object.entries(config.assets)),sorted(Object.entries(expectedAssets))),'CONFIG_ASSETS_MISMATCH');
+ if(target==='pos')requireThat(config.main===undefined,'CONFIG_MAIN_NOT_APPROVED');
  if(target!=='pos')requireThat(config.main===(target==='admin'?'./worker.ts':'./worker.js'),'CONFIG_MAIN_MISMATCH');
  if(target!=='pos')requireThat(same(sorted(config.r2_buckets||[]),sorted(Object.entries(info.r2).map(([binding,bucket_name])=>({binding,bucket_name})))),'CONFIG_R2_MISMATCH');
  if(target==='admin'){
@@ -162,18 +174,112 @@ export async function createWranglerEnvironment(tempRoot,baseEnv=process.env){
  delete env.GH_TOKEN;delete env.GITHUB_TOKEN;
  return env;
 }
-function apiClient(){
- requireThat(process.env.CLOUDFLARE_ACCOUNT_ID===RELEASE.account,'CLOUDFLARE_ACCOUNT_MISMATCH');
- const token=process.env.CLOUDFLARE_API_TOKEN;requireThat(typeof token==='string'&&token.length>0,'CLOUDFLARE_TOKEN_MISSING');
- return async(path)=>{
-  requireThat(path.startsWith(`/accounts/${RELEASE.account}/workers/`),'API_ROUTE_NOT_APPROVED');
-  const response=await fetch(`https://api.cloudflare.com/client/v4${path}`,{method:'GET',headers:{authorization:`Bearer ${token}`,accept:'application/json'},redirect:'error',signal:AbortSignal.timeout(30000)});
+function assertMonitoringPreserved(settings,onDiagnostic){
+ const observation=settings.observability;const tails=settings.tail_consumers;
+ const observationAbsent=observation===undefined||observation===null;
+ const observationDisabled=observation&&typeof observation==='object'&&!Array.isArray(observation)&&observation.enabled===false&&Object.keys(observation).length===1;
+ onDiagnostic({endpoint:'settings',stage:'monitoring',observabilityState:observationAbsent?'absent':observationDisabled?'disabled':'active-or-custom',logpushState:settings.logpush===true?'enabled':settings.logpush===false||settings.logpush===undefined?'disabled-or-absent':'invalid',tailConsumerCount:Array.isArray(tails)?tails.length:tails===undefined||tails===null?0:null});
+ requireThat(observationAbsent||observationDisabled,'MONITORING_OBSERVABILITY_REVIEW_REQUIRED');
+ requireThat(settings.logpush===undefined||settings.logpush===false,'MONITORING_LOGPUSH_REVIEW_REQUIRED');
+ requireThat(tails===undefined||tails===null||Array.isArray(tails)&&tails.length===0,'MONITORING_TAIL_CONSUMERS_REVIEW_REQUIRED');
+}
+const PAGINATION_KEYS=['count','page','per_page','total_count','total_pages'];
+const MAX_DEPLOYMENT_PAGES=25,DEPLOYMENTS_PER_PAGE=100,MAX_DOMAIN_RECORDS=2500;
+function scriptShape(value){
+ const booleanShape=(flag)=>typeof flag==='boolean'?flag:flag===undefined?'absent':'invalid';
+ return {hasAssets:booleanShape(value?.has_assets),hasModules:booleanShape(value?.has_modules),handlersCount:Array.isArray(value?.handlers)?value.handlers.length:value?.handlers===undefined?'absent':'invalid',namedHandlersCount:Array.isArray(value?.named_handlers)?value.named_handlers.length:value?.named_handlers===undefined?'absent':'invalid'};
+}
+function paginationDiagnostic(info){
+ if(info===undefined)return {paginationPresent:false};
+ const plain=info!==null&&typeof info==='object'&&!Array.isArray(info);
+ const out={paginationPresent:true,paginationObject:plain};
+ if(plain){
+  out.unknownPaginationKeys=Object.keys(info).some(key=>!PAGINATION_KEYS.includes(key));
+  for(const key of PAGINATION_KEYS)out[key]=Number.isSafeInteger(info[key])?info[key]:info[key]===undefined?'absent':'invalid';
+ }
+ return out;
+}
+function validatePageInfo(info){
+ requireThat(info&&typeof info==='object'&&!Array.isArray(info)&&Object.keys(info).length===5&&Object.keys(info).every(key=>PAGINATION_KEYS.includes(key)),'PAGINATION_SHAPE_UNVERIFIED');
+ for(const key of PAGINATION_KEYS)requireThat(Number.isSafeInteger(info[key])&&info[key]>=0,'PAGINATION_VALUE_INVALID');
+ requireThat(info.page>=1&&info.per_page>=1,'PAGINATION_VALUE_INVALID');
+ return info;
+}
+export function createMetadataClient({accountId,token,fetchImpl=fetch,onDiagnostic=()=>{}}){
+ requireThat(accountId===RELEASE.account,'CLOUDFLARE_ACCOUNT_MISMATCH');
+ requireThat(typeof token==='string'&&token.length>0,'CLOUDFLARE_TOKEN_MISSING');
+ const base=`/accounts/${RELEASE.account}/workers`;
+ const endpointOf=(path)=>{
+  if(path===`${base}/domains`)return 'domains';
+  if(path===`${base}/subdomain`)return 'account-subdomain';
+  for(const {service} of Object.values(TARGETS)){
+   const script=`${base}/scripts/${service}`;
+   for(const kind of ['settings','deployments','subdomain'])if(path===`${script}/${kind}`)return kind;
+   if(path.startsWith(`${script}/versions/`)&&/^[a-zA-Z0-9_.-]+$/.test(path.slice(`${script}/versions/`.length)))return 'version';
+  }
+  fail('API_ROUTE_NOT_APPROVED');
+ };
+ const request=async(path,endpoint,page)=>{
+  onDiagnostic({endpoint,stage:'request',...(page?{requestedPage:page,requestedPerPage:DEPLOYMENTS_PER_PAGE}:{})});
+  const response=await fetchImpl(`https://api.cloudflare.com/client/v4${path}`,{method:'GET',headers:{authorization:`Bearer ${token}`,accept:'application/json'},redirect:'error',signal:AbortSignal.timeout(30000)});
+  onDiagnostic({endpoint,stage:'http',status:Number.isInteger(response.status)?response.status:null});
   requireThat(response.ok,'CLOUDFLARE_METADATA_READ_FAILED');
-  const body=await response.json();requireThat(body?.success===true&&body.result!==undefined,'CLOUDFLARE_METADATA_RESPONSE_INVALID');
-  if(body.result_info?.total_pages>1)fail('METADATA_PAGINATION_REQUIRES_REVIEW');
+  const body=await response.json();
+  const result=body?.result;const rows=endpoint==='deployments'?result?.deployments:endpoint==='domains'?result:null;
+  onDiagnostic({endpoint,stage:'response',resultType:Array.isArray(result)?'array':result===null?'null':typeof result,recordCount:Array.isArray(rows)?rows.length:null,...(endpoint==='settings'?scriptShape(result):{}),...paginationDiagnostic(body?.result_info)});
+  requireThat(body?.success===true&&result!==undefined,'CLOUDFLARE_METADATA_RESPONSE_INVALID');
+  return body;
+ };
+ return async(path)=>{
+  const endpoint=endpointOf(path);
+  if(endpoint==='deployments'){
+   // Official list contract: first row is the latest actively serving deployment.
+   // Validate complete bounded pages rather than guessing that a short page terminates.
+   const rows=[],ids=new Set();let expected=null,firstIds=null;
+   const checkPage=(body,page)=>{
+    requireThat(Array.isArray(body.result?.deployments),'DEPLOYMENTS_SHAPE_INVALID');
+    const items=body.result.deployments,info=validatePageInfo(body.result_info);
+    requireThat(info.page===page&&info.per_page===DEPLOYMENTS_PER_PAGE,'PAGINATION_REQUEST_MISMATCH');
+    requireThat(info.total_pages<=MAX_DEPLOYMENT_PAGES&&info.total_count<=MAX_DEPLOYMENT_PAGES*DEPLOYMENTS_PER_PAGE,'PAGINATION_BOUND_EXCEEDED');
+    requireThat(info.total_pages===Math.ceil(info.total_count/info.per_page)||(info.total_count===0&&info.total_pages===1),'PAGINATION_TOTALS_INCONSISTENT');
+    const wanted=Math.min(info.per_page,Math.max(0,info.total_count-(page-1)*info.per_page));
+    requireThat(info.count===items.length&&items.length===wanted,'PAGINATION_TRUNCATED_OR_INCONSISTENT');
+    const totals={totalPages:info.total_pages,totalCount:info.total_count};
+    if(expected)requireThat(same(totals,expected),'PAGINATION_CHANGED');else expected=totals;
+    return items;
+   };
+   for(let page=1;page<=MAX_DEPLOYMENT_PAGES;page++){
+    const items=checkPage(await request(`${path}?page=${page}&per_page=${DEPLOYMENTS_PER_PAGE}`,endpoint,page),page);
+    const pageIds=items.map(item=>metadataString(item?.id,'DEPLOYMENT_ID_MISSING'));
+    for(const id of pageIds){requireThat(!ids.has(id),'PAGINATION_DUPLICATE');ids.add(id);}
+    if(page===1)firstIds=pageIds;rows.push(...items);
+    if(page>=expected.totalPages){
+     requireThat(rows.length===expected.totalCount,'PAGINATION_TRUNCATED_OR_INCONSISTENT');
+     if(page>1){const first=checkPage(await request(`${path}?page=1&per_page=${DEPLOYMENTS_PER_PAGE}`,endpoint,1),1);requireThat(same(first.map(item=>item?.id),firstIds),'PAGINATION_CHANGED');}
+     return {deployments:rows};
+    }
+   }
+   fail('PAGINATION_BOUND_EXCEEDED');
+  }
+  const body=await request(path,endpoint);
+  if(endpoint==='domains'){
+   requireThat(Array.isArray(body.result)&&body.result.length<=MAX_DOMAIN_RECORDS,'DOMAINS_SHAPE_OR_BOUND_INVALID');
+   // The official domains operation lists all domains and has no page/per_page inputs.
+   // Do not invent a pagination request if the provider advertises an incomplete list.
+   if(body.result_info!==undefined){
+    const info=validatePageInfo(body.result_info);
+    requireThat(info.page===1&&info.total_pages<=1&&info.count===body.result.length&&info.total_count===body.result.length&&info.per_page>=body.result.length&&(body.result.length===0||info.total_pages===1),'DOMAINS_COMPLETENESS_UNVERIFIED');
+   }
+   const ids=new Set(),hosts=new Set();
+   for(const row of body.result){const id=metadataString(row?.id,'DOMAIN_ID_MISSING');const host=metadataString(row?.hostname,'DOMAIN_HOST_MISSING');requireThat(!ids.has(id)&&!hosts.has(host),'DOMAINS_DUPLICATE');ids.add(id);hosts.add(host);}
+  }else if(body.result_info!==undefined){
+   // Single-object endpoints must not silently swallow list/cursor metadata.
+   requireThat(body.result_info&&typeof body.result_info==='object'&&!Array.isArray(body.result_info)&&Object.keys(body.result_info).length===0,'UNEXPECTED_ENDPOINT_PAGINATION');
+  }
   return body.result;
  };
 }
+function apiClient(onDiagnostic){return createMetadataClient({accountId:process.env.CLOUDFLARE_ACCOUNT_ID,token:process.env.CLOUDFLARE_API_TOKEN,onDiagnostic});}
 async function contextFromEnvironment(){
  const event=JSON.parse(await readFile(process.env.GITHUB_EVENT_PATH,'utf8'));
  const localHead=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
@@ -229,12 +335,14 @@ async function main(){
   requireThat(command==='release','COMMAND_INVALID');
   // Re-check remote HEAD immediately before the first Cloudflare credential use.
   await verifyRemoteHead(ctx.expectedSha,{token:process.env.GH_TOKEN});
-  const api=apiClient();const declaredVars=config.vars||{};
-  const before=await readSnapshot(target,{api,declaredVars});receipt.before=before;receipt.status='PREFLIGHT_PASSED';
+  receipt.metadataDiagnostics=[];
+  const onDiagnostic=(entry)=>{receipt.failureStage=entry.endpoint+':'+entry.stage;if(receipt.metadataDiagnostics.length<240)receipt.metadataDiagnostics.push(entry);};
+  const api=apiClient(onDiagnostic);const declaredVars=config.vars||{};
+  const before=await readSnapshot(target,{api,declaredVars,config,root,onDiagnostic});receipt.before=before;receipt.status='PREFLIGHT_PASSED';
   await writeFile(receiptPath,JSON.stringify(receipt,null,2)+'\n');
   if(ctx.operation==='preflight'){console.log('EXISTING_TARGET_PREFLIGHT_PASSED');return;}
   // Recheck target metadata immediately before mutation. No automatic service creation.
-  const latest=await readSnapshot(target,{api,declaredVars});
+  const latest=await readSnapshot(target,{api,declaredVars,config,root,onDiagnostic});
   requireThat(same(before,latest),'PREDEPLOY_METADATA_CHANGED');
   await verifyRemoteHead(ctx.expectedSha,{token:process.env.GH_TOKEN});
   const configPath=target==='pos'?join(process.env.RUNNER_TEMP||'/tmp',`mfp-v3-pos-release-${process.env.GITHUB_RUN_ID||'run'}.json`):join(root,targetInfo(target).directory,'wrangler.release.jsonc');
@@ -247,7 +355,7 @@ async function main(){
   const commandResult=await runQuiet(process.execPath,args,{cwd:root,env:await createWranglerEnvironment(process.env.RUNNER_TEMP||'/tmp')});
   receipt.wrangler={version:RELEASE.wrangler,exitCode:commandResult.exitCode};
   // Read back even after a nonzero command exit: upload could have partially succeeded.
-  try{receipt.after=await readSnapshot(target,{api,declaredVars,expectedSha:ctx.expectedSha});assertPreserved(before,receipt.after);}catch{receipt.postflight='FAILED';fail('POSTDEPLOY_METADATA_UNVERIFIED');}
+  try{receipt.after=await readSnapshot(target,{api,declaredVars,expectedSha:ctx.expectedSha,config,root,onDiagnostic});assertPreserved(before,receipt.after);}catch{receipt.postflight='FAILED';fail('POSTDEPLOY_METADATA_UNVERIFIED');}
   requireThat(commandResult.exitCode===0,'WRANGLER_DEPLOY_FAILED');
   receipt.readback=await publicReadback(target,ctx.expectedSha);receipt.status='DEPLOYED_VERIFIED';
   await writeFile(receiptPath,JSON.stringify(receipt,null,2)+'\n');console.log('DEPLOYED_AND_PRESERVATION_VERIFIED');
