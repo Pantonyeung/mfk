@@ -26,6 +26,7 @@ import type {MfpTenderConfig} from './checkout-domain.ts';
 import {createMfpPrintHardwareSession,type MfpPrintHardwareBinding,type MfpPrintHardwareSession} from './print-hardware-domain.ts';
 import {MfpPrintHardwareRuntime,mfpPrintHardwareRuntimeBinding} from './print-hardware-runtime.tsx';
 import {MfpExternalRuntime,mfpExternalRuntimeBinding,type MfpExternalProviderBinding} from './external-runtime.tsx';
+import {MfpUnavailableState} from './operator-ui.tsx';
 import {MfpCheckCenter} from './check-center.tsx';
 
 type OperationsBinding=Readonly<{
@@ -53,7 +54,7 @@ function MfpMoreRuntime({binding,onTool}:{binding:OperationsBinding;onTool:(tool
   return <MfpMoreWorkspace model={readback.data} onTool={onTool}/>;
 }
 
-function MfpOrderOperationsRuntime({surface,page,security,binding,pendingDiningIntent,onDiningAdmitted,onReturnToOrdering,printSession,onOpenPrintHardware}:{
+function MfpOrderOperationsRuntime({surface,page,security,binding,pendingDiningIntent,onDiningAdmitted,onReturnToOrdering,printSession,onOpenPrintHardware,onCheckConnection}:{
   surface:MfpOrderingSurface;
   page:MfpOperationalPage;
   security:MfpSecurityPort;
@@ -63,6 +64,7 @@ function MfpOrderOperationsRuntime({surface,page,security,binding,pendingDiningI
   onReturnToOrdering:()=>void;
   printSession:MfpPrintHardwareSession;
   onOpenPrintHardware:()=>void;
+  onCheckConnection:()=>void;
 }){
   const [operationStatus,setOperationStatus]=useState('');
   const sessions=useRef(new Map<string,ReturnType<typeof createMfpOrderOperationSession>>());
@@ -112,8 +114,8 @@ function MfpOrderOperationsRuntime({surface,page,security,binding,pendingDiningI
     }catch(error){setOperationStatus(`BLOCKED · ${message(error)}`);}
   };
 
-  if(readback.isPending)return <section className="mfp-operations-state" aria-busy="true"><b>正在讀取正式訂單…</b><span>畫面只會顯示 canonical readback。</span></section>;
-  if(readback.error||!readback.data)return <section className="mfp-operations-state" role="alert"><b>Order Operations 暫未接駁</b><span>{message(readback.error)}</span><button type="button" onClick={()=>void readback.refetch()}>重新讀取</button></section>;
+  if(readback.isPending)return <section className="mfp-operations-state" aria-busy="true"><b>正在讀取正式訂單…</b><span>正在等候門店資料，請稍候。</span></section>;
+  if(readback.error||!readback.data)return <MfpUnavailableState title={`${page==='DINING'?'堂食':page==='AVAILABILITY'?'售罄與產能':'訂單'}尚未接駁`} description="未能取得門店資料。請檢查連線，接駁後再重新讀取。" code={message(readback.error)} onRetry={()=>void readback.refetch()} onCheckConnection={onCheckConnection}/>;
   return <MfpOrderOperationsWorkspace surface={surface} page={page} model={readback.data} tenders={binding.tenders} operationStatus={operationStatus} pendingDiningIntent={pendingDiningIntent} onOperation={operation=>void submit(operation)} onSplitCheckout={part=>void split(part)} onTool={tool=>{if(tool==='Print Devices')onOpenPrintHardware();else setOperationStatus(tool==='Day Close'||tool==='Reports'?'BLOCKED · 需要現有 A5 Money / Reporting runtime binding':'BLOCKED · 此工具會由後續 Stage 接駁');}} onReturnToOrdering={onReturnToOrdering} printSession={printSession}/>;
 }
 
@@ -132,14 +134,14 @@ export function MfpApplicationRuntime({surface,security,sync,projectionStore,che
   const printSession=useRef<MfpPrintHardwareSession|null>(null);
   if(!printSession.current)printSession.current=createMfpPrintHardwareSession(print);
   return <div className="mfp-application-runtime">
-    <MfpExternalRuntime surface={surface} security={security} authority={operations.authority} binding={external}/>
     <MfpOperationsNavigation surface={surface} active={page} onNavigate={setPage}/>
     <div className="mfp-application-workspace">
-      <div hidden={page!=='ORDERING'}><MfpOrderingRuntime surface={surface} security={security} sync={sync} projectionStore={projectionStore} checkout={checkout} onDiningIntent={intent=>{setPendingDiningIntent(intent);setPage('DINING');}}/></div>
+      <div hidden={page!=='PENDING'}><MfpExternalRuntime surface={surface} security={security} authority={operations.authority} binding={external} onCheckConnection={()=>setPage('CHECK_CENTER')}/></div>
+      <div hidden={page!=='ORDERING'}><MfpOrderingRuntime surface={surface} security={security} sync={sync} projectionStore={projectionStore} checkout={checkout} onCheckConnection={()=>setPage('CHECK_CENTER')} onDiningIntent={intent=>{setPendingDiningIntent(intent);setPage('DINING');}}/></div>
       {page==='PRINT_HARDWARE'?<MfpPrintHardwareRuntime surface={surface} session={printSession.current}/>:null}
-      {page==='MORE'?<MfpMoreRuntime binding={operations} onTool={tool=>setPage(tool==='Print Devices'?'PRINT_HARDWARE':['Check Center','Backup / Restore','Diagnostics','Admin Sync','Devices'].includes(tool)?'CHECK_CENTER':'MORE')}/>:null}
+      {page==='MORE'?<MfpMoreRuntime binding={operations} onTool={tool=>setPage(tool==='Availability'?'AVAILABILITY':tool==='Print Devices'?'PRINT_HARDWARE':['Check Center','Backup / Restore','Diagnostics','Admin Sync','Devices'].includes(tool)?'CHECK_CENTER':'MORE')}/>:null}
       {page==='CHECK_CENTER'?<MfpCheckCenter surface={surface}/>:null}
-      {page!=='ORDERING'&&page!=='PRINT_HARDWARE'&&page!=='MORE'&&page!=='CHECK_CENTER'?<MfpOrderOperationsRuntime surface={surface} page={page} security={security} binding={operations} pendingDiningIntent={pendingDiningIntent} onDiningAdmitted={()=>setPendingDiningIntent(null)} onReturnToOrdering={()=>setPage('ORDERING')} printSession={printSession.current} onOpenPrintHardware={()=>setPage('PRINT_HARDWARE')}/>:null}
+      {page!=='PENDING'&&page!=='ORDERING'&&page!=='PRINT_HARDWARE'&&page!=='MORE'&&page!=='CHECK_CENTER'?<MfpOrderOperationsRuntime surface={surface} page={page} security={security} binding={operations} pendingDiningIntent={pendingDiningIntent} onDiningAdmitted={()=>setPendingDiningIntent(null)} onReturnToOrdering={()=>setPage('ORDERING')} printSession={printSession.current} onOpenPrintHardware={()=>setPage('PRINT_HARDWARE')} onCheckConnection={()=>setPage('CHECK_CENTER')}/>:null}
     </div>
   </div>;
 }

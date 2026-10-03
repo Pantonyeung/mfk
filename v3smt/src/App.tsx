@@ -25,13 +25,13 @@ export function V3SmtApp(){
 
   return <main className="v3smt-shell" data-surface={surface}>
     <header className="mfp-app-head">
-      <small>PARALLEL PREVIEW · NO PRODUCTION ROUTING</small>
+      <small>驗收預覽</small>
       <h1>MoreFun POS</h1>
-      <p>MFP Pad + MFP Mobile · Ordering、Checkout、Money、Order Operations、Print / Hardware、Customer / Keeta</p>
+      <p>店員工作台</p>
     </header>
     <MfpApplicationRuntime surface={surface} security={mfpSecurityPort} sync={mfpSyncCoordinator} projectionStore={mfpSyncProjectionStore} checkout={mfpCheckoutRuntimeBinding} operations={mfpOrderOperationsRuntimeBinding} print={mfpPrintHardwareRuntimeBinding}/>
     <details className="mfp-diagnostics">
-      <summary>A1–A8 Diagnostics</summary>
+      <summary>進階診斷</summary>
       <section className="v3smt-grid">
         <article><span>Surface</span><strong>{surface}</strong></article>
         <article><span>Formal Transaction</span><strong>{MFP_STATE_AUTHORITY.formalTransaction}</strong></article>

@@ -26,20 +26,50 @@ export interface MfpA9PhysicalEvidence{
   readonly result:MfpA9PhysicalResult;
 }
 
+function isRecord(value:unknown):value is Record<string,unknown>{
+  return value!==null&&typeof value==='object'&&!Array.isArray(value);
+}
+
+// The physical runbook requires an ISO timestamp. Date.parse alone also accepts
+// locale dates/numeric strings and silently rolls invalid calendar days forward.
+function isIsoTimestamp(value:unknown):boolean{
+  if(typeof value!=='string')return false;
+  const match=/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?(Z|[+-](\d{2}):?(\d{2}))$/i.exec(value);
+  if(!match)return false;
+  const year=Number(match[1]),month=Number(match[2]),day=Number(match[3]);
+  const leap=year%4===0&&(year%100!==0||year%400===0);
+  const days=[31,leap?29:28,31,30,31,30,31,31,30,31,30,31];
+  const hour=Number(match[4]),minute=Number(match[5]),second=Number(match[6]);
+  // ISO end-of-day 24:00 is valid only at exact midnight; other rollovers are not.
+  const validHour=hour<=23||(hour===24&&minute===0&&second===0&&(!match[7]||/^0+$/.test(match[7])));
+  return month>=1&&month<=12&&day>=1&&day<=days[month-1]!
+    &&validHour&&minute<=59&&second<=59
+    &&(match[8]!.toUpperCase()==='Z'||(Number(match[9])<=23&&Number(match[10])<=59))
+    &&Number.isFinite(Date.parse(value));
+}
+
 export function evaluateMfpA9PhysicalAcceptance(input:{expectedSourceSha:string;expectedReleaseId:string;records:readonly MfpA9PhysicalEvidence[]}):Readonly<{status:MfpA9Status;codes:readonly string[]}>{
   const codes:string[]=[];
-  if(!/^[0-9a-f]{40}$/.test(input.expectedSourceSha))codes.push('MFP_PHYSICAL_EXPECTED_SOURCE_INVALID');
-  if(!/^[A-Za-z0-9._-]{1,96}$/.test(input.expectedReleaseId))codes.push('MFP_PHYSICAL_EXPECTED_RELEASE_INVALID');
-  const records=new Map<MfpA9PhysicalGateId,MfpA9PhysicalEvidence>();
-  for(const record of input.records){
-    if(records.has(record.gateId)){codes.push('MFP_PHYSICAL_DUPLICATE_GATE');continue;}
-    records.set(record.gateId,record);
-    if(!record.device.trim())codes.push('MFP_PHYSICAL_DEVICE_REQUIRED');
-    if(record.sourceSha!==input.expectedSourceSha)codes.push('MFP_PHYSICAL_SOURCE_MISMATCH');
-    if(record.releaseId!==input.expectedReleaseId)codes.push('MFP_PHYSICAL_RELEASE_MISMATCH');
-    if(!Number.isFinite(Date.parse(record.timestamp)))codes.push('MFP_PHYSICAL_TIMESTAMP_INVALID');
-    if(record.result==='FAIL')codes.push(`MFP_PHYSICAL_GATE_FAILED:${record.gateId}`);
-    if(record.result==='BLOCKED')codes.push(`MFP_PHYSICAL_GATE_BLOCKED:${record.gateId}`);
+  const supplied:Record<string,unknown>=isRecord(input)?input:{};
+  if(typeof supplied.expectedSourceSha!=='string'||!/^[0-9a-f]{40}$/.test(supplied.expectedSourceSha))codes.push('MFP_PHYSICAL_EXPECTED_SOURCE_INVALID');
+  if(typeof supplied.expectedReleaseId!=='string'||!/^[A-Za-z0-9._-]{1,96}$/.test(supplied.expectedReleaseId))codes.push('MFP_PHYSICAL_EXPECTED_RELEASE_INVALID');
+  if(!Array.isArray(supplied.records))codes.push('MFP_PHYSICAL_RECORDS_INVALID');
+  const records=new Set<MfpA9PhysicalGateId>();
+  for(const record of Array.isArray(supplied.records)?supplied.records:[]){
+    if(!isRecord(record)){codes.push('MFP_PHYSICAL_RECORD_INVALID');continue;}
+    if(typeof record.gateId!=='string'||!MFP_A9_PHYSICAL_GATES.includes(record.gateId as MfpA9PhysicalGateId)){
+      codes.push('MFP_PHYSICAL_GATE_INVALID');continue;
+    }
+    const gateId=record.gateId as MfpA9PhysicalGateId;
+    if(records.has(gateId))codes.push('MFP_PHYSICAL_DUPLICATE_GATE');
+    records.add(gateId);
+    if(typeof record.device!=='string'||!record.device.trim())codes.push('MFP_PHYSICAL_DEVICE_REQUIRED');
+    if(typeof record.sourceSha!=='string'||record.sourceSha!==supplied.expectedSourceSha)codes.push('MFP_PHYSICAL_SOURCE_MISMATCH');
+    if(typeof record.releaseId!=='string'||record.releaseId!==supplied.expectedReleaseId)codes.push('MFP_PHYSICAL_RELEASE_MISMATCH');
+    if(!isIsoTimestamp(record.timestamp))codes.push('MFP_PHYSICAL_TIMESTAMP_INVALID');
+    if(record.result==='FAIL')codes.push(`MFP_PHYSICAL_GATE_FAILED:${gateId}`);
+    else if(record.result==='BLOCKED')codes.push(`MFP_PHYSICAL_GATE_BLOCKED:${gateId}`);
+    else if(record.result!=='PASS')codes.push(`MFP_PHYSICAL_RESULT_INVALID:${gateId}`);
   }
   for(const gate of MFP_A9_PHYSICAL_GATES)if(!records.has(gate))codes.push(`MFP_PHYSICAL_GATE_MISSING:${gate}`);
   const unique=Object.freeze([...new Set(codes)]);
@@ -51,13 +81,14 @@ export function evaluateMfpA9Cutover(input:Readonly<{
   physicalVerified:boolean;publicReady:boolean;customerKeetaGreen:boolean;offlinePrintAuthGreen:boolean;
   smmRuntimeDependencyAbsent:boolean;
 }>):Readonly<{status:MfpA9Status;codes:readonly string[]}>{
-  const checks:ReadonlyArray<readonly [boolean,string]>=[
-    [input.sourceVerified,'MFP_SOURCE_NOT_ACCEPTED'],[input.builderVerified,'MFP_BUILDER_NOT_ACCEPTED'],
-    [input.productionBindingsAccepted,'MFP_PRODUCTION_BINDINGS_NOT_ACCEPTED'],[input.physicalVerified,'MFP_PHYSICAL_ACCEPTANCE_REQUIRED'],
-    [input.publicReady,'MFP_PUBLIC_CUTOVER_NOT_READY'],[input.customerKeetaGreen,'MFP_EXTERNAL_ACCEPTANCE_NOT_GREEN'],
-    [input.offlinePrintAuthGreen,'MFP_OFFLINE_PRINT_AUTH_NOT_GREEN'],[input.smmRuntimeDependencyAbsent,'MFP_SMM_RUNTIME_DEPENDENCY_PRESENT'],
-    [input.ownerAuthorized,'MFP_OWNER_CUTOVER_AUTHORIZATION_REQUIRED'],
+  const supplied:Record<string,unknown>=isRecord(input)?input:{};
+  const checks:ReadonlyArray<readonly [unknown,string]>=[
+    [supplied.sourceVerified,'MFP_SOURCE_NOT_ACCEPTED'],[supplied.builderVerified,'MFP_BUILDER_NOT_ACCEPTED'],
+    [supplied.productionBindingsAccepted,'MFP_PRODUCTION_BINDINGS_NOT_ACCEPTED'],[supplied.physicalVerified,'MFP_PHYSICAL_ACCEPTANCE_REQUIRED'],
+    [supplied.publicReady,'MFP_PUBLIC_CUTOVER_NOT_READY'],[supplied.customerKeetaGreen,'MFP_EXTERNAL_ACCEPTANCE_NOT_GREEN'],
+    [supplied.offlinePrintAuthGreen,'MFP_OFFLINE_PRINT_AUTH_NOT_GREEN'],[supplied.smmRuntimeDependencyAbsent,'MFP_SMM_RUNTIME_DEPENDENCY_PRESENT'],
+    [supplied.ownerAuthorized,'MFP_OWNER_CUTOVER_AUTHORIZATION_REQUIRED'],
   ];
-  const codes=Object.freeze(checks.filter(([ok])=>!ok).map(([,code])=>code));
+  const codes=Object.freeze(checks.filter(([ok])=>ok!==true).map(([,code])=>code));
   return Object.freeze({status:codes.length?'BLOCKED':'PHYSICAL_VERIFIED',codes});
 }

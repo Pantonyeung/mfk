@@ -170,7 +170,9 @@ class RegressionDecisionTests(unittest.TestCase):
 
     def test_commander_drift_requires_stop_and_report(self):
         agents = (Path(__file__).parents[2] / "AGENTS.md").read_text(encoding="utf-8")
-        self.assertIn("verify live `main`", agents)
+        self.assertIn("verify the declared parent SHA and live repository evidence", agents)
+        self.assertIn("supersession is explicitly Owner-directed and recorded", agents)
+        self.assertIn("Do not silently infer supersession", agents)
         self.assertIn("**STOP**", agents)
         self.assertIn("GOVERNANCE_DRIFT", agents)
 

@@ -240,3 +240,61 @@ describe('MFP V3 A5 terminal and UNKNOWN handling',()=>{
     expect(value.submitFrontlineFormalCommand).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('checkout asynchronous outcome ownership',()=>{
+  function pending<T>(){let resolve!:(value:T)=>void;let reject!:(reason:Error)=>void;const promise=new Promise<T>((yes,no)=>{resolve=yes;reject=no;});return {promise,resolve,reject};}
+  const review=async(value:ReturnType<typeof fixture>)=>{await value.checkout.open();value.checkout.selectChannel('WALK_IN');value.checkout.selectTender('FPS');value.checkout.openFinalReview();};
+
+  it('cannot reopen validation over a committed payment receipt',async()=>{
+    const value=fixture();await review(value);const receipt=await value.checkout.paymentConfirm();
+    await expect(value.checkout.open()).rejects.toThrow('MFP_CHECKOUT_FORMAL_SUBMISSION_LOCKED');
+    expect(value.checkout.getSnapshot()).toMatchObject({state:'COMMITTED',result:receipt});
+  });
+
+  it('removes the old review while a new discount validation is pending',async()=>{
+    const value=fixture();await review(value);
+    const validation=pending<Awaited<ReturnType<MfpFormalCheckoutAuthority['validateCheckout']>>>();
+    vi.mocked(value.authority.validateCheckout).mockReturnValueOnce(validation.promise);
+    const next=value.checkout.validateStudentDiscount(null);
+    expect(()=>value.checkout.openFinalReview()).toThrow('MFP_CHECKOUT_FORMAL_VALIDATION_REQUIRED');
+    await expect(value.checkout.paymentConfirm()).rejects.toThrow('MFP_CHECKOUT_FINAL_REVIEW_REQUIRED');
+    validation.resolve({state:'VALID',quote});await next;
+    expect(value.submitFrontlineFormalCommand).not.toHaveBeenCalled();
+  });
+
+  it('ignores an older validation that completes after the newer result',async()=>{
+    const value=fixture();
+    const older=pending<Awaited<ReturnType<MfpFormalCheckoutAuthority['validateCheckout']>>>();
+    vi.mocked(value.authority.validateCheckout).mockReturnValueOnce(older.promise);
+    const first=value.checkout.open();
+    await value.checkout.open();
+    older.resolve({state:'REJECTED',rejectionCode:'OLD_QUOTE_REJECTED'});await first;
+    expect(value.checkout.getSnapshot()).toMatchObject({state:'VALID',quote,rejectionCode:null});
+  });
+
+  it('invalidates the old quote when formal revalidation throws',async()=>{
+    const value=fixture();await review(value);
+    vi.mocked(value.authority.validateCheckout).mockRejectedValueOnce(new Error('OFFLINE'));
+    await expect(value.checkout.validateStudentDiscount(null)).rejects.toThrow('OFFLINE');
+    expect(value.checkout.getSnapshot()).toMatchObject({state:'UNKNOWN',quote:null,finalReview:null});
+    await expect(value.checkout.paymentConfirm()).rejects.toThrow('MFP_CHECKOUT_FINAL_REVIEW_REQUIRED');
+    expect(()=>value.checkout.returnToOrder()).not.toThrow();
+  });
+
+  it('does not restore a cancelled checkout after its validation completes',async()=>{
+    const value=fixture();const validation=pending<Awaited<ReturnType<MfpFormalCheckoutAuthority['validateCheckout']>>>();
+    vi.mocked(value.authority.validateCheckout).mockReturnValueOnce(validation.promise);
+    const opening=value.checkout.open();value.checkout.returnToOrder();
+    validation.resolve({state:'VALID',quote});await opening;
+    expect(value.checkout.getSnapshot()).toMatchObject({state:'NEW',quote:null,finalReview:null});
+  });
+
+  it('recovers a lost submit reply with UNKNOWN and the same submission identity',async()=>{
+    const value=fixture();await review(value);
+    value.submitFrontlineFormalCommand.mockRejectedValueOnce(new Error('MFP_NATIVE_TIMEOUT'));
+    await expect(value.checkout.paymentConfirm()).resolves.toMatchObject({state:'UNKNOWN',submissionId:'SUB-01',readbackRequired:true,retryPermitted:false});
+    expect(value.checkout.getSnapshot().state).toBe('UNKNOWN');
+    await expect(value.checkout.paymentConfirm()).resolves.toMatchObject({state:'COMMITTED'});
+    expect(value.submitFrontlineFormalCommand.mock.calls.map(([command])=>command.submissionId)).toEqual(['SUB-01','SUB-01']);
+  });
+});

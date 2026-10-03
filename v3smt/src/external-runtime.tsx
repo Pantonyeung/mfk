@@ -26,6 +26,7 @@ import {
   type MfpPaymentEvidenceReview,
 } from './external-domain.ts';
 import type {MfpOrderOperationsReadPort} from './order-operations-domain.ts';
+import {MfpUnavailableState} from './operator-ui.tsx';
 import type {MfpOrderingSurface} from './ordering-domain.ts';
 import type {MfpSecurityPort} from './security-port.ts';
 
@@ -80,9 +81,9 @@ export function MfpExternalInbox({surface,model,actions}:{surface:MfpOrderingSur
   const [cutoff,setCutoff]=useState('');
   const intents=[...model.customer.intents,...model.keeta.intents];
   return <section className={mobile?'mfp-external-mobile-inbox':'mfp-external-pad-strip'} data-external-surface={surface} aria-label="External pending inbox">
-    <header><div><b>Pending / Keeta</b><small>canonical read model · {model.revision}</small></div><button type="button" onClick={()=>actions.onRefresh()}>Refresh</button><details><summary>Customer 接單</summary><label>截單時間<input type="datetime-local" value={cutoff} onChange={event=>setCutoff(event.target.value)}/></label><button type="button" onClick={()=>actions.onSetCustomerControl('OPEN',null)}>Open</button><button type="button" disabled={!cutoff} onClick={()=>actions.onSetCustomerControl('SPECIAL_CUTOFF',new Date(cutoff).toISOString())}>Special cutoff</button><button type="button" onClick={()=>actions.onSetCustomerControl('IMMEDIATE_STOP',null)}>Immediate stop</button></details></header>
+    <header><div><b>待處理訂單</b><small>canonical read model · {model.revision}</small></div><button type="button" onClick={()=>actions.onRefresh()}>重新讀取</button><details><summary>網上接單設定</summary><label>截單時間<input type="datetime-local" value={cutoff} onChange={event=>setCutoff(event.target.value)}/></label><button type="button" onClick={()=>actions.onSetCustomerControl('OPEN',null)}>開放接單</button><button type="button" disabled={!cutoff} onClick={()=>actions.onSetCustomerControl('SPECIAL_CUTOFF',new Date(cutoff).toISOString())}>設定截單時間</button><button type="button" onClick={()=>actions.onSetCustomerControl('IMMEDIATE_STOP',null)}>即時暫停接單</button></details></header>
     {model.customer.acceptance.mode!=='OPEN'?<aside><b>{model.customer.acceptance.mode}</b><span>{model.customer.acceptance.message||'Customer 暫停接新單'}</span><small>只影響新 Customer 單 · WhatsApp fallback</small></aside>:null}
-    <div className="mfp-external-cards">{intents.length?intents.map(intent=><ExternalCard key={intentKey(intent)} intent={intent} onOpen={actions.onOpen}/>):<small role="status">暫時未有外部 pending order</small>}</div>
+    <div className="mfp-external-cards">{intents.length?intents.map(intent=><ExternalCard key={intentKey(intent)} intent={intent} onOpen={actions.onOpen}/>):<small role="status">暫時未有待處理訂單</small>}</div>
   </section>;
 }
 
@@ -161,7 +162,7 @@ export function startMfpExternalLifecycle(coordinator:ExternalCoordinatorLifecyc
   return()=>{environment.removeEventListener('online',online);environment.removeEventListener('offline',offline);disconnect();};
 }
 
-export function MfpExternalRuntime({surface,security,authority,binding=mfpExternalRuntimeBinding}:{surface:MfpOrderingSurface;security:MfpSecurityPort;authority:ExternalAuthority;binding?:MfpExternalProviderBinding}){
+export function MfpExternalRuntime({surface,security,authority,binding=mfpExternalRuntimeBinding,onCheckConnection}:{surface:MfpOrderingSurface;security:MfpSecurityPort;authority:ExternalAuthority;binding?:MfpExternalProviderBinding;onCheckConnection?:()=>void}){
   const adapter=useMemo<MfpExternalAdapter>(()=>Object.freeze({submitExternalAction(action:MfpExternalAdapterAction){security.precheckFrontlineAction();return binding.adapter.submitExternalAction(action);}}),[binding.adapter,security]);
   const coordinatorRef=useRef<ReturnType<typeof createMfpExternalCoordinator>|null>(null);
   if(!coordinatorRef.current)coordinatorRef.current=createMfpExternalCoordinator({transport:binding.transport});
@@ -219,7 +220,7 @@ export function MfpExternalRuntime({surface,security,authority,binding=mfpExtern
     }
   },[model]);
 
-  if(!model)return <section className="mfp-external-runtime" data-external-state={snapshot.state}><button type="button" onClick={()=>void coordinator.manualRefresh().catch(()=>{})}>Pending / Keeta · {snapshot.state}</button>{snapshot.lastError?<small role="alert">{snapshot.lastError}</small>:null}</section>;
+  if(!model)return <section className="mfp-external-runtime" data-external-state={snapshot.state}><MfpUnavailableState title="待處理訂單尚未接駁" description="未能取得網上及 Keeta 訂單。連線恢復後先會顯示真實待處理訂單。" code={snapshot.lastError??undefined} onRetry={()=>void coordinator.manualRefresh().catch(()=>{})} onCheckConnection={onCheckConnection}/></section>;
   const selected=[...model.customer.intents,...model.keeta.intents].find(intent=>intentKey(intent)===selectedKey)||null;
   const actions:MfpExternalUiActions={
     onOpen:intent=>setSelectedKey(intentKey(intent)),

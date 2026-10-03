@@ -171,7 +171,7 @@ export function createMfpA9NativeAdapter(environment?:Partial<NativeEnvironment>
   return Object.freeze({
     mode:()=>mfpRuntimeMode(env.currentUrl()),
     readCarrierHealth:()=>request('carrier.health',['carrier.health.result']),
-    readStoreKernelHealth:()=>request('store.kernel.health.v1',['store.kernel.health.completed.v1']),
+    readStoreKernelHealth:()=>request('store.kernel.health.v1',['store.kernel.health.completed.v1'],{protocolVersion:1}),
     readPrintGatewaySnapshot:()=>request('print.gateway.snapshot',['print.gateway.snapshot.result']),
     readFaults:()=>request('diagnostics.faults.read',['diagnostics.faults.read.result']),
     recordAction(action:string,route:string){return request('diagnostics.action.record',['diagnostics.action.record.result'],{action:bounded(action,'MFP_DIAGNOSTICS_ACTION_INVALID',120),route:bounded(route,'MFP_DIAGNOSTICS_ROUTE_INVALID',160)});},

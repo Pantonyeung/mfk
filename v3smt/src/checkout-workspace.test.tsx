@@ -48,3 +48,18 @@ describe('MFP V3 A5 formal Checkout UI',()=>{
     if(state==='UNKNOWN')expect(html).toContain('UNKNOWN → READBACK');
   });
 });
+
+describe('checkout validation recovery controls',()=>{
+  it('allows returning to the order after an unknown validation before any submission',()=>{
+    const html=renderToStaticMarkup(<MfpCheckoutWorkspace surface="MFP_PAD" intent={intent} snapshot={{...snapshot,state:'UNKNOWN',quote:null,finalReview:null,result:null}} tenders={tenders} actions={actions}/>);
+    expect(html).toContain('<button type="button">← 返回訂單</button>');
+  });
+});
+
+describe('checkout action errors',()=>{
+  it('shows the reason a checkout action cannot continue',()=>{
+    const html=renderToStaticMarkup(<MfpCheckoutWorkspace surface="MFP_PAD" intent={intent} snapshot={snapshot} tenders={tenders} actions={actions} feedback="MFP_CHECKOUT_CHANNEL_REQUIRED"/>);
+    expect(html).toContain('MFP_CHECKOUT_CHANNEL_REQUIRED');
+    expect(html).toContain('role="alert"');
+  });
+});

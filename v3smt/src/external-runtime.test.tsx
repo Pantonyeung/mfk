@@ -106,6 +106,7 @@ describe('MFP V3 A8 external runtime safety',()=>{
   it('is mounted above the shared application workspace and reuses A6 authority',()=>{
     const source=readFileSync(new URL('./order-operations-runtime.tsx',import.meta.url),'utf8');
     expect(source).toContain('<MfpExternalRuntime');expect(source).toContain('authority={operations.authority}');
-    expect(source.indexOf('<MfpExternalRuntime')).toBeLessThan(source.indexOf('<MfpOperationsNavigation'));
+    expect(source.match(/<MfpExternalRuntime /g)).toHaveLength(1);
+    expect(source).toContain("hidden={page!=='PENDING'}");
   });
 });

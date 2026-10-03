@@ -94,18 +94,48 @@ function canonicalJson(value:unknown,seen=new Set<object>()):string{
   }finally{seen.delete(value);}
 }
 
+function snapshotPayload(value:unknown,seen=new Set<object>()):unknown{
+  if(value===null||typeof value==='string'||typeof value==='boolean')return value;
+  if(typeof value==='number'){
+    if(!Number.isFinite(value))throw new Error('MFP_COMMAND_PAYLOAD_INVALID');
+    return value;
+  }
+  if(typeof value!=='object'||seen.has(value))throw new Error('MFP_COMMAND_PAYLOAD_INVALID');
+  seen.add(value);
+  try{
+    if(Array.isArray(value)){
+      const copy=new Array<unknown>(value.length);
+      for(let index=0;index<copy.length;index++){
+        if(index in value)copy[index]=snapshotPayload(value[index],seen);
+      }
+      return Object.freeze(copy);
+    }
+    const prototype=Object.getPrototypeOf(value);
+    if(prototype!==Object.prototype&&prototype!==null)throw new Error('MFP_COMMAND_PAYLOAD_INVALID');
+    const copy=Object.create(prototype) as Record<string,unknown>;
+    for(const key of Object.keys(value)){
+      Object.defineProperty(copy,key,{
+        value:snapshotPayload((value as Record<string,unknown>)[key],seen),
+        enumerable:true,
+      });
+    }
+    return Object.freeze(copy);
+  }finally{seen.delete(value);}
+}
+
 export function createMfpCommandEnvelope(input:MfpStoreKernelCommandEnvelope):MfpStoreKernelCommandEnvelope{
-  if(input.schema!==MFP_STORE_KERNEL_COMMAND_SCHEMA)throw new Error('MFP_COMMAND_SCHEMA_INVALID');
-  text(input.storeId,'MFP_COMMAND_STORE_ID_INVALID');
-  text(input.deviceId,'MFP_COMMAND_DEVICE_ID_INVALID');
-  text(input.staffSessionRef,'MFP_COMMAND_STAFF_SESSION_INVALID');
-  text(input.submissionId,'MFP_COMMAND_SUBMISSION_ID_INVALID');
-  text(input.idempotencyKey,'MFP_COMMAND_IDEMPOTENCY_KEY_INVALID');
-  text(input.commandType,'MFP_COMMAND_TYPE_INVALID',160);
-  if(!validRevision(input.expectedRevision))throw new Error('MFP_COMMAND_EXPECTED_REVISION_INVALID');
-  if(!input.createdAt||!Number.isFinite(Date.parse(input.createdAt)))throw new Error('MFP_COMMAND_CREATED_AT_INVALID');
-  canonicalJson(input.payload);
-  return Object.freeze({...input});
+  const command={...input};
+  if(command.schema!==MFP_STORE_KERNEL_COMMAND_SCHEMA)throw new Error('MFP_COMMAND_SCHEMA_INVALID');
+  text(command.storeId,'MFP_COMMAND_STORE_ID_INVALID');
+  text(command.deviceId,'MFP_COMMAND_DEVICE_ID_INVALID');
+  text(command.staffSessionRef,'MFP_COMMAND_STAFF_SESSION_INVALID');
+  text(command.submissionId,'MFP_COMMAND_SUBMISSION_ID_INVALID');
+  text(command.idempotencyKey,'MFP_COMMAND_IDEMPOTENCY_KEY_INVALID');
+  text(command.commandType,'MFP_COMMAND_TYPE_INVALID',160);
+  if(!validRevision(command.expectedRevision))throw new Error('MFP_COMMAND_EXPECTED_REVISION_INVALID');
+  if(!command.createdAt||!Number.isFinite(Date.parse(command.createdAt)))throw new Error('MFP_COMMAND_CREATED_AT_INVALID');
+  // Capture caller-owned data before fingerprinting or the first asynchronous outbox operation.
+  return Object.freeze({...command,payload:snapshotPayload(command.payload)});
 }
 
 function commandFingerprint(command:MfpStoreKernelCommandEnvelope){

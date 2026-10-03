@@ -296,13 +296,13 @@ export function applyMfpSyncChangeBatch(
   for(const item of value.changes){
     validateChange(item,value,expected++);
     const key=entityKey(item.entityType,item.entityId);
+    const existing=out[key];
+    if(existing&&existing.entityRevision>item.entityRevision)continue;
     if(item.op==='DELETE'){delete out[key];continue;}
     const next=validateEntity({
       entityType:item.entityType,entityId:item.entityId,entityRevision:item.entityRevision,
       payload:item.payload!,payloadHash:item.payloadHash,
     });
-    const existing=out[key];
-    if(existing&&existing.entityRevision>next.entityRevision)continue;
     if(existing&&existing.entityRevision===next.entityRevision){
       if(existing.payloadHash!==next.payloadHash)throw new Error('MFP_SYNC_ENTITY_REVISION_CONFLICT');
       continue;
@@ -357,7 +357,11 @@ export function createMfpSyncCoordinator(input:{
   const listeners=new Set<()=>void>();
   let active:MfpSyncActiveProjection|null=null;
   let advertisedHeadSeq=0;
+  let invalidationVersion=0;
+  let headReadVersion=0;
+  let canonicalTailPending=false;
   let inFlight:Promise<void>|null=null;
+  let continuation:ReturnType<typeof setTimeout>|null=null;
   let snapshot:MfpSyncSnapshot=Object.freeze({
     connection:'DISCONNECTED',state:'UNINITIALIZED',headSeq:null,appliedSeq:null,lkgAvailable:false,
     lastDoorbellAt:null,lastHeadReadAt:null,lastAppliedAt:null,lastAckAt:null,lastError:null,
@@ -386,13 +390,18 @@ export function createMfpSyncCoordinator(input:{
   };
 
   const runCatchUpPass=async()=>{
+    canonicalTailPending=false;
     update({state:'CONNECTING',lastError:null});
     const context=await input.readRequestContext();
     text(context.storeId,'MFP_SYNC_CONTEXT_STORE_ID_INVALID',64);
     text(context.clientId,'MFP_SYNC_CONTEXT_CLIENT_ID_INVALID',180);
     text(context.deviceId,'MFP_SYNC_CONTEXT_DEVICE_ID_INVALID',180);
+    headReadVersion=invalidationVersion;
     const head=validateHead(await input.transport.readHead(context),context);
     update({headSeq:head.headSeq,lastHeadReadAt:now()});
+    if(active&&active.storeId===head.storeId&&head.headSeq<active.appliedSeq){
+      throw new Error('MFP_SYNC_HEAD_REGRESSION');
+    }
 
     if(active?.appliedSeq===head.headSeq){
       if(active.storeId!==head.storeId||active.projectionHash!==head.projectionHash)throw new Error('MFP_SYNC_PROJECTION_HASH_MISMATCH');
@@ -428,7 +437,17 @@ export function createMfpSyncCoordinator(input:{
       }
       if(changes.kind==='CHECKPOINT_REQUIRED')throw new Error('MFP_SYNC_CHECKPOINT_RECOVERY_REJECTED');
       if(changes.batch.storeId!==head.storeId||changes.batch.headSeq<head.headSeq)throw new Error('MFP_SYNC_CHANGE_BATCH_IDENTITY_INVALID');
-      const applied=applyMfpSyncChangeBatch(staged.entities,staged.appliedSeq,changes.batch);
+      let applied=applyMfpSyncChangeBatch(staged.entities,staged.appliedSeq,changes.batch);
+      if(applied.appliedSeq>head.headSeq){
+        // Validate the whole response above, but only publish the prefix whose
+        // projection hash this HEAD authenticates. Pull a fresh HEAD for the tail.
+        applied=applyMfpSyncChangeBatch(staged.entities,staged.appliedSeq,{
+          ...changes.batch,toInclusive:head.headSeq,
+          changes:changes.batch.changes.filter(item=>item.portSeq<=head.headSeq),
+        });
+        advertisedHeadSeq=Math.max(advertisedHeadSeq,changes.batch.headSeq);
+        canonicalTailPending=true;
+      }
       staged={...staged,...applied};
     }
 
@@ -446,21 +465,39 @@ export function createMfpSyncCoordinator(input:{
     await acknowledge(candidate,context);
   };
 
+  const cancelContinuation=()=>{
+    if(continuation!==null){clearTimeout(continuation);continuation=null;}
+  };
+
   const requestCatchUp=()=>{
     if(snapshot.connection==='OFFLINE')return Promise.reject(new Error('MFP_SYNC_OFFLINE'));
     if(inFlight)return inFlight;
+    cancelContinuation();
+    let completed=false;
     const task=(async()=>{
       try{
         for(let pass=0;pass<2;pass++){
           await runCatchUpPass();
-          if(advertisedHeadSeq<=(active?.appliedSeq??-1))return;
+          if(invalidationVersion===headReadVersion&&advertisedHeadSeq<=(active?.appliedSeq??-1)){completed=true;return;}
         }
+        completed=true;
         update({state:'BEHIND'});
       }catch(error){
         update({state:securityFailure(error)?'ERROR':active?'RECOVERING':'ERROR',lastError:errorCode(error)});
         throw error;
       }
-    })().finally(()=>{if(inFlight===task)inFlight=null;});
+    })().finally(()=>{
+      if(inFlight===task)inFlight=null;
+      // Yield after two passes if a new invalidation arrived or the verified
+      // prefix advanced with a canonical tail left. A stale hint cannot poll.
+      if(completed&&(invalidationVersion!==headReadVersion||canonicalTailPending)&&snapshot.connection!=='OFFLINE'){
+        update({state:'BEHIND'});
+        continuation=setTimeout(()=>{
+          continuation=null;
+          void requestCatchUp().catch(()=>{});
+        },0);
+      }
+    });
     inFlight=task;
     return task;
   };
@@ -484,13 +521,14 @@ export function createMfpSyncCoordinator(input:{
         advertisedHeadSeq=Math.max(advertisedHeadSeq,advertised);
       }
       instant(doorbell.observedAt,'MFP_SYNC_DOORBELL_OBSERVED_AT_INVALID');
+      invalidationVersion++;
       update({lastDoorbellAt:now()});
       return requestCatchUp();
     },
     networkOnline(){update({connection:'DISCONNECTED'});return requestCatchUp();},
     resumed:requestCatchUp,
     manualCatchUp:requestCatchUp,
-    networkOffline(){update({connection:'OFFLINE',state:active?'OFFLINE':'ERROR'});},
+    networkOffline(){cancelContinuation();update({connection:'OFFLINE',state:active?'OFFLINE':'ERROR'});},
     connectDoorbell(){
       return input.transport.connectDoorbell({
         onOpen(){void coordinator.webSocketOpened().catch(()=>{});},

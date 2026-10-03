@@ -309,3 +309,62 @@ describe('MFP V3 A2 security port',()=>{
     }));
   });
 });
+
+describe('security asynchronous session ownership',()=>{
+  function pending<T>(){let resolve!:(value:T)=>void;let reject!:(reason:Error)=>void;const promise=new Promise<T>((yes,no)=>{resolve=yes;reject=no;});return {promise,resolve,reject};}
+
+  it('does not restore a login that completed after logout',async()=>{
+    const value=fixture();await value.security.loadDevice();await value.security.refreshDeviceAuthorization();
+    const login=pending<MfpStaffLoginResult>();vi.mocked(value.authority.loginStaff).mockReturnValueOnce(login.promise);
+    const work=value.security.loginStaff('STAFF-01','2468');await value.security.logoutStaff();
+    login.resolve({state:'AUTHENTICATED',session:value.formalSession});await work;
+    expect(value.security.getSnapshot()).toMatchObject({session:null,sessionState:'UNAUTHORIZED'});
+    expect(()=>value.security.precheckFrontlineAction()).toThrow('MFP_STAFF_SESSION_UNAUTHORIZED');
+  });
+
+  it('does not restore a readback that completed after logout',async()=>{
+    const value=fixture();await authorizeAndLogin(value);
+    const readback=pending<MfpStaffSession>();vi.mocked(value.authority.readStaffSession).mockReturnValueOnce(readback.promise);
+    const work=value.security.refreshStaffSession();await value.security.logoutStaff();
+    readback.resolve(value.formalSession);await work;
+    expect(value.security.getSnapshot()).toMatchObject({session:null,sessionState:'UNAUTHORIZED'});
+  });
+
+  it('does not replace a newer login with an older rejected login',async()=>{
+    const value=fixture();await value.security.loadDevice();await value.security.refreshDeviceAuthorization();
+    const login=pending<MfpStaffLoginResult>();vi.mocked(value.authority.loginStaff).mockReturnValueOnce(login.promise);
+    const old=value.security.loginStaff('STAFF-02','2468');await value.security.loginStaff('STAFF-01','2468');
+    login.resolve({state:'UNAUTHORIZED'});await old;
+    expect(value.security.getSnapshot()).toMatchObject({session:value.formalSession,sessionState:'AUTHENTICATED'});
+  });
+
+  it('does not clear a newer login when an old readback fails',async()=>{
+    const value=fixture();await authorizeAndLogin(value);
+    const readback=pending<MfpStaffSession>();vi.mocked(value.authority.readStaffSession).mockReturnValueOnce(readback.promise);
+    const work=value.security.refreshStaffSession();await value.security.loginStaff('STAFF-01','2468');
+    readback.reject(new Error('OFFLINE'));await expect(work).rejects.toThrow('OFFLINE');
+    expect(value.security.getSnapshot()).toMatchObject({session:value.formalSession,sessionState:'AUTHENTICATED'});
+  });
+
+  it('does not clear a newer login when an old command is rejected as unauthorized',async()=>{
+    const value=fixture();await authorizeAndLogin(value);
+    const submitted=pending<MfpStoreKernelResult>();vi.mocked(value.storeKernel.submitFormalCommand).mockReturnValueOnce(submitted.promise);
+    const work=value.security.submitFrontlineFormalCommand(command());await value.security.logoutStaff();await value.security.loginStaff('STAFF-01','2468');
+    submitted.resolve({schema:'mfp.store-kernel.submission.result.v1',submissionId:'SUB-01',state:'REJECTED',rejectionCode:'UNAUTHORIZED'});await work;
+    expect(value.security.getSnapshot()).toMatchObject({session:value.formalSession,sessionState:'AUTHENTICATED'});
+  });
+
+  it('fails closed on a login transport failure instead of retaining the prior session',async()=>{
+    const value=fixture();await authorizeAndLogin(value);
+    vi.mocked(value.authority.loginStaff).mockRejectedValueOnce(new Error('OFFLINE'));
+    await expect(value.security.loginStaff('STAFF-02','2468')).rejects.toThrow('OFFLINE');
+    expect(value.security.getSnapshot()).toMatchObject({session:null,sessionState:'UNKNOWN'});
+  });
+
+  it('rejects a readback for a different opaque session',async()=>{
+    const value=fixture();await authorizeAndLogin(value);
+    vi.mocked(value.authority.readStaffSession).mockResolvedValueOnce(session('AUTHENTICATED',undefined,{staffSessionRef:'SESSION-OTHER'}));
+    await expect(value.security.refreshStaffSession()).rejects.toThrow('MFP_STAFF_SESSION_IDENTITY_MISMATCH');
+    expect(value.security.getSnapshot()).toMatchObject({session:null,sessionState:'UNKNOWN'});
+  });
+});

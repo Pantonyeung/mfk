@@ -45,22 +45,30 @@ export function createMfpFormalBusinessNativeTransport(
       };
       const accept=(raw:unknown)=>{
         const value=parseNative(raw);if(!value||value.requestId!==requestId)return;
-        if(value.status==='failed'||value.type==='mfp.store-kernel.formal.error.v1'){
+        if(value.type==='carrier.error'||value.type==='mfp.store-kernel.formal.error.v1'&&value.protocolVersion===1){
           finish(new Error(typeof value.errorCode==='string'&&/^[A-Z0-9_:-]{1,160}$/.test(value.errorCode)?value.errorCode:'MFP_NATIVE_CAPABILITY_FAILED'));return;
         }
-        if(value.type==='mfp.store-kernel.submission.result.v1')finish(null,value as unknown as MfpStoreKernelResult);
+        if(value.type==='mfp.store-kernel.submission.result.v1'&&value.protocolVersion===1
+          &&value.schema==='mfp.store-kernel.submission.result.v1'&&value.submissionId===message.submissionId){
+          finish(null,value as unknown as MfpStoreKernelResult);
+        }
       };
       const onWindow=(event:NativeEvent)=>accept(event.data);
       const onBridge=(event:NativeEvent)=>accept(event.data);
       const stopWindow=env.listenWindow(onWindow);
       bridge.addEventListener?.('message',onBridge);
       timer=env.setTimer(()=>finish(new Error('MFP_NATIVE_TIMEOUT')),timeoutMs);
-      try{bridge.postMessage(JSON.stringify({protocolVersion:1,...message,requestId}));}
+      try{bridge.postMessage(JSON.stringify({...message,protocolVersion:1,requestId}));}
       catch{finish(new Error('MFP_NATIVE_BRIDGE_POST_FAILED'));}
     });
   };
   return Object.freeze({
-    submitCommand:(command:MfpStoreKernelCommandEnvelope)=>request({type:'mfp.store-kernel.command.v1',...command}),
+    submitCommand:(command:MfpStoreKernelCommandEnvelope)=>request({
+      type:'mfp.store-kernel.command.v1',schema:command.schema,
+      storeId:command.storeId,deviceId:command.deviceId,staffSessionRef:command.staffSessionRef,
+      submissionId:command.submissionId,idempotencyKey:command.idempotencyKey,commandType:command.commandType,
+      expectedRevision:command.expectedRevision,payload:command.payload,createdAt:command.createdAt,
+    }),
     readSubmission:(command:MfpStoreKernelCommandEnvelope)=>request({
       type:'mfp.store-kernel.submission.read.v1',storeId:command.storeId,deviceId:command.deviceId,
       staffSessionRef:command.staffSessionRef,submissionId:command.submissionId,

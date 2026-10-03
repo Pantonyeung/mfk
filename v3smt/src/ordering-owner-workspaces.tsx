@@ -32,23 +32,23 @@ export function MfpDisplaySettingsPanel({settings,onChange,onClose}:{
 }){
   const range=(key:'categoryRows'|'productColumns'|'fontScale'|'densityScale',value:number)=>onChange({...settings,[key]:value});
   return <section className="mfp-config mfp-display-settings" role="dialog" aria-modal="true" aria-labelledby="mfp-display-settings-title">
-    <header><div><small>PRESENTATION ONLY · INSTANT PREVIEW</small><h2 id="mfp-display-settings-title">Display Settings</h2></div><button type="button" autoFocus aria-label="關閉顯示設定" onClick={onClose}>×</button></header>
+    <header><div><small>只影響顯示</small><h2 id="mfp-display-settings-title">顯示設定</h2></div><button type="button" autoFocus aria-label="關閉顯示設定" onClick={onClose}>×</button></header>
     <div className="mfp-config-scroll mfp-settings-grid">
       <label>分類行數 <output>{settings.categoryRows}</output><input type="range" min="1" max="4" step="1" value={settings.categoryRows} onChange={event=>range('categoryRows',Number(event.target.value))}/></label>
       <label>商品欄數 <output>{settings.productColumns}</output><input type="range" min="2" max="6" step="1" value={settings.productColumns} onChange={event=>range('productColumns',Number(event.target.value))}/></label>
       <label>字體比例 <output>{settings.fontScale.toFixed(2)}</output><input type="range" min="0.8" max="1.4" step="0.05" value={settings.fontScale} onChange={event=>range('fontScale',Number(event.target.value))}/></label>
       <label>整體密度 <output>{settings.densityScale.toFixed(2)}</output><input type="range" min="0.75" max="1.25" step="0.05" value={settings.densityScale} onChange={event=>range('densityScale',Number(event.target.value))}/></label>
       <label className="mfp-setting-check"><input type="checkbox" checked={settings.showImages} onChange={event=>onChange({...settings,showImages:event.target.checked})}/>顯示商品圖片</label>
-      <p>設定只影響畫面；商品、價錢、選項、套餐同 Cart intent 不會改變。</p>
+      <p>設定只影響畫面；商品、價錢、選項、套餐同本單餐點不會改變。</p>
     </div>
-    <footer><div><small>RESTART PERSISTED</small><strong>即時預覽已套用</strong></div><button type="button" onClick={onClose}>完成</button></footer>
+    <footer><div><small>自動保存顯示偏好</small><strong>即時預覽已套用</strong></div><button type="button" onClick={onClose}>完成</button></footer>
   </section>;
 }
 
 export function MfpSilentGuidance({catalog,draft}:{catalog:MfpOrderingCatalog;draft:MfpOrderingDraft}){
   const target=mfpGuidanceTarget(catalog,draft);
-  const labels:Record<typeof target,string>={REQUIRED:'Required',QUICK_DRINK:'Quick Drink',COMBO_BLOCKER:'Combo blocker',FAST_PAIR:'Fast Pair',CHECKOUT:'Checkout',PRODUCT:'Product'};
-  return <div className="mfp-silent-guidance" data-guidance-target={target}><small>SILENT GUIDED FLOW</small><b>{labels[target]}</b><span>只提示焦點，不會自動提交或改動 Cart。</span></div>;
+  const labels:Record<typeof target,string>={REQUIRED:'完成必選',QUICK_DRINK:'揀選飲品',COMBO_BLOCKER:'完成套餐',FAST_PAIR:'快速配對',CHECKOUT:'核對本單',PRODUCT:'揀選餐點'};
+  return <div className="mfp-silent-guidance" data-guidance-target={target}><small>點單提示</small><b>{labels[target]}</b><span>餐點確認後，先再安排堂食或結帳。</span></div>;
 }
 
 function FastPairPanel({catalog,draft,onClose}:{catalog:MfpOrderingCatalog;draft:MfpOrderingDraft;onClose:()=>void}){
@@ -56,7 +56,7 @@ function FastPairPanel({catalog,draft,onClose}:{catalog:MfpOrderingCatalog;draft
   const [assignments,setAssignments]=useState(()=>assignMfpFastPair(plan));
   const units=new Map(plan.snackUnits.map(unit=>[unit.id,unit] as const));
   return <section className="mfp-config" role="dialog" aria-modal="true" aria-labelledby="mfp-fast-pair-title">
-    <header><div><small>POSITIONAL ONLY · NO RECOMMENDATION</small><h2 id="mfp-fast-pair-title">Fast Pair</h2></div><button type="button" autoFocus aria-label="關閉快速組合" onClick={onClose}>×</button></header>
+    <header><div><small>POSITIONAL ONLY · NO RECOMMENDATION</small><h2 id="mfp-fast-pair-title">快速配對</h2></div><button type="button" autoFocus aria-label="關閉快速組合" onClick={onClose}>×</button></header>
     <div className="mfp-config-scroll mfp-fast-pair-list">{plan.slots.length?plan.slots.map(slot=><article key={slot.id}>
       <strong>{slot.label}</strong><span>{slot.mainUnitId}</span><select aria-label={`${slot.label} 小食配對`} value={assignments[slot.id]??''} onChange={event=>setAssignments(current=>swapMfpFastPair(plan,current,slot.id,event.target.value))}>
         <option value="">保持單點</option>{slot.compatibleSnackUnitIds.map(id=><option key={id} value={id}>{units.get(id)?.productId} · {id}</option>)}
@@ -74,9 +74,9 @@ function RequiredPanel({catalog,draft,onEdit,onClose}:{
 }){
   const tasks=requiredTasksForMfpDraft(catalog,draft);
   return <section className="mfp-config" role="dialog" aria-modal="true" aria-labelledby="mfp-required-title">
-    <header><div><small>CANONICAL PRODUCT CONFIG ONLY</small><h2 id="mfp-required-title">Required</h2></div><button type="button" autoFocus aria-label="關閉必選" onClick={onClose}>×</button></header>
+    <header><div><small>CANONICAL PRODUCT CONFIG ONLY</small><h2 id="mfp-required-title">必選項目</h2></div><button type="button" autoFocus aria-label="關閉必選" onClick={onClose}>×</button></header>
     <div className="mfp-config-scroll mfp-required-list">{tasks.length?tasks.map(task=><article key={`${task.cartLineId}:${task.optionSetId}`}>
-      <div><b>{task.label}</b><small>{task.cartLineId} · {task.min}–{task.max}</small></div><button type="button" onClick={()=>onEdit(draft.lines.find(line=>line.cartLineId===task.cartLineId)!)}>補選同一 Cart Line</button>
+      <div><b>{task.label}</b><small>{task.cartLineId} · {task.min}–{task.max}</small></div><button type="button" onClick={()=>onEdit(draft.lines.find(line=>line.cartLineId===task.cartLineId)!)}>補選餐點</button>
     </article>):<p className="mfp-empty-copy">必選已齊。</p>}</div>
     <footer><div><small>UNRESOLVED = INCOMPLETE</small><strong>{tasks.length} 項待處理</strong></div><button type="button" onClick={onClose}>完成</button></footer>
   </section>;
@@ -97,8 +97,8 @@ export function MfpFastLanes({catalog,draft,onEdit,onCombo}:{
   const required=requiredTasksForMfpDraft(catalog,draft).length;
   const close=()=>setPanel(null);
   return <><div className="mfp-fast-lanes" aria-label="Fast Lane">
-    <button type="button" onClick={()=>setPanel('PAIR')}>Fast Pair</button>
-    <button type="button" className={required?'attention':''} onClick={()=>setPanel('REQUIRED')}>Required <span>{required}</span></button>
+    <button type="button" onClick={()=>setPanel('PAIR')}>快速配對</button>
+    <button type="button" className={required?'attention':''} onClick={()=>setPanel('REQUIRED')}>必選項目 <span>{required}</span></button>
     <button type="button" onClick={()=>setPanel('COMBO')}>紫米套餐</button>
   </div>{panel?<div className="mfp-config-layer">
     {panel==='PAIR'?<FastPairPanel catalog={catalog} draft={draft} onClose={close}/>:panel==='REQUIRED'?<RequiredPanel catalog={catalog} draft={draft} onEdit={line=>{close();onEdit(line);}} onClose={close}/>:<RiceComboPanel catalog={catalog} onCombo={comboId=>{close();onCombo(comboId);}} onClose={close}/>}</div>:null}</>;
@@ -130,24 +130,24 @@ export function MfpCartDraft({domain,catalog,draft,heldDraft,canDraft,onChange,o
   };
   const retrieve=()=>{if(heldDraft){onChange(heldDraft);onHeldDraft(null);}};
   return <><section className="mfp-cart" aria-labelledby="mfp-cart-title">
-    <header><div><small>DRAFT ONLY · PREVIEW #{String(draft.lines.length+1).padStart(3,'0')}</small><h2 id="mfp-cart-title">Cart Draft</h2></div><span className={intent.checkoutReady?'ready':'incomplete'}>{intent.checkoutReady?'CHECKOUT-READY':'INCOMPLETE'}</span></header>
-    <div className="mfp-cart-toolbar"><div role="group" aria-label="Cart view">{(['ORIGINAL','SORT','COMBINE'] as const).map(mode=><button type="button" key={mode} className={viewMode===mode?'active':''} aria-pressed={viewMode===mode} onClick={()=>setViewMode(mode)}>{mode}</button>)}</div><button type="button" className="mfp-clear-secondary" disabled={!canDraft||!draft.lines.length} onClick={()=>setClearConfirm(true)}>清除</button></div>
-    {clearConfirm?<div className="mfp-clear-confirm" role="alert"><span>確認清除本機 Cart Draft？</span><button type="button" onClick={()=>setClearConfirm(false)}>取消</button><button type="button" className="danger" onClick={()=>{onChange(domain.createDraft(draft.serviceMode));setClearConfirm(false);}}>確認清除</button></div>:null}
+    <header><div><small>未提交 · 餐點草稿</small><h2 id="mfp-cart-title">本單餐點</h2></div><span className={intent.checkoutReady?'ready':'incomplete'}>{intent.checkoutReady?'可結帳':'未完成'}</span></header>
+    <div className="mfp-cart-toolbar"><div role="group" aria-label="餐點排列">{(['ORIGINAL','SORT','COMBINE'] as const).map(mode=><button type="button" key={mode} className={viewMode===mode?'active':''} aria-pressed={viewMode===mode} onClick={()=>setViewMode(mode)}>{{ORIGINAL:'原序',SORT:'分類',COMBINE:'合併'}[mode]}</button>)}</div><button type="button" className="mfp-clear-secondary" disabled={!canDraft||!draft.lines.length} onClick={()=>setClearConfirm(true)}>清除</button></div>
+    {clearConfirm?<div className="mfp-clear-confirm" role="alert"><span>確認清除未提交餐點？</span><button type="button" onClick={()=>setClearConfirm(false)}>取消</button><button type="button" className="danger" onClick={()=>{onChange(domain.createDraft(draft.serviceMode));setClearConfirm(false);}}>確認清除</button></div>:null}
     <div className="mfp-service-mode" role="group" aria-label="全單用餐方式">
       <button type="button" aria-pressed={draft.serviceMode==='takeaway'} className={draft.serviceMode==='takeaway'?'active':''} disabled={!canDraft} onClick={()=>setMode('takeaway')}>全單外賣</button>
       <button type="button" aria-pressed={draft.serviceMode==='dine-in'} className={draft.serviceMode==='dine-in'?'active':''} disabled={!canDraft} onClick={()=>setMode('dine-in')}>全單堂食</button>
     </div>
     <div className="mfp-cart-lines">{rows.length?rows.map(row=><article key={row.cartLineIds.join(':')}>
-      <div><b><i>#{sequencePreviewForMfpLine(draft,row.cartLineIds[0]!)}</i> {row.line.displayName}</b><small>{row.line.kind} · {row.line.state}{row.combined?' · COMBINED':''}</small>{row.line.note?<small>備註：{row.line.note}</small>:null}{row.line.issues.map(code=><span key={code}>{code}</span>)}</div>
+      <div><b><i>#{sequencePreviewForMfpLine(draft,row.cartLineIds[0]!)}</i> {row.line.displayName}</b><small>{row.line.kind==='PRODUCT'?'單點':'套餐'} · {row.line.state==='READY'?'選項已齊':'請完成選項'}{row.combined?' · 已合併':''}</small>{row.line.note?<small>備註：{row.line.note}</small>:null}{row.line.issues.map(code=><span key={code}>{code}</span>)}</div>
       {row.combined&&viewMode==='COMBINE'?<div className="mfp-line-quantity"><button type="button" aria-label={`減少 ${row.line.displayName}`} disabled={!canDraft||row.quantity===1} onClick={()=>onChange(updateCombinedQuantity(domain,draft,row.cartLineIds,-1))}>−</button><strong>{row.quantity}</strong><button type="button" aria-label={`增加 ${row.line.displayName}`} disabled={!canDraft} onClick={()=>onChange(updateCombinedQuantity(domain,draft,row.cartLineIds,1))}>＋</button></div>:<strong>×{row.quantity}</strong>}
       <strong>{formatMoney(row.line.previewUnitMinor===null?null:row.line.previewUnitMinor*row.quantity)}</strong>
       <div className="mfp-line-service" role="group" aria-label={`${row.line.displayName} 用餐方式`}><button type="button" className={row.line.serviceMode==='takeaway'?'active':''} disabled={!canDraft||row.cartLineIds.length>1} onClick={()=>onChange(domain.setLineServiceMode(draft,row.line.cartLineId,'takeaway'))}>外賣</button><button type="button" className={row.line.serviceMode==='dine-in'?'active':''} disabled={!canDraft||row.cartLineIds.length>1} onClick={()=>onChange(domain.setLineServiceMode(draft,row.line.cartLineId,'dine-in'))}>堂食</button></div>
       <div className="mfp-line-actions"><button type="button" disabled={!canDraft||row.cartLineIds.length>1} onClick={()=>onEdit(row.line)}>修改</button><button type="button" disabled={!canDraft||row.cartLineIds.length>1} onClick={()=>onChange(domain.removeLine(draft,row.line.cartLineId))}>移除</button></div>
-    </article>):<p className="mfp-empty-copy">未有商品。可用 Retrieve 取回今次本機 session 嘅暫存草稿。</p>}</div>
-    <footer><div><small>{intent.pricing}</small><strong>{formatMoney(intent.previewSubtotalMinor)}</strong><span>Preview 唔係 final formal quote</span></div><div className="mfp-cart-primary-actions"><button type="button" className="mfp-hold-dining" disabled={!canDraft||(!draft.lines.length&&!heldDraft)} onClick={()=>draft.lines.length?setHoldOpen(true):retrieve()}>{mfpHoldEntryLabel(draft)}</button><button type="button" className="mfp-checkout-entry" disabled={!canDraft||!intent.checkoutReady||!onCheckout} onClick={onCheckout}>Checkout</button></div></footer>
+    </article>):<p className="mfp-empty-copy">未有餐點。揀選商品後會顯示喺呢度；如有本機暫存單，可按「取回」。</p>}</div>
+    <footer><div><small title={intent.pricing}>預計金額</small><strong>{formatMoney(intent.previewSubtotalMinor)}</strong><span>正式金額會喺結帳時核實</span></div><div className="mfp-cart-primary-actions"><button type="button" className="mfp-hold-dining" disabled={!canDraft||(!draft.lines.length&&!heldDraft)} onClick={()=>draft.lines.length?setHoldOpen(true):retrieve()}>{mfpHoldEntryLabel(draft)==='Retrieve'?'取回':'暫存／堂食'}</button><button type="button" className="mfp-checkout-entry" disabled={!canDraft||!intent.checkoutReady||!onCheckout} onClick={onCheckout}>結帳</button></div></footer>
   </section>{holdOpen?<div className="mfp-config-layer"><section className="mfp-config" role="dialog" aria-modal="true" aria-labelledby="mfp-hold-dining-title">
-    <header><div><small>DRAFT / LOCAL UX ONLY</small><h2 id="mfp-hold-dining-title">Hold / Dining</h2></div><button type="button" autoFocus aria-label="關閉暫存堂食" onClick={()=>setHoldOpen(false)}>×</button></header>
-     <div className="mfp-config-scroll mfp-destination-picker"><p>建議：{defaultMfpDraftDestination(draft)==='HOLD'?'Hold':'Dining'}。你可以隨時改。</p><div role="group" aria-label="暫存或堂食"><button type="button" className={destination==='HOLD'?'active':''} onClick={()=>setDestinationOverride('HOLD')}>Hold</button><button type="button" className={destination==='DINING'?'active':''} onClick={()=>setDestinationOverride('DINING')}>Dining</button></div>{destination==='DINING'?<p>Dining 會選擇 Waiting 或可用枱位；正式提交仍由 Store Kernel 處理。</p>:null}</div>
+    <header><div><small>未提交餐點</small><h2 id="mfp-hold-dining-title">暫存／堂食</h2></div><button type="button" autoFocus aria-label="關閉暫存堂食" onClick={()=>setHoldOpen(false)}>×</button></header>
+     <div className="mfp-config-scroll mfp-destination-picker"><p>建議：{defaultMfpDraftDestination(draft)==='HOLD'?'暫存':'堂食'}。你可以隨時改。</p><div role="group" aria-label="暫存或堂食"><button type="button" className={destination==='HOLD'?'active':''} onClick={()=>setDestinationOverride('HOLD')}>暫存</button><button type="button" className={destination==='DINING'?'active':''} onClick={()=>setDestinationOverride('DINING')}>堂食</button></div>{destination==='DINING'?<p>堂食會選擇等位單或可用枱位，再交由門店系統正式開單。</p>:null}</div>
      <footer><div><small>{destination==='HOLD'?'本機草稿':'尚未正式提交'}</small><strong>{draft.lines.length} 行草稿</strong></div><button type="button" onClick={storeDraft}>{destination==='DINING'?'前往安排枱位':'保存本機草稿'}</button></footer>
   </section></div>:null}</>;
 }

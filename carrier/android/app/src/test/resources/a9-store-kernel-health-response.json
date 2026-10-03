@@ -1,0 +1,12 @@
+{
+  "protocolVersion": 1,
+  "type": "store.kernel.health.completed.v1",
+  "requestId": "mfp-v3-diagnostic-contract",
+  "status": "ok",
+  "schemaVersion": 1,
+  "databaseName": "morefun_store_kernel.db",
+  "writerThread": "fixture-writer",
+  "journalMode": "wal",
+  "synchronous": 2,
+  "counts": {"aggregates": 0, "receipts": 0, "inbox": 0, "outbox": 0, "journal": 0}
+}

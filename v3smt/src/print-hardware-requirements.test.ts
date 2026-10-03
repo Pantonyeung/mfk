@@ -96,7 +96,7 @@ const gates:readonly Gate[]=[
   lacks(74,'A7 creates no SMM authority',printSource,/SMM_INTENT_STORE|HeadSeq|x-mfk-smm-session|mfk-smm-web/),
   lacks(75,'A7 creates no second business engine',printSource,/class\s+\w*(?:Print|Order|Payment|Pricing)(?:Engine|Authority)/),
   lacks(76,'browser does not own DurablePrintJob',printSource+state,/Dexie.*Print|printJobs!:\s*Table|durablePrint/i),
-  has(77,'A7 contains no production deploy config',workflow,"! grep -RInE 'wrangler deploy|cloudflare deploy|workers_dev' v3smt"),
+  has(77,'A7 contains no production deploy config',workflow,"wrangler_paths=$(find v3smt -iname 'wrangler*' -print)","reject_matches grep -RInE --exclude='*.test.ts' --exclude='*.test.tsx' 'wrangler deploy|cloudflare deploy|workers_dev' v3smt/src","reject_matches grep -RInE 'wrangler deploy|cloudflare deploy|workers_dev' \"$deploy_path\""),
   has(78,'Pad and Mobile share one Print Hardware contract',workspace,'SHARED_PAD_MOBILE',"surface==='MFP_MOBILE'"),
 ];
 
