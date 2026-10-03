@@ -9,7 +9,7 @@ This document records the latest Owner direction, the first verified native slic
 - Original reviewed checkout: `48c7eca6c051e72562ea9974bc2c6465b8584a7b`
 - Isolated branch: `feat/MFP-V3-A9R-POS-KERNEL-R1-2026-10-03`
 - Verified prerequisite commit: `8c52b155fb75edd39e4018853ca3c4144682e179`
-- Latest verified native code commit: `3c0cd77` (`CHECKOUT_PAYMENT_CONFIRM` mapping: `3e53a26`)
+- Latest verified native code commit: `1e94181` (`CHECKOUT_PAYMENT_CONFIRM` mapping: `3e53a26`; outbox fence: `3c0cd77`)
 - Existing Draft PR reference: `#651`; this branch has not been pushed to it.
 - Existing A9 base authority: `69adb11215677d506545c5428f8deea4b89e7db2`
 
@@ -24,7 +24,8 @@ This document records the latest Owner direction, the first verified native slic
 - Tender availability is driven by canonical enable/disable configuration.
 - Money uses integer minor units; duplicate taps and retries produce one effect.
 - Runtime assets and configuration remain updateable; no menu, price, tender, or runtime content is compiled as native truth.
-- Owner account/password authorization is the required parent of staff account/PIN sessions; a missing, changed, unknown, or revoked parent authorization removes staff access. Parent authorization/logout scope remains an explicit unresolved policy decision.
+- Owner account/password authorization is the device-bound parent of staff account/PIN sessions; a missing, changed, unknown, or revoked parent authorization removes staff access on that device. Owner logout is device-local and does not revoke independently authorized store devices.
+- Electronic tender becomes canonical from explicit staff visual review recorded as `STAFF_CONFIRMED`, not provider verification. No screenshot is uploaded or stored, and reconnect/session change must not create a duplicate payment.
 
 ## Completed bounded slice
 
@@ -34,7 +35,7 @@ The browser JSON parser rejects `readDependencies`; only trusted native handlers
 
 The repository now also contains immutable session observations, exact Admin checkout source facts, and a trusted-native checkout assembler. Those contracts do not authenticate a device, verify a PIN, issue an Owner/staff session, prove enrollment provenance, select a production tender, or compute the unresolved Student policy by themselves.
 
-The staff-session contract enforces a maximum 12-hour lifetime, transaction-time observation inputs, exact store/device/staff/session and parent-Owner authorization identity/revision, active frontline roles without a Manager-only gate, and rejects `VIEWER`/`REPORT_ONLY`, expired, inactive, revoked, unknown, or mismatched inputs. Verifier metadata is redacted and accepts only PBKDF2-SHA256 with a 256-bit hash; there is no raw-PIN field.
+The staff-session contract enforces a maximum 12-hour lifetime, transaction-time observation inputs, exact store/device/staff/session and device-bound parent-Owner authorization identity/revision, active frontline roles without a Manager-only gate, and rejects `VIEWER`/`REPORT_ONLY`, expired, inactive, revoked, unknown, or mismatched inputs. A revoked device A parent invalidates device A staff admission/session while an independently authorized device B remains valid. Verifier metadata is redacted and accepts only PBKDF2-SHA256 with a 256-bit hash; there is no raw-PIN field.
 
 The Admin checkout adapter consumes the accepted `ADMIN_ACTIVE_CONFIGURATION` Room state and extracts exact integer-minor money facts with provenance. It deliberately leaves `posTenderPolicy` and `studentEligibilityPolicy` unbound. `customerPaymentChannels` and promotion data remain evidence only.
 
@@ -72,13 +73,14 @@ Latest scoped command:
 gradle.bat -p carrier/android :app:testDebugUnitTest -x verifySmtWebBundle --tests com.morefunos.smt.storekernel.business.* --tests com.morefunos.smt.storekernel.StoreKernelFormalReceiptTest --tests com.morefunos.smt.storekernel.FormalAdminConfigSourceIntegrationTest --no-daemon
 ```
 
-Latest full native result at `3c0cd77`:
+Latest full native result at `1e94181`:
 
-- 11 suites
-- 85 tests passed
+- 12 suites
+- 89 tests passed
 - 0 failures, 0 errors, 0 skipped
 - 12 dedicated `FormalCheckoutPaymentConfirmIntegrationTest` cases using real Room
 - 25 `StoreKernelFormalReceiptTest` cases, including same-worker stale ACK/release lease races
+- `:app:lintDebug`: successful
 - `:app:assembleDebug -x verifySmtWebBundle --no-daemon`: successful, including desugaring, DEX, and APK packaging
 
 The checkout persistence tests use Room and cover atomic commit/replay, forged review rejection, incomplete and mismatched read sets, malformed/trailing normalized intent, dependency advance, deadline expiry, injected failure after receipt with full rollback, display-sequence contention, Router lost-reply recovery from a durable receipt, and close/reopen of a file-backed database. They are not FakeGateway-only tests. The trusted authorities in this suite are test-injected and are not production-source proof.
@@ -141,12 +143,12 @@ No live endpoint is changed by this branch.
 
 - Device admission needs an MFK-native enrollment/authorization record. Admin ACK membership is only config-delivery evidence and is not authorization.
 - Staff authentication can consume the canonical `MFK_STAFF_AUTH_V1` verifier projection, and the value contract now enforces the 12-hour maximum; the real native verifier, session issuer/revoker, and persisted producer remain unbound and must expose no PINs to persistence or logs.
-- Owner-parent authorization scope remains undecided: device-local, store-wide, or cross-device. The value contract fails closed but does not choose the scope or create account/password credentials.
+- Owner-parent authorization is now device-local. The real account/password verifier, persisted authorization/session issuer, and revocation producer remain unbound and must not create or expose credentials.
 - `storeSettings.customerPaymentChannels` is a Customer electronic-channel configuration. It is not, by itself, proof of all-POS tender eligibility or settlement. The formal POS tender publication field/source must be bound explicitly and otherwise fails closed.
 - Admin `businessDay.cutoff` classifies the business date for reporting/history. Current accepted behavior does not establish an old-V2-style OPEN-only trading gate; no such gate may be invented.
 - The canonical source of `studentDiscountEligible` is not present in the published Admin contract. This is a money-policy/data decision; checkout must fail closed for Student Discount until the Owner selects a canonical eligibility field or publication rule.
 - Student discount still needs exact option/surcharge basis, odd-minor rounding, and stacking behavior against `riceballDrink`; the mapper does not invent those answers.
-- Electronic tender settlement still needs an explicit rule: staff-recorded evidence versus provider-verified success.
+- Electronic tender evidence is settled as `STAFF_CONFIRMED` after staff visual review. The production tender producer remains unbound; it must not claim provider verification, store screenshots, or duplicate payment on reconnect/session change.
 - The native checkout handler ports still need real MFK producers for device/Owner/staff admission, formal quote/normalized intent, enabled POS tender, active Business Day, and display-sequence allocation. Public bridge registration stays fail-closed until all are available.
 - `MFP_ORDER_COMMITTED_V1` and `MFP_PAYMENT_CONFIRMED_V1` are now inserted atomically with deterministic identities, but dispatcher consumers and print/projection acknowledgement semantics remain separate stages. Commit `3c0cd77` fences outbox ACK/release by the claim's monotonically increasing `attemptCount`; a callback from an expired lease cannot alter a reclaimed lease even when the worker identity is reused. Dispatchers must echo the claim item's positive `attemptCount` or fail closed.
 - No physical printer/device or live financial acceptance was run. Physical acceptance remains a separate gate.

@@ -38,11 +38,14 @@ The same submission replays one effect. Receipt-first recovery survives a lost r
 
 Outbox ACK and release now require the positive `attemptCount` from the claimed item and include it in the Room CAS. A stale callback from an expired lease cannot mutate a newer claim, even when the worker identity is reused.
 
-At native code commit `3c0cd77681b15b8d980f4e1dbe7aa2650643dbf3`:
+Commit `1e94181` encodes the Owner's resolved policy without inventing provider proof: non-cash settlement requires canonical `STAFF_CONFIRMED` evidence, cash requires `CASH_COUNTED`, and no screenshot is stored. Parent Owner authorization is device-bound, so local logout invalidates existing/new staff access on that device while another device remains valid.
 
-- 11 Android unit-test suites;
-- 85 tests passed;
+At native code commit `1e94181b2bd433531571e68e13cb5516f9c08904`:
+
+- 12 Android unit-test suites;
+- 89 tests passed;
 - 0 failures, 0 errors, 0 skipped;
+- `:app:lintDebug` passed;
 - `:app:assembleDebug -x verifySmtWebBundle --no-daemon` passed.
 
 These tests inject trusted source ports. They do not prove production device enrollment, Owner/staff authentication, electronic settlement, physical printing, OTA behavior, or public routing.
@@ -61,12 +64,12 @@ Every outbox dispatcher must echo the claim item's positive `attemptCount`. Miss
 4. Preserve Order identity, display number, payment, items, and first seated time; never fabricate an Order merely because a table is occupied.
 5. Continue real native producer/adapter binding and then register only the bounded capability whose complete input/read set is proven.
 
-## Actual Owner decisions still required
+## Resolved Owner policy
 
-- Electronic settlement authority: staff-confirmed evidence or provider-confirmed success.
-- Owner logout scope: this device only or all devices in the store.
+- Electronic settlement uses staff-confirmed visual-review evidence. It is not provider-verified evidence, and no screenshot is uploaded or stored.
+- Owner logout revokes descendant staff access on this device only. Other store devices keep their independently bound authorization.
 
-Ordinary non-Student checkout and read/adapter engineering should continue while those decisions remain open.
+No remaining policy question blocks ordinary producer/read/adapter engineering. Credentials, enrollment provenance, Student eligibility/basis/rounding/stacking, and any genuine new money-policy choice still require explicit authority rather than invention.
 
 ## Release boundary
 

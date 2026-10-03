@@ -161,6 +161,8 @@ For CHECKOUT_PAYMENT_CONFIRM:
 - Student Discount intent must be revalidated formally
 - tender eligibility formally validated
 - cash settlement uses integer minor units
+- cash settlement evidence is `CASH_COUNTED`
+- electronic settlement is canonical only after staff visual review recorded as `STAFF_CONFIRMED`; this is not provider verification and no screenshot is stored
 - one canonical Order/payment result
 - no Order before Payment Confirm for normal checkout
 - double tap/retry idempotent
@@ -291,9 +293,10 @@ Current:
 
 - R0 native router: `SOURCE_VERIFIED`
 - bounded non-Student cash `CHECKOUT_PAYMENT_CONFIRM` mapping and same-Room transaction: `SOURCE_AND_ROOM_VERIFIED`
+- settlement evidence and device-local Owner logout value contracts: `SOURCE_AND_ROOM_VERIFIED`
 - production device/Owner/staff, quote, POS tender, Business Day, display-sequence, dispatcher, and public bridge binding: `IN_PROGRESS / FAIL_CLOSED`
 
-The verified checkout mapping does not create production credentials, prove electronic settlement, authorize a live charge, or activate a browser route. Trusted ports are test-injected until real MFK-native producers are bound. Student Discount remains fail-closed until its canonical eligibility and remaining money-policy rules exist.
+The verified checkout mapping does not create production credentials, prove provider settlement, authorize a live charge, store a payment screenshot, or activate a browser route. Parent Owner authorization is device-bound; logout revokes descendant staff access only on that device. Trusted ports are test-injected until real MFK-native producers are bound. Student Discount remains fail-closed until its canonical eligibility and remaining money-policy rules exist.
 
 Owner has authorized continued bounded POS engineering. Existing engineering gaps are not by themselves a stop condition. Genuine money-policy choices, credentials/access expansion, destructive or sensitive work, and ambiguous authority conflicts still require Owner direction.
 

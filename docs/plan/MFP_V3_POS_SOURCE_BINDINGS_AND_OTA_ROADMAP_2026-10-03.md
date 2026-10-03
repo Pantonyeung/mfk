@@ -54,7 +54,7 @@ The actual device enrollment ceremony is security-sensitive and requires explici
 
 Commit `a2a3194732ee10b136eb488dad408d0442e6546a` freezes the first fail-closed staff-session value contract. It enforces the 12-hour exclusive expiry boundary, exact store/device/staff/session and parent-Owner authorization identity/revision, active device/staff observations, operational roles/scopes, and published PBKDF2-SHA256 verifier metadata without persisting a PIN. `VIEWER` and `REPORT_ONLY` cannot operate. This is not a PIN verifier, device-enrollment authority, Owner-login producer, or session issuer.
 
-The Owner requirement is that a successful Owner account/password authorization is the parent prerequisite for staff account/PIN login, and Owner logout revokes descendant staff access. The safe record model binds every staff session to an opaque parent Owner authorization reference and revision, so missing, unknown, revoked, or changed parent authority rejects. The remaining policy decision is the scope of that parent authorization and logout effect: device-local, store-wide, or cross-device. No scope is inferred by the record model.
+The Owner requirement is that a successful Owner account/password authorization is the parent prerequisite for staff account/PIN login, and Owner logout revokes descendant staff access on that device only. Commit `1e94181` binds every staff session to an opaque parent Owner authorization reference, revision, and device identity. Missing, unknown, revoked, changed, or cross-device parent authority rejects, while an independently authorized second device remains valid. The real verifier, issuer, persisted producer, and revoker remain unbound.
 
 ## Stage 3 — Formal quote, discount, tender, and Business Day producers
 
@@ -67,6 +67,7 @@ Required money behavior:
 - Student Discount is 50% of the highest eligible single unit; stable cart-line order breaks equal-price ties;
 - tender is eligible only when present and enabled in the explicitly bound canonical POS tender publication at confirmation; `storeSettings.customerPaymentChannels` alone is Customer electronic-channel configuration and cannot be promoted to all-POS eligibility or settlement proof;
 - cash received/change are integer minor units; received must cover formal total; non-cash cannot inject cash change;
+- cash evidence is `CASH_COUNTED`; electronic evidence is explicit staff visual review recorded as `STAFF_CONFIRMED`, never a provider-verified claim or stored screenshot;
 - the active Business Day is a canonical transaction classification derived from the accepted cutoff/timezone publication. No OPEN-only trading gate is added unless the controlling Owner contract explicitly requires one.
 
 Canonical eligibility for Student Discount is still absent from the Admin publication contract. Until the Owner selects the field/publication rule, any Student Discount request fails closed with a stable rejection; non-student checkout work can continue.
@@ -103,6 +104,8 @@ Commit `3e53a26` implements the bounded non-Student cash assembler and closed co
 Real Room tests prove full rollback after an injected post-receipt failure, stale dependency rejection, transaction deadline rejection, one-winner display-sequence contention, lost-reply receipt recovery through the real Router gateway, duplicate replay, and file-backed database reopen without a second effect. These tests inject trusted source ports. They do not prove device enrollment, PIN verification, production POS tender/Student eligibility, physical printing, or public bridge activation.
 
 Commit `3c0cd77` closes the same-worker outbox reclaim race without a schema migration: claim already atomically increments and returns `attemptCount`; ACK and release now require that positive token and include it in the Room compare-and-set predicate. A stale callback from attempt 1 cannot acknowledge or release attempt 2. Every dispatcher must echo the claimed token; omission fails closed.
+
+Commit `1e94181` freezes the resolved evidence and logout semantics. Tender mapping rejects cash without `CASH_COUNTED` and non-cash without `STAFF_CONFIRMED`, persists the mode in canonical Payment JSON, and deliberately defines no provider-verified mode. Device-bound parent authorization makes a local Owner revocation remove that device's staff access without affecting another device.
 
 The production bridge remains fail-closed until real MFK producers supply the exact security, pricing, tender, Business Day, and display-allocation snapshots. Non-Student cash behavior is implemented; Student requests continue to fail closed because the canonical eligibility and remaining money-policy decisions are unresolved.
 

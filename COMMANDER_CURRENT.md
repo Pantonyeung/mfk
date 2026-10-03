@@ -19,6 +19,9 @@ Latest verified native implementation commits:
 
 - checkout mapping: `3e53a264bbbd4dcfe90305f0d69b63427b40f0ad`
 - outbox attempt fence: `3c0cd77681b15b8d980f4e1dbe7aa2650643dbf3`
+- AtomicFile backup recovery: `6b87f6a`
+- Android API 24 compatibility: `16ca7fb`
+- settlement evidence and device-local Owner logout policy: `1e94181`
 
 This branch-local current control explicitly supersedes the older A9R execution-branch pointer for this Owner-directed POS Kernel lane. It does not supersede the A9R authority, create a second authority, or grant promotion.
 
@@ -58,20 +61,22 @@ React/browser is not the business authority. Admin remains the sole canonical pu
 - immutable device/staff/session and checkout-source contracts that fail closed when a producer is absent;
 - atomic display-sequence CAS, canonical Order, canonical Payment, receipt, and deterministic Order/Payment outbox effects for non-Student cash confirmation;
 - receipt-first retry/lost-reply/reopen recovery;
-- outbox ACK/release fencing by the claimed positive `attemptCount`.
+- outbox ACK/release fencing by the claimed positive `attemptCount`;
+- explicit `CASH_COUNTED` versus `STAFF_CONFIRMED` settlement evidence with no provider-verified claim or screenshot storage;
+- device-bound parent Owner authorization so a local logout revokes staff access on that device without revoking another device.
 
-At `3c0cd77`, the full Android unit suite is 11 suites / 85 tests, with 0 failures, 0 errors, and 0 skipped. `:app:assembleDebug -x verifySmtWebBundle --no-daemon` also succeeds. These are source/Room/build results, not production, device, physical-print, or live-payment proof.
+At `1e94181`, the full Android unit suite is 12 suites / 89 tests, with 0 failures, 0 errors, and 0 skipped. `:app:lintDebug` and `:app:assembleDebug -x verifySmtWebBundle --no-daemon` also succeed. These are source/Room/build results, not production, device, physical-print, or live-payment proof.
 
 ## Production binding boundary
 
 Missing production inputs must fail closed. Current engineering gaps include native device/Owner/staff admission, formal quote, enabled POS tender, active Business Day, display allocation, dispatcher consumers, canonical Orders/Dining reads, and public bridge registration. These gaps are authorized engineering work; they are not permission to invent credentials, policy, or a second authority.
 
-The two unresolved Owner decisions are:
+The Owner has resolved the prior settlement/logout decisions:
 
-- whether electronic settlement becomes canonical from staff-confirmed evidence or provider-confirmed success;
-- whether Owner logout revokes descendant staff sessions only on this device or across all store devices.
+- electronic settlement records staff visual review as `STAFF_CONFIRMED`; it must not claim provider verification, upload/store screenshots, or create a second payment after reconnect/session change;
+- Owner logout revokes the parent authorization and descendant staff access on that device only; other devices remain unaffected.
 
-Ordinary non-Student checkout engineering may continue without those decisions.
+The real native verifier/session issuer/revoker, tender producer, and production bridge remain engineering gaps and fail closed until bound.
 
 ## Hard locks
 

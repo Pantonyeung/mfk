@@ -39,7 +39,7 @@
   "authority_impact": "EXTENDS THE ONE EXISTING STORE_KERNEL_FORMAL_BUSINESS_AUTHORITY WITH BOUNDED NATIVE PRODUCERS AND HANDLERS; REACT REMAINS NON-AUTHORITATIVE AND UNBOUND PRODUCTION INPUTS FAIL CLOSED",
   "persistence_impact": "REUSES THE EXISTING STORE KERNEL DATABASE COORDINATOR RECEIPT JOURNAL IDEMPOTENCY INBOX AND OUTBOX; ADDS NO DATABASE OR CLIENT BUSINESS TRUTH",
   "provider_impact": "NONE; CUSTOMER AND KEETA HANDLERS REMAIN UNBOUND AND NO PROVIDER CREDENTIAL OR ENDPOINT IS ADDED",
-  "transaction_impact": "THE TRUSTED NATIVE NON-STUDENT CASH CHECKOUT HANDLER ATOMICALLY WRITES DISPLAY SEQUENCE ORDER PAYMENT RECEIPT AND DETERMINISTIC OUTBOX EFFECTS; PUBLIC PRODUCTION ROUTING REMAINS UNREGISTERED UNTIL REAL SOURCE PRODUCERS ARE BOUND",
+  "transaction_impact": "THE TRUSTED NATIVE NON-STUDENT CHECKOUT CONTRACT REQUIRES CASH_COUNTED OR STAFF_CONFIRMED SETTLEMENT EVIDENCE AND THE CASH HANDLER ATOMICALLY WRITES DISPLAY SEQUENCE ORDER PAYMENT RECEIPT AND DETERMINISTIC OUTBOX EFFECTS; PUBLIC PRODUCTION ROUTING REMAINS UNREGISTERED UNTIL REAL SOURCE PRODUCERS ARE BOUND",
   "production_routing_impact": "SOURCE ROUTE ONLY; NO CANDIDATE PUBLISH BUILDER REQUEST CHANGE OTA ACTIVATION DEPLOY CUTOVER OR SMM DECOMMISSION",
   "expected_behavior_change": [
     "The trusted Android bridge accepts only mfp.store-kernel.command.v1 and mfp.store-kernel.submission.read.v1 for formal business traffic.",
@@ -48,7 +48,9 @@
     "Submission replay is readback-first and fingerprint conflicts cannot create a second effect.",
     "Trusted native handlers can attach an immutable revision read set that is validated inside the same Room transaction before any commit effect.",
     "CHECKOUT_PAYMENT_CONFIRM derives one canonical non-Student cash Order and Payment transaction from trusted fresh native facts while the public production bridge remains fail closed.",
-    "Outbox acknowledgement and release require the positive attemptCount returned by the current claim so stale callbacks cannot mutate a newer lease."
+    "Outbox acknowledgement and release require the positive attemptCount returned by the current claim so stale callbacks cannot mutate a newer lease.",
+    "Electronic tender records staff-confirmed visual-review evidence without claiming provider verification or storing a screenshot; cash records counted-cash evidence.",
+    "Parent Owner authorization is device-bound so logout revokes descendant staff access on that device without revoking independently authorized devices."
   ],
   "non_goals": [
     "No client Order Pricing Payment Refund Dining Capacity or Print authority.",

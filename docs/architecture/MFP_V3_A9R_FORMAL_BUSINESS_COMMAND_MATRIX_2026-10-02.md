@@ -20,7 +20,7 @@ The browser may submit only `mfp.store-kernel.command.v1`. It cannot name aggreg
 
 | Command | Required fresh canonical reads before a write | Expected revision source | Logical state owner | Current stable result |
 |---|---|---|---|---|
-| `CHECKOUT_PAYMENT_CONFIRM` | Receipt; device; parent Owner authorization; staff session; Admin configuration; formal quote; POS tender; active Business Day; display sequence | Exact seven native aggregate dependencies plus earliest deadline | One canonical Order/Payment transaction in the existing Store Kernel | Trusted-port non-Student cash path is `SOURCE_AND_ROOM_VERIFIED`; public bridge remains fail-closed while real producers are unbound; Student requests reject until canonical policy exists |
+| `CHECKOUT_PAYMENT_CONFIRM` | Receipt; device; device-bound parent Owner authorization; staff session; Admin configuration; formal quote; POS tender; active Business Day; display sequence | Exact seven native aggregate dependencies plus earliest deadline | One canonical Order/Payment transaction in the existing Store Kernel | Trusted-port non-Student cash path is `SOURCE_AND_ROOM_VERIFIED`; cash evidence must be `CASH_COUNTED`, electronic evidence must be `STAFF_CONFIRMED` and never provider-verified; public bridge remains fail-closed while real producers are unbound; Student requests reject until canonical policy exists |
 | `ORDER_FULFILLMENT_SET` | Security admission; canonical Order and fulfillment revision; receipt | Canonical Order revision | Existing canonical Order | `MFP_ORDER_OPERATIONS_PRODUCTION_BINDING_MISSING` |
 | `ORDER_MODIFICATION_REQUEST` | Security admission; canonical Order/payment facts and revision; receipt | Canonical Order revision | Existing canonical Order or formally linked adjustment | `MFP_ORDER_OPERATIONS_PRODUCTION_BINDING_MISSING` |
 | `ORDER_PAYMENT_CORRECTION` | Security admission; canonical Order/payment facts and revision; receipt | Canonical Payment/Order revision | Existing canonical Payment or linked correction | `MFP_ORDER_OPERATIONS_PRODUCTION_BINDING_MISSING` |
@@ -46,13 +46,13 @@ The native checkout assembler fresh-validates trusted security, normalized inten
 
 - a Business-Day display-sequence compare-and-set;
 - one deterministic canonical `ORDER` with exact integer-minor totals and retained Orders-contract fields;
-- one deterministic linked canonical `PAYMENT` with cash received/change in integer minor units;
+- one deterministic linked canonical `PAYMENT` with an explicit settlement evidence mode; cash has integer-minor received/change and electronic tender records only staff-confirmed visual review;
 - one durable command receipt;
 - deterministic `MFP_ORDER_COMMITTED_V1` and `MFP_PAYMENT_CONFIRMED_V1` outbox events.
 
 No Order, Payment, or outbox effect exists before Payment Confirm. Opening Checkout, changing channel/tender, and entering Final Review remain zero-commit client workflow. Student Discount intent never finalizes client-computed money and currently fails closed because canonical eligibility and remaining policy rules are not published.
 
-The production bridge remains unregistered until every trusted source producer is bound. Test-injected sources prove the mapping and transaction behavior only; they are not production-authentication or payment evidence.
+The production bridge remains unregistered until every trusted source producer is bound. Test-injected sources prove the mapping and transaction behavior only; they are not production-authentication, provider-payment, or screenshot evidence. Owner logout is device-local: revoking that device's parent authorization invalidates its descendant staff access while independently authorized devices remain unaffected.
 
 ## Next authorized engineering steps
 
