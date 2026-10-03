@@ -41,6 +41,8 @@ public final class FormalStaffSessionRecords {
         OWNER_AUTHORIZATION_MISSING,
         OWNER_AUTHORIZATION_UNKNOWN,
         OWNER_AUTHORIZATION_REVOKED,
+        OWNER_AUTHORIZATION_VALID_FOR_STAFF_LOGIN,
+        OWNER_AUTHORIZATION_DEVICE_MISMATCH,
         OWNER_AUTHORIZATION_REF_MISMATCH,
         OWNER_AUTHORIZATION_REVISION_MISMATCH,
         STAFF_MISSING,
@@ -56,8 +58,8 @@ public final class FormalStaffSessionRecords {
     /** Exactly one revision member is present. String and numeric identities remain distinct. */
     public record Revision(String text, Long number) { }
 
-    /** Opaque parent login authorization; this record does not choose device- versus store-scoping. */
-    public record ParentAuthorization(String ownerAuthorizationRef, Revision revision) { }
+    /** Opaque parent login authorization scoped to exactly one device. */
+    public record ParentAuthorization(String ownerAuthorizationRef, Revision revision, String deviceId) { }
 
     /** Expected identity and current canonical revision, independently established by a native read. */
     public record Context(
@@ -153,9 +155,10 @@ public final class FormalStaffSessionRecords {
         if (device == null) return Code.DEVICE_MISSING;
         if (device == DeviceStatus.REVOKED) return Code.DEVICE_REVOKED;
         if (device != DeviceStatus.AUTHORIZED) return Code.DEVICE_UNKNOWN;
-        if (ownerAuthorization == null) return Code.OWNER_AUTHORIZATION_MISSING;
-        if (ownerAuthorization == OwnerAuthorizationStatus.REVOKED) return Code.OWNER_AUTHORIZATION_REVOKED;
-        if (ownerAuthorization != OwnerAuthorizationStatus.AUTHORIZED) return Code.OWNER_AUTHORIZATION_UNKNOWN;
+        final Code parentCode = validateParentAuthorization(
+            context.parentAuthorization(), ownerAuthorization, context.deviceId()
+        );
+        if (parentCode != Code.OWNER_AUTHORIZATION_VALID_FOR_STAFF_LOGIN) return parentCode;
         if (staff == null) return Code.STAFF_MISSING;
         if (staff != StaffStatus.ACTIVE) return Code.STAFF_INACTIVE;
         if (session == null) return Code.SESSION_MISSING;
@@ -179,6 +182,9 @@ public final class FormalStaffSessionRecords {
         }
         if (!context.staffSessionRef().equals(session.staffSessionRef())) return Code.SESSION_REF_MISMATCH;
         if (!context.deviceId().equals(session.deviceId())) return Code.DEVICE_MISMATCH;
+        if (!session.parentAuthorization().deviceId().equals(session.deviceId())) {
+            return Code.OWNER_AUTHORIZATION_DEVICE_MISMATCH;
+        }
         if (!context.storeId().equals(session.storeId())) return Code.STORE_MISMATCH;
         if (!context.staffId().equals(session.staffId())) return Code.STAFF_MISMATCH;
         if (!context.parentAuthorization().ownerAuthorizationRef()
@@ -218,7 +224,28 @@ public final class FormalStaffSessionRecords {
     }
 
     private static boolean parentAuthorization(ParentAuthorization value) {
-        return value != null && text(value.ownerAuthorizationRef()) && revision(value.revision());
+        return value != null
+            && text(value.ownerAuthorizationRef())
+            && revision(value.revision())
+            && text(value.deviceId());
+    }
+
+    /** Validates the current device-local Owner authorization used to admit staff. */
+    public static Code validateParentAuthorization(
+        ParentAuthorization authorization,
+        OwnerAuthorizationStatus status,
+        String deviceId
+    ) {
+        if (!text(deviceId)) return Code.CONTEXT_INVALID;
+        if (authorization == null) return Code.OWNER_AUTHORIZATION_MISSING;
+        if (!parentAuthorization(authorization)) return Code.CONTEXT_INVALID;
+        if (!authorization.deviceId().equals(deviceId)) {
+            return Code.OWNER_AUTHORIZATION_DEVICE_MISMATCH;
+        }
+        if (status == null) return Code.OWNER_AUTHORIZATION_MISSING;
+        if (status == OwnerAuthorizationStatus.REVOKED) return Code.OWNER_AUTHORIZATION_REVOKED;
+        if (status != OwnerAuthorizationStatus.AUTHORIZED) return Code.OWNER_AUTHORIZATION_UNKNOWN;
+        return Code.OWNER_AUTHORIZATION_VALID_FOR_STAFF_LOGIN;
     }
 
     public static Code validateVerifier(VerifierMetadata verifier) {

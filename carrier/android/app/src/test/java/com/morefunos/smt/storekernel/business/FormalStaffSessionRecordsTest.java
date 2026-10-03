@@ -3,6 +3,7 @@ package com.morefunos.smt.storekernel.business;
 import static com.morefunos.smt.storekernel.business.FormalStaffSessionRecords.DEFAULT_PIN_ITERATIONS;
 import static com.morefunos.smt.storekernel.business.FormalStaffSessionRecords.MAX_LIFETIME_MS;
 import static com.morefunos.smt.storekernel.business.FormalStaffSessionRecords.validate;
+import static com.morefunos.smt.storekernel.business.FormalStaffSessionRecords.validateParentAuthorization;
 import static com.morefunos.smt.storekernel.business.FormalStaffSessionRecords.validateVerifier;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
@@ -33,7 +34,9 @@ public final class FormalStaffSessionRecordsTest {
     private static final long ISSUED = 1_000L;
     private static final Revision R1 = new Revision("synthetic-r1", null);
     private static final Revision OWNER_R1 = new Revision("synthetic-owner-r1", null);
-    private static final ParentAuthorization OWNER = new ParentAuthorization("owner-auth-fixture", OWNER_R1);
+    private static final ParentAuthorization OWNER = new ParentAuthorization(
+        "owner-auth-fixture", OWNER_R1, "device-fixture"
+    );
     private static final Context CTX = new Context(
         "session-fixture",
         "device-fixture",
@@ -42,6 +45,56 @@ public final class FormalStaffSessionRecordsTest {
         R1,
         OWNER
     );
+
+    @Test
+    public void ownerLogoutRevokesOnlyThisDeviceParentAuthorization() {
+        final ParentAuthorization deviceA = new ParentAuthorization("owner-auth-a", OWNER_R1, "device-a");
+        final ParentAuthorization deviceB = new ParentAuthorization("owner-auth-b", OWNER_R1, "device-b");
+
+        assertEquals(
+            Code.OWNER_AUTHORIZATION_REVOKED,
+            validateParentAuthorization(deviceA, OwnerAuthorizationStatus.REVOKED, "device-a")
+        );
+        assertEquals(
+            Code.OWNER_AUTHORIZATION_VALID_FOR_STAFF_LOGIN,
+            validateParentAuthorization(deviceB, OwnerAuthorizationStatus.AUTHORIZED, "device-b")
+        );
+        assertEquals(
+            Code.OWNER_AUTHORIZATION_DEVICE_MISMATCH,
+            validateParentAuthorization(deviceA, OwnerAuthorizationStatus.AUTHORIZED, "device-b")
+        );
+
+        final Context contextA = new Context(
+            "session-a", "device-a", "store-fixture", "staff-fixture", R1, deviceA
+        );
+        final SessionRecord sessionA = new SessionRecord(
+            SessionState.AUTHENTICATED, "session-a", "staff-fixture", "Synthetic staff",
+            Role.STAFF, Scope.STORE, List.of(), ISSUED, ISSUED + 1,
+            "device-a", "store-fixture", R1, deviceA
+        );
+        final Context contextB = new Context(
+            "session-b", "device-b", "store-fixture", "staff-fixture", R1, deviceB
+        );
+        final SessionRecord sessionB = new SessionRecord(
+            SessionState.AUTHENTICATED, "session-b", "staff-fixture", "Synthetic staff",
+            Role.STAFF, Scope.STORE, List.of(), ISSUED, ISSUED + 1,
+            "device-b", "store-fixture", R1, deviceB
+        );
+        assertEquals(
+            Code.OWNER_AUTHORIZATION_REVOKED,
+            validate(
+                sessionA, contextA, DeviceStatus.AUTHORIZED,
+                OwnerAuthorizationStatus.REVOKED, StaffStatus.ACTIVE, ISSUED
+            ).code()
+        );
+        assertEquals(
+            Code.VALID_AT_OBSERVATION,
+            validate(
+                sessionB, contextB, DeviceStatus.AUTHORIZED,
+                OwnerAuthorizationStatus.AUTHORIZED, StaffStatus.ACTIVE, ISSUED
+            ).code()
+        );
+    }
 
     @Test
     public void validatesObservationBoundariesAndContext() {
@@ -128,13 +181,15 @@ public final class FormalStaffSessionRecordsTest {
         final SessionRecord otherOwnerRef = new SessionRecord(
             numbered.state(), numbered.staffSessionRef(), numbered.staffId(), numbered.displayName(), numbered.role(), numbered.scope(),
             numbered.permissions(), numbered.issuedAtEpochMs(), numbered.expiresAtEpochMs(), numbered.deviceId(), numbered.storeId(),
-            numbered.sessionRevision(), new ParentAuthorization("other-owner-auth", OWNER_R1)
+            numbered.sessionRevision(), new ParentAuthorization("other-owner-auth", OWNER_R1, CTX.deviceId())
         );
         assertEquals(Code.OWNER_AUTHORIZATION_REF_MISMATCH, validate(otherOwnerRef, new Context(CTX.staffSessionRef(), CTX.deviceId(), CTX.storeId(), CTX.staffId(), numeric, OWNER), DeviceStatus.AUTHORIZED, OwnerAuthorizationStatus.AUTHORIZED, StaffStatus.ACTIVE, ISSUED).code());
         final SessionRecord otherOwnerRevision = new SessionRecord(
             numbered.state(), numbered.staffSessionRef(), numbered.staffId(), numbered.displayName(), numbered.role(), numbered.scope(),
             numbered.permissions(), numbered.issuedAtEpochMs(), numbered.expiresAtEpochMs(), numbered.deviceId(), numbered.storeId(),
-            numbered.sessionRevision(), new ParentAuthorization(OWNER.ownerAuthorizationRef(), new Revision("owner-r2", null))
+            numbered.sessionRevision(), new ParentAuthorization(
+                OWNER.ownerAuthorizationRef(), new Revision("owner-r2", null), CTX.deviceId()
+            )
         );
         assertEquals(Code.OWNER_AUTHORIZATION_REVISION_MISMATCH, validate(otherOwnerRevision, new Context(CTX.staffSessionRef(), CTX.deviceId(), CTX.storeId(), CTX.staffId(), numeric, OWNER), DeviceStatus.AUTHORIZED, OwnerAuthorizationStatus.AUTHORIZED, StaffStatus.ACTIVE, ISSUED).code());
     }

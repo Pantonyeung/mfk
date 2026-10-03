@@ -23,6 +23,7 @@ public final class FormalCheckoutRecords {
     public static final long MAX_SAFE_INTEGER = 9_007_199_254_740_991L;
     public enum Phase { FINAL_REVIEW, UNKNOWN, VALIDATED_PAYMENT_CONFIRM }
     public enum TenderKind { CASH, NON_CASH }
+    public enum SettlementEvidenceMode { CASH_COUNTED, STAFF_CONFIRMED }
     public enum DiscountMode { NONE, MANUAL, AUTO }
     public enum OutboxBinding { CANONICAL_V1 }
     public enum RevisionKind { TEXT, NUMBER }
@@ -107,10 +108,11 @@ public final class FormalCheckoutRecords {
         }
     }
 
-    /** Recording evidence is not electronic-provider settlement success. */
+    /** Staff confirmation is an observation, never an electronic-provider settlement claim. */
     public record Tender(
         String tenderId,
         TenderKind kind,
+        SettlementEvidenceMode evidenceMode,
         String recordingEvidenceRef,
         long amountMinor,
         Long cashReceivedMinor,
@@ -371,10 +373,14 @@ public final class FormalCheckoutRecords {
         identifier(tender.tenderId());
         identifier(tender.recordingEvidenceRef());
         Objects.requireNonNull(tender.kind());
+        if (tender.evidenceMode() == null) throw invalid("SETTLEMENT_EVIDENCE_INVALID");
         minor(tender.amountMinor());
         if (!accepted.contains(tender.tenderId())) throw invalid("TENDER_NOT_IN_FORMAL_QUOTE");
         if (tender.amountMinor() != quote.totalDueMinor()) throw invalid("SETTLEMENT_MISMATCH");
         if (tender.kind() == TenderKind.CASH) {
+            if (tender.evidenceMode() != SettlementEvidenceMode.CASH_COUNTED) {
+                throw invalid("SETTLEMENT_EVIDENCE_INVALID");
+            }
             if (tender.cashReceivedMinor() == null || tender.changeMinor() == null) {
                 throw invalid("SETTLEMENT_MISMATCH");
             }
@@ -384,8 +390,13 @@ public final class FormalCheckoutRecords {
                 || subtract(tender.cashReceivedMinor(), tender.amountMinor()) != tender.changeMinor()) {
                 throw invalid("SETTLEMENT_MISMATCH");
             }
-        } else if (tender.cashReceivedMinor() != null || tender.changeMinor() != null) {
-            throw invalid("SETTLEMENT_MISMATCH");
+        } else {
+            if (tender.evidenceMode() != SettlementEvidenceMode.STAFF_CONFIRMED) {
+                throw invalid("SETTLEMENT_EVIDENCE_INVALID");
+            }
+            if (tender.cashReceivedMinor() != null || tender.changeMinor() != null) {
+                throw invalid("SETTLEMENT_MISMATCH");
+            }
         }
 
         final BusinessDay day = Objects.requireNonNull(facts.day());

@@ -26,6 +26,7 @@ import com.morefunos.smt.storekernel.business.FormalCheckoutRecords.Phase;
 import com.morefunos.smt.storekernel.business.FormalCheckoutRecords.Quote;
 import com.morefunos.smt.storekernel.business.FormalCheckoutRecords.Revision;
 import com.morefunos.smt.storekernel.business.FormalCheckoutRecords.SecurityEvidence;
+import com.morefunos.smt.storekernel.business.FormalCheckoutRecords.SettlementEvidenceMode;
 import com.morefunos.smt.storekernel.business.FormalCheckoutRecords.SourceIdentity;
 import com.morefunos.smt.storekernel.business.FormalCheckoutRecords.Submission;
 import com.morefunos.smt.storekernel.business.FormalCheckoutRecords.Tender;
@@ -124,6 +125,7 @@ public final class FormalCheckoutPaymentConfirmIntegrationTest {
         assertEquals("mfp.canonical-payment.v1", paymentJson.getString("schema"));
         assertEquals(mapping.order().orderId(), paymentJson.getString("orderId"));
         assertEquals(5_000L, paymentJson.getLong("amountMinor"));
+        assertEquals("CASH_COUNTED", paymentJson.getJSONObject("tender").getString("evidenceMode"));
 
         final List<StoreKernelOutboxEntity> outbox = database.storeKernelDao().readAllOutbox();
         assertEquals("MFP_ORDER_COMMITTED_V1", outbox.get(0).eventType);
@@ -705,7 +707,10 @@ public final class FormalCheckoutPaymentConfirmIntegrationTest {
                 Instant.parse("2026-10-03T01:02:00Z")
             ),
             new DiscountDecision("NO-STUDENT-1", Revision.text("STUDENT-POLICY-UNUSED"), DiscountMode.NONE, 0, List.of()),
-            new Tender("CASH", TenderKind.CASH, "CASH-COUNT-1", 5_000, 5_000L, 0L),
+            new Tender(
+                "CASH", TenderKind.CASH, SettlementEvidenceMode.CASH_COUNTED,
+                "CASH-COUNT-1", 5_000, 5_000L, 0L
+            ),
             new BusinessDay(
                 "DAY-1", LocalDate.parse("2026-10-03"), Revision.numeric(1), "DAY-CUTOFF-1",
                 "0001", "DAY-1", 0, 1

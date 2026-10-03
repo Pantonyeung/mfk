@@ -473,6 +473,7 @@ public final class FormalCheckoutCommitFactory {
         final JSONObject result = new JSONObject()
             .put("tenderId", value.tenderId())
             .put("kind", value.kind().name())
+            .put("evidenceMode", value.evidenceMode().name())
             .put("recordingEvidenceRef", value.recordingEvidenceRef())
             .put("amountMinor", value.amountMinor());
         if (value.cashReceivedMinor() != null) result.put("cashReceivedMinor", value.cashReceivedMinor());

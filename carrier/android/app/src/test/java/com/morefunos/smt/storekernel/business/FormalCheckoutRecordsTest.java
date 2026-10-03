@@ -24,6 +24,7 @@ import com.morefunos.smt.storekernel.business.FormalCheckoutRecords.Quote;
 import com.morefunos.smt.storekernel.business.FormalCheckoutRecords.Revision;
 import com.morefunos.smt.storekernel.business.FormalCheckoutRecords.RevisionKind;
 import com.morefunos.smt.storekernel.business.FormalCheckoutRecords.SecurityEvidence;
+import com.morefunos.smt.storekernel.business.FormalCheckoutRecords.SettlementEvidenceMode;
 import com.morefunos.smt.storekernel.business.FormalCheckoutRecords.SourceIdentity;
 import com.morefunos.smt.storekernel.business.FormalCheckoutRecords.Submission;
 import com.morefunos.smt.storekernel.business.FormalCheckoutRecords.Tender;
@@ -40,6 +41,31 @@ import java.util.List;
 public final class FormalCheckoutRecordsTest {
     private static final String CANONICAL_INTENT = "{\"schema\":\"mfp.normalized-ordering-intent.v1\",\"lines\":[{\"cartLineId\":\"line-1\"}]}";
     private static final String CANONICAL_INTENT_HASH = "336f12546a8c8a41053b761f6915ba15e245a85313fbb166ea5868429a82777c";
+
+    @Test
+    public void nonCashSettlementRequiresStaffConfirmationWithoutProviderClaim() {
+        final Facts facts = sample("store-1", "submission-1");
+        final Tender accepted = new Tender(
+            "FPS", TenderKind.NON_CASH, SettlementEvidenceMode.STAFF_CONFIRMED,
+            "staff-screen-review-1", 1_500, null, null
+        );
+        assertEquals(SettlementEvidenceMode.STAFF_CONFIRMED, map(withTender(facts, accepted)).payment().tender().evidenceMode());
+        expectCode("SETTLEMENT_EVIDENCE_INVALID", () -> map(withTender(
+            facts,
+            new Tender(
+                "FPS", TenderKind.NON_CASH, SettlementEvidenceMode.CASH_COUNTED,
+                "staff-screen-review-1", 1_500, null, null
+            )
+        )));
+        expectCode("SETTLEMENT_EVIDENCE_INVALID", () -> map(withTender(
+            facts,
+            new Tender(
+                "CASH", TenderKind.CASH, SettlementEvidenceMode.STAFF_CONFIRMED,
+                "staff-screen-review-1", 1_500, 2_000L, 500L
+            )
+        )));
+        assertThrows(IllegalArgumentException.class, () -> SettlementEvidenceMode.valueOf("PROVIDER_VERIFIED"));
+    }
 
     @Test
     public void carriesCanonicalNormalizedIntentInsteadOfOnlyAnOpaquePointer() {
@@ -117,19 +143,19 @@ public final class FormalCheckoutRecordsTest {
         final Facts facts = sample("store-1", "submission-1");
         final Quote quote = facts.quote();
         expectCode("TENDER_NOT_IN_FORMAL_QUOTE", () -> map(withTender(
-            facts, new Tender("OTHER", TenderKind.NON_CASH, "e", 1_500, null, null)
+            facts, new Tender("OTHER", TenderKind.NON_CASH, SettlementEvidenceMode.STAFF_CONFIRMED, "e", 1_500, null, null)
         )));
         expectCode("SETTLEMENT_MISMATCH", () -> map(withTender(
-            facts, new Tender("CASH", TenderKind.CASH, "e", 1_500, 1_000L, 0L)
+            facts, new Tender("CASH", TenderKind.CASH, SettlementEvidenceMode.CASH_COUNTED, "e", 1_500, 1_000L, 0L)
         )));
         expectCode("SETTLEMENT_MISMATCH", () -> map(withTender(
-            facts, new Tender("CASH", TenderKind.CASH, "e", 1_500, 2_000L, 400L)
+            facts, new Tender("CASH", TenderKind.CASH, SettlementEvidenceMode.CASH_COUNTED, "e", 1_500, 2_000L, 400L)
         )));
         expectCode("SETTLEMENT_MISMATCH", () -> map(withTender(
-            facts, new Tender("CASH", TenderKind.CASH, "e", 1_600, 2_000L, 400L)
+            facts, new Tender("CASH", TenderKind.CASH, SettlementEvidenceMode.CASH_COUNTED, "e", 1_600, 2_000L, 400L)
         )));
         expectCode("SETTLEMENT_MISMATCH", () -> map(withTender(
-            facts, new Tender("CASH", TenderKind.NON_CASH, "e", 1_500, 2_000L, 500L)
+            facts, new Tender("CASH", TenderKind.NON_CASH, SettlementEvidenceMode.STAFF_CONFIRMED, "e", 1_500, 2_000L, 500L)
         )));
         expectCode("IDENTIFIER_INVALID", () -> map(sample("bad\u0000store", "s")));
         expectCode("IDENTIFIER_INVALID", () -> map(sample("bad\ud800store", "s")));
@@ -175,7 +201,7 @@ public final class FormalCheckoutRecordsTest {
         final Mapping mapped = map(facts);
         final Facts nonCash = withTender(
             facts,
-            new Tender("FPS", TenderKind.NON_CASH, "native-record-ref", 1_500, null, null)
+            new Tender("FPS", TenderKind.NON_CASH, SettlementEvidenceMode.STAFF_CONFIRMED, "native-record-ref", 1_500, null, null)
         );
         assertEquals("FPS", map(nonCash).payment().tender().tenderId());
         final Facts changed = withQuote(facts, quote("changed-quote", 2_000, 500, 1_500));
@@ -222,7 +248,7 @@ public final class FormalCheckoutRecordsTest {
                 facts.phase(), facts.submission(), facts.security(), facts.validatedIntentRef(), facts.validatedIntentHash(), facts.validatedIntentJson(),
                 facts.channelId(), facts.sourceIdentity(), edge,
                 new DiscountDecision("no-discount-decision", Revision.text("policy"), DiscountMode.NONE, 0, List.of()),
-                new Tender("FUTURE_NATIVE_TENDER", TenderKind.NON_CASH, "native-evidence", amount, null, null),
+                new Tender("FUTURE_NATIVE_TENDER", TenderKind.NON_CASH, SettlementEvidenceMode.STAFF_CONFIRMED, "native-evidence", amount, null, null),
                 facts.day()
             );
             assertEquals(amount, map(edgeFacts).payment().amountMinor());
@@ -250,7 +276,7 @@ public final class FormalCheckoutRecordsTest {
                 "decision-1", Revision.text("policy-4"), DiscountMode.MANUAL, 1,
                 List.of(new DiscountSelection("line-1", 1))
             ),
-            new Tender("CASH", TenderKind.CASH, "settlement-evidence-1", 1_500, 2_000L, 500L),
+            new Tender("CASH", TenderKind.CASH, SettlementEvidenceMode.CASH_COUNTED, "settlement-evidence-1", 1_500, 2_000L, 500L),
             new BusinessDay(
                 "day-1", LocalDate.parse("2026-10-03"), Revision.numeric(8), "classification-evidence-1",
                 "0001", "day-1", 0, 1
