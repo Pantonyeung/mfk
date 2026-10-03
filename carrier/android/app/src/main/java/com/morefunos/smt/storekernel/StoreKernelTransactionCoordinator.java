@@ -17,6 +17,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.LongSupplier;
 
 public final class StoreKernelTransactionCoordinator implements AutoCloseable {
     enum FailurePoint {
@@ -35,20 +36,37 @@ public final class StoreKernelTransactionCoordinator implements AutoCloseable {
     private final StoreKernelDatabase database;
     private final StoreKernelDao dao;
     private final FailurePoint failurePoint;
+    private final LongSupplier nowEpochMs;
     private final AtomicBoolean closed = new AtomicBoolean(false);
 
     public static StoreKernelTransactionCoordinator open(@NonNull Context context) {
-        return new StoreKernelTransactionCoordinator(StoreKernelDatabase.open(context), FailurePoint.NONE);
+        return new StoreKernelTransactionCoordinator(
+            StoreKernelDatabase.open(context),
+            FailurePoint.NONE,
+            System::currentTimeMillis
+        );
     }
 
     StoreKernelTransactionCoordinator(StoreKernelDatabase database) {
-        this(database, FailurePoint.NONE);
+        this(database, FailurePoint.NONE, System::currentTimeMillis);
     }
 
     StoreKernelTransactionCoordinator(StoreKernelDatabase database, FailurePoint failurePoint) {
+        this(database, failurePoint, System::currentTimeMillis);
+    }
+
+    StoreKernelTransactionCoordinator(
+        StoreKernelDatabase database,
+        FailurePoint failurePoint,
+        LongSupplier nowEpochMs
+    ) {
+        if (database == null || failurePoint == null || nowEpochMs == null) {
+            throw new IllegalArgumentException("STORE_KERNEL_COORDINATOR_DEPENDENCY_REQUIRED");
+        }
         this.database = database;
         this.dao = database.storeKernelDao();
         this.failurePoint = failurePoint;
+        this.nowEpochMs = nowEpochMs;
     }
 
     public CompletableFuture<CommitResult> commit(StoreKernelContract.CommitRequest request) {
@@ -63,6 +81,21 @@ public final class StoreKernelTransactionCoordinator implements AutoCloseable {
         return submit(() -> database.runInTransaction(() -> readCommandReceiptInTransaction(request)));
     }
 
+    public CompletableFuture<CommandReceiptReadResult> readCommandReceiptByCommandId(
+        String requestId,
+        String storeId,
+        String commandId
+    ) {
+        return submit(() -> database.runInTransaction(() -> CommandReceiptReadResult.from(
+            requestId,
+            dao.readReceiptByCommandId(storeId, commandId)
+        )));
+    }
+
+    public CompletableFuture<CommandReceiptReadResult> recordCommandResult(StoreKernelContract.CommandResultRequest request) {
+        return submit(() -> database.runInTransaction(() -> recordCommandResultInTransaction(request)));
+    }
+
     public CompletableFuture<InboxAppendResult> appendInbox(StoreKernelContract.InboxAppendRequest request) {
         return submit(() -> database.runInTransaction(() -> appendInboxInTransaction(request)));
     }
@@ -73,7 +106,12 @@ public final class StoreKernelTransactionCoordinator implements AutoCloseable {
 
     public CompletableFuture<Void> acknowledgeOutbox(StoreKernelContract.OutboxAcknowledgeRequest request) {
         return submit(() -> database.runInTransaction(() -> {
-            final int changed = dao.acknowledgeOutbox(request.eventId, request.leaseOwner, request.acknowledgedAt);
+            final int changed = dao.acknowledgeOutbox(
+                request.eventId,
+                request.leaseOwner,
+                request.attemptCount,
+                request.acknowledgedAt
+            );
             if (changed != 1) throw failure("STORE_KERNEL_OUTBOX_LEASE_CONFLICT");
             return null;
         }));
@@ -81,7 +119,12 @@ public final class StoreKernelTransactionCoordinator implements AutoCloseable {
 
     public CompletableFuture<Void> releaseOutbox(StoreKernelContract.OutboxReleaseRequest request) {
         return submit(() -> database.runInTransaction(() -> {
-            final int changed = dao.releaseOutbox(request.eventId, request.leaseOwner, request.errorCode);
+            final int changed = dao.releaseOutbox(
+                request.eventId,
+                request.leaseOwner,
+                request.attemptCount,
+                request.errorCode
+            );
             if (changed != 1) throw failure("STORE_KERNEL_OUTBOX_LEASE_CONFLICT");
             return null;
         }));
@@ -137,21 +180,67 @@ public final class StoreKernelTransactionCoordinator implements AutoCloseable {
         return CommandReceiptReadResult.found(request.requestId, receipt);
     }
 
-    private CommitResult commitInTransaction(StoreKernelContract.CommitRequest request) {
-        final StoreKernelCommandReceiptEntity prior = dao.readReceipt(
+    private CommandReceiptReadResult recordCommandResultInTransaction(StoreKernelContract.CommandResultRequest request) {
+        validateCommandResultRequest(request);
+        final StoreKernelCommandReceiptEntity prior = readPriorReceipt(
             request.storeId,
             request.operationId,
-            request.idempotencyKey
+            request.idempotencyKey,
+            request.commandId,
+            request.requestFingerprint
+        );
+        if (prior != null) return CommandReceiptReadResult.found(request.requestId, prior);
+
+        final long commitSequence = dao.nextCommitSequence();
+        final StoreKernelCommandReceiptEntity receipt = new StoreKernelCommandReceiptEntity(
+            request.storeId,
+            request.operationId,
+            request.idempotencyKey,
+            request.commandId,
+            request.requestFingerprint,
+            request.resultJson,
+            StoreKernelContract.sha256(request.resultJson),
+            request.traceId,
+            commitSequence,
+            request.recordedAt
+        );
+        dao.insertReceipt(receipt);
+        insertJournal(request.traceId, request.commandId, 1, "RECEIVED", request.recordedAt, commitSequence);
+        insertJournal(request.traceId, request.commandId, 2, "VALIDATED", request.recordedAt, commitSequence);
+        insertJournal(request.traceId, request.commandId, 3, "REJECTED", request.recordedAt, commitSequence);
+        return CommandReceiptReadResult.found(request.requestId, receipt);
+    }
+
+    private CommitResult commitInTransaction(StoreKernelContract.CommitRequest request) {
+        final StoreKernelCommandReceiptEntity prior = readPriorReceipt(
+            request.storeId,
+            request.operationId,
+            request.idempotencyKey,
+            request.commandId,
+            request.requestFingerprint
         );
         trip(FailurePoint.AFTER_IDEMPOTENCY_LOOKUP);
         if (prior != null) {
-            if (!prior.requestFingerprint.equals(request.requestFingerprint)) {
-                throw failure("STORE_KERNEL_IDEMPOTENCY_FINGERPRINT_CONFLICT");
-            }
             return CommitResult.replay(request.requestId, prior);
         }
 
+        if (request.commitDeadlineEpochMs != null && nowEpochMs.getAsLong() >= request.commitDeadlineEpochMs) {
+            throw failure("STORE_KERNEL_COMMIT_DEADLINE_EXPIRED");
+        }
         validateClosedCommit(request);
+        // Replay above is final even when dependencies later change. For a new command,
+        // validate every read-only dependency in the same transaction as the writes below.
+        for (StoreKernelContract.AggregateReadDependency dependency : request.readDependencies) {
+            final StoreKernelAggregateEntity current = dao.readAggregate(
+                request.storeId,
+                dependency.aggregateType,
+                dependency.aggregateId
+            );
+            final long actualRevision = current == null ? 0 : current.revision;
+            if (actualRevision != dependency.expectedRevision) {
+                throw failure("STORE_KERNEL_READ_DEPENDENCY_REVISION_CONFLICT");
+            }
+        }
         final List<StoreKernelAggregateEntity> currentAggregates = new ArrayList<>();
         for (StoreKernelContract.AggregateMutation mutation : request.mutations) {
             final StoreKernelAggregateEntity current = dao.readAggregate(
@@ -341,6 +430,72 @@ public final class StoreKernelTransactionCoordinator implements AutoCloseable {
         }
     }
 
+    private StoreKernelCommandReceiptEntity readPriorReceipt(
+        String storeId,
+        String operationId,
+        String idempotencyKey,
+        String commandId,
+        String requestFingerprint
+    ) {
+        final StoreKernelCommandReceiptEntity byCommand = dao.readReceiptByCommandId(storeId, commandId);
+        if (byCommand != null) {
+            validateReceiptIdentity(byCommand, operationId, idempotencyKey, commandId, requestFingerprint);
+            return byCommand;
+        }
+        final StoreKernelCommandReceiptEntity byIdempotency = dao.readReceipt(storeId, operationId, idempotencyKey);
+        if (byIdempotency != null) {
+            validateReceiptIdentity(byIdempotency, operationId, idempotencyKey, commandId, requestFingerprint);
+            return byIdempotency;
+        }
+        return null;
+    }
+
+    private void validateReceiptIdentity(
+        StoreKernelCommandReceiptEntity receipt,
+        String operationId,
+        String idempotencyKey,
+        String commandId,
+        String requestFingerprint
+    ) {
+        if (!receipt.requestFingerprint.equals(requestFingerprint)) {
+            throw failure("STORE_KERNEL_IDEMPOTENCY_FINGERPRINT_CONFLICT");
+        }
+        if (!receipt.operationId.equals(operationId)
+            || !receipt.idempotencyKey.equals(idempotencyKey)
+            || !receipt.commandId.equals(commandId)) {
+            throw failure("STORE_KERNEL_IDEMPOTENCY_IDENTITY_CONFLICT");
+        }
+    }
+
+    private void validateCommandResultRequest(StoreKernelContract.CommandResultRequest request) {
+        if (request == null
+            || invalidText(request.requestId)
+            || invalidText(request.commandId)
+            || invalidText(request.storeId)
+            || invalidText(request.operationId)
+            || invalidText(request.idempotencyKey)
+            || invalidText(request.traceId)
+            || invalidText(request.recordedAt)
+            || request.requestFingerprint == null
+            || !request.requestFingerprint.matches("^[0-9a-f]{64}$")
+            || request.resultJson == null
+            || request.resultJson.isEmpty()
+            || request.resultJson.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 131_072) {
+            throw failure("STORE_KERNEL_COMMAND_RESULT_INVALID");
+        }
+        try {
+            if (!(new JSONTokener(request.resultJson).nextValue() instanceof JSONObject)) {
+                throw failure("STORE_KERNEL_COMMAND_RESULT_INVALID");
+            }
+        } catch (JSONException error) {
+            throw failure("STORE_KERNEL_COMMAND_RESULT_INVALID");
+        }
+    }
+
+    private static boolean invalidText(String value) {
+        return value == null || value.isEmpty() || !value.equals(value.trim()) || value.length() > 160;
+    }
+
     private void insertJournal(
         String traceId,
         String commandId,
@@ -483,6 +638,10 @@ public final class StoreKernelTransactionCoordinator implements AutoCloseable {
 
         static CommandReceiptReadResult missing(String requestId) {
             return new CommandReceiptReadResult(requestId, null);
+        }
+
+        static CommandReceiptReadResult from(String requestId, StoreKernelCommandReceiptEntity receipt) {
+            return new CommandReceiptReadResult(requestId, receipt);
         }
 
         public JSONObject toJson() throws JSONException {

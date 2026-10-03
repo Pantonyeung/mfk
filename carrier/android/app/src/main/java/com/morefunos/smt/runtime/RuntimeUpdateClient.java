@@ -100,13 +100,14 @@ public final class RuntimeUpdateClient {
         final File download = new File(context.getCacheDir(), "morefun-runtime-update.mfos");
         try {
             download(descriptor.bundleUri.toURL(), download);
-            final RuntimeBundleMetadata staged = installer.stageSignedBundle(download, descriptor.archiveSha256);
-            if (!descriptor.releaseId.equals(staged.releaseId)
-                || !descriptor.runtimeVersion.equals(staged.runtimeVersion)
-                || !descriptor.channel.equals(staged.channel)
-                || descriptor.minCarrierVersionCode != staged.minCarrierVersionCode
-                || descriptor.bridgeVersion != staged.bridgeVersion) throw new IOException("RUNTIME_UPDATE_MANIFEST_BUNDLE_MISMATCH");
-            return staged;
+            return installer.stageSignedBundle(download, descriptor.archiveSha256, new RuntimeBundleMetadata(
+                descriptor.releaseId,
+                descriptor.runtimeVersion,
+                descriptor.channel,
+                descriptor.minCarrierVersionCode,
+                descriptor.bridgeVersion,
+                descriptor.archiveSha256
+            ));
         } finally {
             if (download.exists() && !download.delete()) download.deleteOnExit();
         }
@@ -203,7 +204,10 @@ public final class RuntimeUpdateClient {
 
     private static String requireReleaseId(String value) throws IOException {
         final String accepted = requireText(value, "RUNTIME_RELEASE_ID_REQUIRED");
-        if (!accepted.matches("[A-Za-z0-9._-]{1,96}")) throw new IOException("RUNTIME_RELEASE_ID_INVALID");
+        if (".".equals(accepted) || "..".equals(accepted)
+            || !accepted.matches("[A-Za-z0-9._-]{1,96}")) {
+            throw new IOException("RUNTIME_RELEASE_ID_INVALID");
+        }
         return accepted;
     }
 

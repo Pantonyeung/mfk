@@ -2,6 +2,7 @@ import {validateMfkAdminConfigEnvelope,type MfkAdminConfigEnvelope} from '../../
 import {validateRuntimeStaffAuthSnapshot,type StaffPinVerifier} from '../../contracts/staff-auth-v1.ts';
 import {OPTION_SET_CENTER_STORAGE_KEYS} from './admin-option-set-center.ts';
 import {readAdminStored,writeAdminStored,type AdminRelease} from './admin-local-store.ts';
+import {validateMfkPosTenderPolicy} from '../../contracts/pos-tender-policy-v1.ts';
 
 export interface AdminBrowserSession{
   readonly staffId:string;
@@ -134,6 +135,9 @@ function writeIfPresent(snapshot:Readonly<Record<string,unknown>>,sourceKey:stri
 }
 export function hydrateAdminFromCanonical(envelope:MfkAdminConfigEnvelope){
   const snapshot=envelope.snapshot;
+  const posTenders=Object.prototype.hasOwnProperty.call(snapshot,'posTenders')
+    ?validateMfkPosTenderPolicy(snapshot.posTenders)
+    :null;
   const staff=canonicalStaffDrafts(snapshot);
   if(snapshot.catalog)writeAdminStored('catalog-draft.v2',snapshot.catalog);
   writeAdminStored('catalog-dirty.v1',false);
@@ -152,6 +156,7 @@ export function hydrateAdminFromCanonical(envelope:MfkAdminConfigEnvelope){
     ['capacity','capacity.v1'],['inventory','inventory-lite.v1'],['loyalty','loyalty.v1'],['coupons','coupons.v1'],
     ['pricingPromotions','pricing-promotions.v1'],['announcements','announcements.v1'],
   ] as const)writeIfPresent(snapshot,sourceKey,storageKey);
+  if(posTenders)writeAdminStored('pos-tenders.v1',posTenders);
   if(snapshot.presentation&&typeof snapshot.presentation==='object'&&!Array.isArray(snapshot.presentation)){
     const presentation=snapshot.presentation as Record<string,unknown>;
     if(presentation.customer!==undefined)writeAdminStored('presentation.customer.v1',presentation.customer);

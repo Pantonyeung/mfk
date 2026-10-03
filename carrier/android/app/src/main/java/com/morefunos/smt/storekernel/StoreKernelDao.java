@@ -34,6 +34,9 @@ interface StoreKernelDao {
     @Query("SELECT * FROM store_kernel_command_receipt WHERE store_id = :storeId AND operation_id = :operationId AND idempotency_key = :idempotencyKey LIMIT 1")
     StoreKernelCommandReceiptEntity readReceipt(String storeId, String operationId, String idempotencyKey);
 
+    @Query("SELECT * FROM store_kernel_command_receipt WHERE store_id = :storeId AND command_id = :commandId LIMIT 1")
+    StoreKernelCommandReceiptEntity readReceiptByCommandId(String storeId, String commandId);
+
     @Insert(onConflict = OnConflictStrategy.ABORT)
     void insertReceipt(StoreKernelCommandReceiptEntity receipt);
 
@@ -98,16 +101,18 @@ interface StoreKernelDao {
     @Query(
         "UPDATE store_kernel_outbox SET status = 'ACKNOWLEDGED', lease_owner = NULL, " +
         "lease_expires_at_epoch_ms = 0, acknowledged_at = :acknowledgedAt, last_error = NULL " +
-        "WHERE event_id = :eventId AND status = 'PROCESSING' AND lease_owner = :leaseOwner"
+        "WHERE event_id = :eventId AND status = 'PROCESSING' AND lease_owner = :leaseOwner " +
+        "AND attempt_count = :attemptCount"
     )
-    int acknowledgeOutbox(String eventId, String leaseOwner, String acknowledgedAt);
+    int acknowledgeOutbox(String eventId, String leaseOwner, int attemptCount, String acknowledgedAt);
 
     @Query(
         "UPDATE store_kernel_outbox SET status = 'PENDING', lease_owner = NULL, " +
         "lease_expires_at_epoch_ms = 0, last_error = :errorCode " +
-        "WHERE event_id = :eventId AND status = 'PROCESSING' AND lease_owner = :leaseOwner"
+        "WHERE event_id = :eventId AND status = 'PROCESSING' AND lease_owner = :leaseOwner " +
+        "AND attempt_count = :attemptCount"
     )
-    int releaseOutbox(String eventId, String leaseOwner, String errorCode);
+    int releaseOutbox(String eventId, String leaseOwner, int attemptCount, String errorCode);
 
     @Query("SELECT * FROM store_kernel_outbox ORDER BY occurred_at ASC, event_id ASC")
     List<StoreKernelOutboxEntity> readAllOutbox();

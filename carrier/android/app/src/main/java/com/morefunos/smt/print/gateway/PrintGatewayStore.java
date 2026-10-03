@@ -79,10 +79,35 @@ public final class PrintGatewayStore extends SQLiteOpenHelper {
         final int updated = getWritableDatabase().update(
             "print_gateway_job",
             values,
-            "dispatch_attempt_id=?",
-            new String[]{dispatchAttemptId}
+            "dispatch_attempt_id=? " +
+            "AND (state!='ACKNOWLEDGED' OR ?='ACKNOWLEDGED') " +
+            "AND (state!='AMBIGUOUS_AFTER_SEND' OR ? IN ('AMBIGUOUS_AFTER_SEND','ACKNOWLEDGED'))",
+            new String[]{dispatchAttemptId, state, state}
         );
-        if (updated != 1) throw new IllegalStateException("PRINT_GATEWAY_JOB_NOT_FOUND");
+        // One atomic same-row predicate prevents late weaker evidence from enabling unsafe retry.
+        if (updated != 1) throw new IllegalStateException("PRINT_GATEWAY_JOB_OR_TRANSITION_REJECTED");
+    }
+
+    public synchronized JSONObject findByDispatchAttemptId(String dispatchAttemptId) throws JSONException {
+        try (Cursor cursor = getReadableDatabase().rawQuery(
+            "SELECT local_job_id,canonical_print_job_id,dispatch_attempt_id,target_json,payload_digest,state,last_stage,last_code,created_at,updated_at " +
+            "FROM print_gateway_job WHERE dispatch_attempt_id=? LIMIT 1",
+            new String[]{dispatchAttemptId}
+        )) {
+            if (!cursor.moveToFirst()) return null;
+            final JSONObject job = new JSONObject();
+            job.put("localJobId", cursor.getString(0));
+            job.put("canonicalPrintJobId", cursor.getString(1));
+            job.put("dispatchAttemptId", cursor.getString(2));
+            job.put("target", new JSONObject(cursor.getString(3)));
+            job.put("payloadDigest", cursor.getString(4));
+            job.put("state", cursor.getString(5));
+            job.put("lastStage", cursor.getString(6));
+            job.put("lastCode", cursor.isNull(7) ? JSONObject.NULL : cursor.getString(7));
+            job.put("createdAt", cursor.getString(8));
+            job.put("updatedAt", cursor.getString(9));
+            return job;
+        }
     }
 
     public synchronized JSONArray recoverableJobs() throws JSONException {
@@ -112,7 +137,7 @@ public final class PrintGatewayStore extends SQLiteOpenHelper {
 
     public synchronized JSONObject latestSnapshot() throws JSONException {
         try (Cursor cursor = getReadableDatabase().rawQuery(
-            "SELECT local_job_id,canonical_print_job_id,dispatch_attempt_id,state,last_stage,last_code,created_at,updated_at " +
+            "SELECT local_job_id,canonical_print_job_id,dispatch_attempt_id,state,last_stage,last_code,created_at,updated_at,payload_digest " +
             "FROM print_gateway_job ORDER BY updated_at DESC LIMIT 1",
             null
         )) {
@@ -131,6 +156,7 @@ public final class PrintGatewayStore extends SQLiteOpenHelper {
             if (cursor.isNull(5)) job.put("lastCode", JSONObject.NULL); else job.put("lastCode", cursor.getString(5));
             job.put("createdAt", cursor.getString(6));
             job.put("updatedAt", cursor.getString(7));
+            job.put("payloadDigest", cursor.getString(8));
             result.put("lastJob", job);
             return result;
         }

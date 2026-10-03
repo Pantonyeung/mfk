@@ -40,6 +40,8 @@ import com.morefunos.smt.runtime.RuntimeReleaseStore;
 import com.morefunos.smt.print.gateway.NativePrintGatewayService;
 import com.morefunos.smt.storekernel.StoreKernelBridgeController;
 import com.morefunos.smt.storekernel.StoreKernelContract;
+import com.morefunos.smt.storekernel.business.FormalBusinessCommandBridgeController;
+import com.morefunos.smt.storekernel.business.FormalBusinessCommandContract;
 import com.morefunos.smt.smm.SmmLanHost;
 import com.morefunos.smt.smm.SmmTrustedDeviceStore;
 
@@ -70,6 +72,7 @@ public final class MainActivity extends Activity {
     private CarrierCommandController carrierCommands;
     private PrintCommandController printCommands;
     private StoreKernelBridgeController storeKernelCommands;
+    private FormalBusinessCommandBridgeController formalBusinessCommands;
     private SmmLanHost smmLanHost;
     private SmmTrustedDeviceStore smmTrustedDevices;
     private NativePrintGatewayService printGateway;
@@ -153,6 +156,7 @@ public final class MainActivity extends Activity {
         printCommands = new PrintCommandController(this, this::postTrustedWebMessage);
         try {
             storeKernelCommands = StoreKernelBridgeController.open(this, this::postTrustedWebMessage);
+            formalBusinessCommands = FormalBusinessCommandBridgeController.open(this, this::postTrustedWebMessage);
         } catch (RuntimeException error) {
             if (faultJournal != null) {
                 faultJournal.record("STORE_KERNEL", "STORE_KERNEL_INITIALIZATION_FAILED", error.getMessage(), null);
@@ -416,6 +420,13 @@ public final class MainActivity extends Activity {
             final JSONObject request = new JSONObject(rawMessage == null ? "{}" : rawMessage);
             requestId = request.optString("requestId", "").trim();
             final String type = request.optString("type", "").trim();
+            if (FormalBusinessCommandContract.isFormalType(type) || type.startsWith("mfp.store-kernel.")) {
+                if (formalBusinessCommands == null) return errorResponse(requestId, "FORMAL_BUSINESS_ROUTER_UNAVAILABLE");
+                return formalBusinessCommands.handle(rawMessage);
+            }
+            if (StoreKernelContract.COMMIT.equals(type)) {
+                return errorResponse(requestId, "STORE_KERNEL_DIRECT_COMMIT_FORBIDDEN");
+            }
             if (StoreKernelContract.isStoreKernelType(type) || type.startsWith("store.kernel.")) {
                 if (storeKernelCommands == null) return errorResponse(requestId, "STORE_KERNEL_UNAVAILABLE");
                 return storeKernelCommands.handle(rawMessage);
@@ -656,6 +667,8 @@ public final class MainActivity extends Activity {
         smmTrustedDevices = null;
         if (storeKernelCommands != null) storeKernelCommands.close();
         storeKernelCommands = null;
+        if (formalBusinessCommands != null) formalBusinessCommands.close();
+        formalBusinessCommands = null;
         if (webView != null) webView.destroy();
         webView = null;
         if (Thread.getDefaultUncaughtExceptionHandler() != previousUncaughtExceptionHandler) {

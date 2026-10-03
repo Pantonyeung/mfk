@@ -1,124 +1,75 @@
-# MFK CURRENT HANDOFF｜2026-10-02
+# Unified V3 source candidate handoff | 2026-10-03
 
-Status: CURRENT / CONTROLLING HANDOFF
+Current branch: `work/MFP-V3-UNIFIED-INTEGRATION-2026-10-03`.
+Read `COMMANDER_CURRENT.md` for exact sources and authority. Detailed collision resolution, verification and remaining provider gates are recorded in `docs/handoff/MFP_V3_UNIFIED_SOURCE_INTEGRATION_2026-10-03.md`.
 
-Controlling authority:
-`docs/governance/MFK_UNIFIED_SURFACES_R1_AUTHORITY_2026-10-02.md`
+This candidate combines exact Admin #605, Customer #619, cloud MFP #653 and latest native `f6138d1b`. It must never be relabelled as old `48c7eca6` native or as a single mobile-only delta.
 
-Commander:
-`COMMANDER_CURRENT.md`
+Admin includes Owner. MFP host owns formal transaction/pricing/print execution; Mobile is auxiliary. V2 is historical/data extraction reference only. No second database, authority, pricing engine in React or fake transaction success.
 
-Execution:
-- Branch: `feat/MFK-UNIFIED-SURFACES-R1-2026-10-02`
-- Draft PR: #627
-- Foundation: `0223513a2142b02554fd6ff61808b871af8b5bbd`
-- Latest main must be fresh-read before every execution restart.
+Current result is a source-integration candidate, not an approved live system. Build, frontend, source-contract and fixture tests are distinct from native Android execution, live canonical readback and physical acceptance. Native runtime test execution in this cloud environment is unavailable until a real Gradle/Android toolchain is supplied or authorized CI runs. The existing CI selector is expanded to cover the merged native Store Kernel, gateway and runtime unit suites without invoking deployment.
 
-## Current owner-locked product target
+Do not deploy, publish canonical data, enroll accounts/devices, run money actions or print physically. Preserve all source IDs/prices/options/defaults/combos/print settings. Missing canonical inputs remain blocked rather than defaulted. Parent review must approve any next publication step.
 
-ADMIN
-- Admin Desktop
-- Admin Mobile / Owner Surface
+Important promotion dependency: inherited `.github/workflows/deploy-mfk-admin.yml` can deploy on main changes to `contracts/**` or `v2admin/**`. Branch push/Draft PR does not trigger that main path; an eventual main merge may. Do not treat merging this aggregate as a source-only action or bypass backup/readback/deployment approval.
 
-SMT
-- SMT Desktop
-- SMT Mobile / Handheld
+Separate hosting-app side effects are also unverified: Cloudflare app checks ran on the earlier PR #653 branch push. Any future branch push/PR may trigger external hosting work even when the MFP source-CI workflow itself has no deploy step. Review actual hosting routes before publication; do not infer safety from GitHub Actions branch filters alone.
 
-Independent Owner App and independent SMM are cancelled as final product identities.
+Selected business configuration extract source addendum: `docs/handoff/MFP_ADMIN_BUSINESS_CONFIG_EXTRACT_2026-10-03.md`. The explicit Prepare → Download control is limited to verified canonical catalog/options/printing data. No real extract has been produced or verified by this source implementation, and it cannot satisfy the pre-rollout preservation gate by itself.
 
-Legacy workers remain temporarily live:
-- `mfk-owner`
-- `mfk-smm-web`
+Local reconciliation now retains both the exact export commit `4f0775f6` and verified main `2e32fb87` as ancestors. All ten newer main design/PRD/naming documents are preserved unchanged. The aggregate manifest uses main as its effective comparison base; the earlier `f680166a` packet remains a historical checkpoint. No remote source publication, deployment or actual selected-data backup is implied. The next source checkpoint is ready for parent review only after its fresh combined checks and exact identity capture.
 
-No decommission until physical verification and separate Owner approval.
+## Physical acceptance scheduling qualification
 
-## Current execution objective
+Owner deferred onsite device/paper acceptance to 2026-10-04, with an 08:00–10:00 Asia/Hong_Kong arrival window. Physical acceptance is PENDING / DEFERRED_BY_OWNER_AVAILABILITY, not PASS or synthetic ACK. It does not globally block separately authorized software verification or UI deployment preparation. Software PrintJob identity, Admin routing, recovery and durable-state proofs keep their own gates; actual deployment remains a separate explicit decision. No reminder or automatic physical action is scheduled by this source update.
 
-UNIFIED SURFACES R1 — IMPLEMENTATION + DIRECT DEPLOY ACCEPTANCE
+The native canonical quote-selection source slice is recorded in `docs/handoff/MFP_V3_CANONICAL_QUOTE_SELECTIONS_2026-10-03.md`. Reviewed source `ed340d7b` preserves the same host quote authority/readset/deadline, adds pure canonical option/combo vectors and prepares unexecuted Room cases. No actual R27 data or Android execution is supplied. Nested combo-component options, option quantities, operational sellability and Student intent remain explicit gaps. The user's flexible selection and one-default-receipt requirements do not authorize silently inventing new intent fields or pricing/print policy here.
 
-Sequence:
-1. Fresh audit PR #627 + latest main + PR #623 foundation.
-2. Integrate latest main safely.
-3. Lock implementation contracts.
-4. Admin Mobile integration into `v2admin`.
-5. SMT Handheld integration into `v2local`.
-6. SMM transitional compatibility adaptation.
-7. Public SMT auth/worker hardening.
-8. Diagnostics adaptation.
-9. Relevant tests + exact-head CI.
-10. Exact source SHA lock.
-11. Acceptance deploy Admin.
-12. Acceptance deploy public SMT.
-13. Runtime identity readback.
-14. Desktop/mobile physical browser acceptance.
-15. Update evidence.
+The reviewed optional-section correction `3b0aa5c8` aligns the extract with the deployed envelope contract: catalog required, optional absent sections visibly inventoried, no synthesized empty/default data. It remains a selected capture, not proof of a complete settings workflow or real saved backup. Richer formal Admin product/options/media/print journeys require separate connection evidence.
 
-## Authority boundaries
+Modifier-price source correction `43676097` is now integrated; see `docs/handoff/MFP_ADMIN_MODIFIER_PRICE_SYNC_2026-10-03.md`. Pricing reads use existing optionCenter, requested edits synchronize both raw copies, metadata/defaults survive later edits, and stale open forms/dirty pricing rows fail closed. The optional-export correction remains included. Preserved historical numeric strings such as `1.000` may still pass the current publication seam despite native rejection; the visible warning does not replace a cross-layer readiness gate. No live price, draft, publication or transaction was changed.
 
-Admin Mobile:
-- same Admin auth/session
-- same canonical readback
-- same permission/audit/publish/diagnostics
-- no dependency on `mfk-owner` / Owner runtime API
 
-SMT Handheld:
-- same Store Kernel / transaction authority as Desktop
-- same Pricing / Order / Fulfillment / Print authority
-- same SMT projection / HeadSeq semantics
-- no SMM formal authority
-- no new `SMM_INTENT_STORE` dependency
+Admin report B1 source prerequisite `0495705cea1ef54e59c6202ed14ac5315771f325` is locally integrated over exact `89e21fa3cbfff5dbbb02a81a889fb4d0dd05b3bd`. Product code and source handoff match the independently approved packet; aggregate governance was reconciled by union. Client option publication now rejects the historical native-incompatible amount gap described above, plus malformed/default/reference/mirror/native-limit/cardinality failures, without repairing data or changing authority/CAS. This supersedes that bounded source-gap statement only. Full authoritative server enforcement and Packet C remain unimplemented. Final exact SHA, combined source regressions and unchanged aggregate HARD_BLOCK risks are recorded in the external integration evidence; no live/Android/physical acceptance or publication permission is implied.
 
-Public SMT:
-- authenticated public surface only
-- no anonymous business mutation
-- acceptance token is not staff identity
-- Browser/Cloud is not Formal Order Authority
 
-## PROMOTE scope already granted
+Admin report Packet C source `9f907eebb5ca6de1a2b54859765515b647dddeb6` is locally integrated over exact `48db835ed71385ce0bf781f8387e74b6c1c7c26b`. Reviewed product blobs and dedicated handoff match the approved source; aggregate governance is preserved by union and append. Existing product-local reusable group/default editing now exists with one atomic draft mutation, preservation/CAS, unsupported quantity limits, interrupted-save/navigation protection and same-draft response-order guards. The earlier Packet C-unimplemented statement is superseded at source level only. New products still need basic Save then explicit reopen for options. Browser UI/history acceptance remains BLOCKED / NOT RUN; live service/canonical/host, Android/Room and physical gates remain pending. Exact integrated SHA, combined checks and aggregate HARD_BLOCK risk delta are external integration evidence; no publication or deployment permission is implied.
 
-Owner has explicitly granted `PROMOTE` for acceptance deployment inside PR #627 after safe main integration and GREEN source tests.
 
-Authorized:
-- existing Admin Worker acceptance deploy
-- existing SMT public Worker acceptance deploy
-- required candidate resource provisioning under existing contracts
-- exact identity readback
-- browser physical acceptance
-- bounded fix / re-test / redeploy loops within the same scope
+## Owner-directed V3 acceptance release preparation
 
-Still separately gated:
-- final PR merge
-- final hostname cutover
-- OTA completion
-- legacy decommission
+Owner explicitly directed expedited Admin/POS/Customer V3 deployment, permitted replacement of unaccepted V2 UI, and retained V2 source as reference on 2026-10-03. This bounded source addendum supersedes the earlier no-runtime-provider-adoption restriction only for the explicitly adopted Admin service: five server modules are copied to V3 ownership; existing service name mfk-admin, ADMIN_SYNC/AdminSyncStore and all other DO/R2/migration identities remain unchanged. No second database, empty seed, data migration or credential change. V2 files remain unchanged reference.
 
-## First restart check
+A separately documented security delta fails closed on unresolved public Customer routes before storage access; existing authenticated Admin and device/staff paths retain checks. This is not approval of the old Customer public provider. Canonical V3 assets cannot switch to demo via URL. Fixed business polling is removed; existing initial/mount/focus/reconnect/doorbell/manual read mechanisms remain.
 
-Before any source edit:
-- verify live main
-- verify PR #627 head/base
-- verify PR #623 foundation
-- verify controlling authority remains 2026-10-02
-- confirm no runtime conflict from main integration
+Source preparation is not deployment. Parent must verify Cloudflare target/current version and retained bindings, preservation/rollback evidence, exact reviewed source/build, and business-read acceptance before activation/mutation. Full aggregate HARD_BLOCK remains visible; unrelated MFP/Customer runtime completeness is not represented as an Admin UI-only acceptance requirement. No workflow, classifier, Builder or OTA change occurs here. See docs/handoff/MFP_ADMIN_V3_ACCEPTANCE_RELEASE_2026-10-03.md.
 
-If conflict:
-`BLOCKED — RUNTIME_CONFLICT`
 
-If governance documents disagree again:
-`BLOCKED — GOVERNANCE_DRIFT`
+### Preservation-first activation amendment
 
-## Required status language
+The initial code-only V3 deployment uses server `MFP_V3_CONFIG_WRITES_ENABLED=0` and build `VITE_MFK_V3_CONFIG_WRITES_ENABLED=0`; missing/malformed values also lock. The UI mounts only existing normal app authentication and selected-business Prepare/Download, not editors or draft/publish providers. Server blocks mutating canonical `/publish`, every non-auth `/admin-browser/` route (including draft/product create/update/delete/publish and version rollback), and payment-QR upload. Matching outer aliases and direct inner DO calls are covered; `GET`/`HEAD`/`OPTIONS` and existing auth/session paths retain behavior. Existing unrelated transaction/operational endpoints are not claimed globally read-only.
 
-Only:
-- SOURCE_VERIFIED
-- DEPLOYED
-- PHYSICAL_VERIFIED
-- BLOCKED
-- FAILED
+Phase 1 is code-only and reversible with preserved storage, not a backup. After the actual selected-business download and identity/checksum/count inspection, parent may deploy the same independently reviewed source in phase 2 with both flags exactly `1`. That re-enables existing authorization-gated configuration paths; it creates no general permission for arbitrary business writes. Server health and asset release manifest report configuration-write mode separately. Query parameters cannot unlock either mode.
 
-MILESTONE:
-`MFK_UNIFIED_SURFACES_R1_CONTROL_AUTHORITY_READY_2026_10_02`
 
----
+### Parent privacy review correction (10:40 UTC)
 
-Historical handoff lineage dated 2026-09-30 and earlier is retained in Git history and its dated authority documents. It is not the current execution entry point where it conflicts with the 2026-10-02 Unified Surfaces R1 authority.
+Public generic `/api/admin-sync/` and `/api/projection/` are now blocked before DO/R2 access in every configuration-write mode, including aliases to full active-envelope reads and projection/native writes. Existing authenticated `/api/admin-browser/` login, canonical read and selected-business extract remain. Setting the config-write flag to1 does not reopen these providers. This supersedes any earlier statement in this packet that the generic transport/doorbell remains active; future restoration requires separately reviewed authenticated admission.
+
+The full-mode read-model provider no longer constructs a WebSocket or reconnect timer for the deliberately blocked event endpoint. Its channel status is UNBOUND; the freshness text explicitly discloses this. Fixed business polling remains absent. Initial/focus/reconnect/manual canonical reads retain their original authenticated path. No missed-event convergence or operational/native provider acceptance is claimed. The source defect is not a finding of an observed live breach; no unfiltered live envelope or credential was inspected.
+
+
+## Reviewed V3 acceptance release branch
+
+Current release branch is `release/MFP-V3-ACCEPTANCE-2026-10-03`, based exactly on `34ce775f72712208676f9ce4f0653e0921338d89`. This branch-specific statement supersedes the prior integration-branch label for this release only. Parent independently approved Admin preservation patch `f0fd0e7e9e221c0a58224044753fa682a08cbaeea4bf75a3349949d407aa6ce1` and Customer truthful-acceptance patch `70d704866baaef680a14b069201c83cb9d894ce0aa51c8b0d011943b2bb8bed7` before integration. Product blobs are unchanged from those reviews. MFP source is unchanged from the base. No unreviewed D1 files are present.
+
+Customer fixtures remain explicitly demo-only. Submission, proof and payment-success paths are unavailable; runtime identity is built from this exact source. Preserve its existing R2 media worker/routes/binding and do not overwrite shared artwork. Admin starts in preservation-only UI/server mode; actual selected-business backup is still pending. V2 source stays unchanged reference.
+
+Owner-approved deployment preparation is recorded without claiming aggregate HARD_BLOCK cleared. The release workflow and target/binding/version preflight require separate parent review before remote publication or dispatch. Main is not merged. This source integration does not perform business writes, credential changes, Carrier/OTA, transactions or physical printing.
+
+
+## Reviewed manual release workflow
+
+Parent approved the four-file manual workflow packet and its single-line concurrency correction, patch SHA-256 `891008e86b6225a1428eda5080f2ba6a23b259245a800ee88a8d130302e10077`. It reuses the registered `deploy-mfk-admin.yml` path on this exact release branch, defaults to read-only preflight, verifies trusted repository/branch/current remote SHA, and uses only existing Cloudflare secrets for fixed existing targets. No broad push trigger, R2 object upload, main merge or Builder/OTA change. The existing `mfk-admin-production` concurrency group is retained with cancellation disabled.
+
+Immediate authority is non-force publication of this release branch followed by manual `operation=preflight,target=all` for its final exact commit. Actual deployment waits for parent inspection of current target/domain/version/namespaces and rollback metadata. Full aggregate HARD_BLOCK remains a reported review input, not silently reclassified. Phase-one Admin remains preservation-only; Customer providers remain unavailable.

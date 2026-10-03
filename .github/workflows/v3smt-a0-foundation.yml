@@ -1,0 +1,269 @@
+name: MFP V3 A9/A9R Source
+
+on:
+  push:
+    branches:
+      - work/MFP-V3-UNIFIED-INTEGRATION-2026-10-03
+      - feat/MFK-V3-SMT-R1-2026-10-02
+      - feat/MFP-V3-A1-STORE-KERNEL-2026-10-02
+      - feat/MFP-V3-A2-DEVICE-STAFF-SECURITY-2026-10-02
+      - feat/MFP-V3-A3-SYNC-OFFLINE-2026-10-02
+      - feat/MFP-V3-A4-ORDERING-SURFACES-2026-10-02
+      - feat/MFP-V3-A5-CHECKOUT-MONEY-2026-10-02
+      - feat/MFP-V3-A6-ORDER-OPERATIONS-2026-10-02
+      - feat/MFP-V3-A7-PRINT-HARDWARE-RECOVERY-2026-10-02
+      - feat/MFP-V3-A8-CUSTOMER-KEETA-EXTERNAL-2026-10-02
+      - feat/MFP-V3-A9-PUBLIC-DIAGNOSTICS-PHYSICAL-CUTOVER-2026-10-02
+      - feat/MFP-V3-A9R-FORMAL-BUSINESS-ROUTER-2026-10-02
+    paths:
+      - '.github/mfk-change-manifest.json'
+      - 'v3smt/**'
+      - 'contracts/pos-tender-policy-v1.ts'
+      - 'contracts/print-template-catalog-v1.ts'
+      - 'carrier/android/**'
+      - 'docs/architecture/MFP_V3_A9R_FORMAL_BUSINESS_COMMAND_MATRIX_2026-10-02.md'
+      - 'docs/governance/MFP_V3_A9R_FORMAL_BUSINESS_ROUTER_AUTHORITY_2026-10-02.md'
+      - 'docs/handoff/MFP_V3_A9R_FORMAL_BUSINESS_ROUTER_CODEX_HANDOFF_2026-10-02.md'
+      - 'docs/design/MFP_PAD_ORDERING_VISUAL_LOCK_R1_2026-10-02.md'
+      - 'docs/governance/MFK_V3_SMT_REBUILD_AUTHORITY_2026-10-02.md'
+      - 'docs/handoff/MFP_V3_A1_CODEX_IMPLEMENTATION_HANDOFF_2026-10-02.md'
+      - 'docs/handoff/MFP_V3_A2_DEVICE_STAFF_SECURITY_CODEX_HANDOFF_2026-10-02.md'
+      - 'docs/handoff/MFP_V3_A3_SYNC_OFFLINE_CODEX_HANDOFF_2026-10-02.md'
+      - 'docs/handoff/MFP_V3_A4_ORDERING_SURFACES_CODEX_HANDOFF_2026-10-02.md'
+      - 'docs/handoff/MFP_V3_A5_CHECKOUT_MONEY_CODEX_HANDOFF_2026-10-02.md'
+      - 'docs/handoff/MFP_V3_A6_ORDER_OPERATIONS_CODEX_HANDOFF_2026-10-02.md'
+      - 'docs/handoff/MFP_V3_A7_PRINT_HARDWARE_RECOVERY_CODEX_HANDOFF_2026-10-02.md'
+      - 'docs/handoff/MFP_V3_A8_CUSTOMER_KEETA_EXTERNAL_CODEX_HANDOFF_2026-10-02.md'
+      - 'docs/handoff/MFP_V3_A9_PUBLIC_DIAGNOSTICS_PHYSICAL_CUTOVER_CODEX_HANDOFF_2026-10-02.md'
+      - 'docs/acceptance/MFP_V3_A9_PHYSICAL_ACCEPTANCE_RUNBOOK_2026-10-02.md'
+      - 'docs/acceptance/MFP_V3_A9_SOURCE_BINDING_AUDIT_2026-10-02.md'
+      - '.github/workflows/v3smt-a0-foundation.yml'
+      - '.github/scripts/test-v3smt-guards.mjs'
+      - '.github/scripts/test_native_print_transition_sql.py'
+  pull_request:
+    paths:
+      - '.github/mfk-change-manifest.json'
+      - 'v3smt/**'
+      - 'contracts/pos-tender-policy-v1.ts'
+      - 'contracts/print-template-catalog-v1.ts'
+      - 'carrier/android/**'
+      - 'docs/architecture/MFP_V3_A9R_FORMAL_BUSINESS_COMMAND_MATRIX_2026-10-02.md'
+      - 'docs/governance/MFP_V3_A9R_FORMAL_BUSINESS_ROUTER_AUTHORITY_2026-10-02.md'
+      - 'docs/handoff/MFP_V3_A9R_FORMAL_BUSINESS_ROUTER_CODEX_HANDOFF_2026-10-02.md'
+      - 'docs/design/MFP_PAD_ORDERING_VISUAL_LOCK_R1_2026-10-02.md'
+      - 'docs/governance/MFK_V3_SMT_REBUILD_AUTHORITY_2026-10-02.md'
+      - 'docs/handoff/MFP_V3_A1_CODEX_IMPLEMENTATION_HANDOFF_2026-10-02.md'
+      - 'docs/handoff/MFP_V3_A2_DEVICE_STAFF_SECURITY_CODEX_HANDOFF_2026-10-02.md'
+      - 'docs/handoff/MFP_V3_A3_SYNC_OFFLINE_CODEX_HANDOFF_2026-10-02.md'
+      - 'docs/handoff/MFP_V3_A4_ORDERING_SURFACES_CODEX_HANDOFF_2026-10-02.md'
+      - 'docs/handoff/MFP_V3_A5_CHECKOUT_MONEY_CODEX_HANDOFF_2026-10-02.md'
+      - 'docs/handoff/MFP_V3_A6_ORDER_OPERATIONS_CODEX_HANDOFF_2026-10-02.md'
+      - 'docs/handoff/MFP_V3_A7_PRINT_HARDWARE_RECOVERY_CODEX_HANDOFF_2026-10-02.md'
+      - 'docs/handoff/MFP_V3_A8_CUSTOMER_KEETA_EXTERNAL_CODEX_HANDOFF_2026-10-02.md'
+      - 'docs/handoff/MFP_V3_A9_PUBLIC_DIAGNOSTICS_PHYSICAL_CUTOVER_CODEX_HANDOFF_2026-10-02.md'
+      - 'docs/acceptance/MFP_V3_A9_PHYSICAL_ACCEPTANCE_RUNBOOK_2026-10-02.md'
+      - 'docs/acceptance/MFP_V3_A9_SOURCE_BINDING_AUDIT_2026-10-02.md'
+      - '.github/workflows/v3smt-a0-foundation.yml'
+      - '.github/scripts/test-v3smt-guards.mjs'
+      - '.github/scripts/test_native_print_transition_sql.py'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Guard enforcement regression tests
+        run: node --test .github/scripts/test-v3smt-guards.mjs
+      - name: Native print durable-transition SQL regression
+        run: python .github/scripts/test_native_print_transition_sql.py
+      - name: Install
+        working-directory: v3smt
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Test
+        working-directory: v3smt
+        run: npm test
+      - name: Typecheck
+        working-directory: v3smt
+        run: npm run typecheck
+      - name: Build
+        working-directory: v3smt
+        run: npm run build
+      - name: Authority, security, sync, ordering, checkout, money, order operations, print and external guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          # grep returns 0 for a forbidden match, 1 for absence, and >1 on error.
+          # Explicit exits are required: bash errexit does not enforce !/if guards.
+          reject_matches() {
+            local status
+            if "$@"; then
+              printf 'Forbidden content detected by guard: ' >&2
+              printf '%q ' "$@" >&2
+              printf '\n' >&2
+              exit 1
+            else
+              status=$?
+              if (( status != 1 )); then
+                printf 'Guard scan failed (exit %s): ' "$status" >&2
+                printf '%q ' "$@" >&2
+                printf '\n' >&2
+                exit "$status"
+              fi
+            fi
+          }
+          reject_matches grep -RInE --include='*.ts' --include='*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'setInterval\s*\(' v3smt/src
+          reject_matches grep -RInE --include='*.ts' --include='*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'from .*(v2local|v2smm)' v3smt/src
+          reject_matches grep -RInE --include='*.ts' --include='*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'SMM_INTENT_STORE|SMM.{0,20}HeadSeq|x-mfk-smm-session|mfk-smm-web' v3smt/src
+          reject_matches grep -RInE 'SMM_INTENT_STORE|SMM.{0,20}HeadSeq|x-mfk-smm-session|mfk-smm-web' v3smt/dist
+          reject_matches grep -RInE --include='*.ts' --include='*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'console\.(log|info|warn|error).*\b(pin|proof|staffSessionRef|session)\b' v3smt/src
+          reject_matches grep -RInE --include='*.ts' --include='*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' '(URLSearchParams|searchParams).*\b(staffSessionRef|session)\b' v3smt/src
+          reject_matches grep -RInE --include='*.ts' --include='*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'localStorage.*\b(pin|proof|staffSessionRef|session)\b' v3smt/src
+          # Keep deployment filenames forbidden at every depth, including outputs.
+          # Assignment preserves find errors instead of hiding them in !/pipelines.
+          wrangler_paths=$(find v3smt -iname 'wrangler*' -print)
+          if [[ -n "$wrangler_paths" ]]; then
+            printf 'Forbidden deployment configuration:\n%s\n' "$wrangler_paths" >&2
+            exit 1
+          fi
+          # Only source assertion fixtures may mention forbidden deployment text.
+          # All other paths (config, dependencies and dist) keep the full scan,
+          # including hidden files and files that happen to have test suffixes.
+          reject_matches grep -RInE --exclude='*.test.ts' --exclude='*.test.tsx' 'wrangler deploy|cloudflare deploy|workers_dev' v3smt/src
+          for deploy_path in v3smt/* v3smt/.[!.]* v3smt/..?*; do
+            [[ -e "$deploy_path" || -L "$deploy_path" ]] || continue
+            [[ "$deploy_path" != v3smt/src ]] || continue
+            reject_matches grep -RInE 'wrangler deploy|cloudflare deploy|workers_dev' "$deploy_path"
+          done
+          grep -RInF "formalTransaction:'STORE_KERNEL'" v3smt/src/state-authority.ts
+          grep -RInF "pricing:'STORE_KERNEL'" v3smt/src/state-authority.ts
+          grep -RInF 'createMfpSurfacePorts' v3smt/src/store-kernel-port.ts
+          grep -RInF 'createMfpSecuritySurfacePorts' v3smt/src/security-port.ts
+          grep -RInF 'input.authority.loginStaff' v3smt/src/security-port.ts
+          grep -RInF 'MFP_STAFF_SESSION_MAX_LIFETIME_MS' v3smt/src/security-port.ts
+          grep -RInF 'refetchInterval:false' v3smt/src/security-harness.tsx
+          grep -RInF "MFP_SYNC_PROTOCOL='MFK_CHECKPOINTED_DELTA_SYNC_PROTOCOL_V1'" v3smt/src/sync-port.ts
+          grep -RInF 'createMfpSyncCoordinator' v3smt/src/sync-port.ts
+          grep -RInF 'input.store.commitAtomically(candidate)' v3smt/src/sync-port.ts
+          grep -RInF 'for(let pass=0;pass<2;pass++)' v3smt/src/sync-port.ts
+          grep -RInF 'createMfpSyncSurfacePorts' v3smt/src/sync-port.ts
+          grep -RInF 'sync.resumed()' v3smt/src/sync-runtime.ts
+          grep -RInF "durableProjection:'DEXIE_ATOMIC_LKG_BUNDLE_ONLY'" v3smt/src/state-authority.ts
+          reject_matches grep -RInE --include='*.ts' --include='*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'doorbell\.(payload|entities|projection)' v3smt/src
+          reject_matches grep -RInE --include='ordering-*.ts' --include='ordering-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' '\bfetch\s*\(|new[[:space:]]+WebSocket\s*\(|setInterval\s*\(|readHead\s*\(|readChanges\s*\(|readCheckpoint\s*\(' v3smt/src
+          reject_matches grep -RInE --include='ordering-*.ts' --include='ordering-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'from .*(v2local|v2smm)|SMM_INTENT_STORE|SMM.{0,20}HeadSeq|x-mfk-smm-session|mfk-smm-web' v3smt/src
+          reject_matches grep -RInE --include='ordering-domain.ts' '\b(orderId|displayNumber|paymentState|fulfillmentState|printState|COMMITTED)\b' v3smt/src
+          grep -RInF "pricing:'LOCAL_PREVIEW_FROM_PUBLISHED_FACTS'" v3smt/src/ordering-domain.ts
+          grep -RInF 'createMfpOrderingSurfaceDomains' v3smt/src/ordering-domain.ts
+          grep -RInF 'projectionStore.readActive()' v3smt/src/ordering-runtime.tsx
+          grep -RInF 'sync.subscribe' v3smt/src/ordering-runtime.tsx
+          grep -RInF 'data-ordering-surface="MFP_PAD"' v3smt/src/ordering-workspace.tsx
+          grep -RInF 'data-ordering-surface="MFP_MOBILE"' v3smt/src/ordering-workspace.tsx
+          grep -RInF "commandType:'CHECKOUT_PAYMENT_CONFIRM'" v3smt/src/checkout-domain.ts
+          grep -RInF 'submitFrontlineFormalCommand' v3smt/src/checkout-domain.ts
+          # Native checkout replaces the old unbound placeholder; require its real admission guards.
+          grep -RInF 'authority:nativeFormalCheckoutAuthority' v3smt/src/checkout-runtime.ts
+          grep -RInF "sessionState!=='AUTHENTICATED'||!session" v3smt/src/checkout-runtime.ts
+          grep -RInF 'MFP_NATIVE_MUTATION_DISABLED_PUBLIC' v3smt/src/formal-business-native-transport.ts
+          grep -RInF "mfpRuntimeMode(env.currentUrl())!=='ANDROID_RUNTIME'" v3smt/src/formal-business-native-transport.ts
+          grep -RInF 'ELECTRONIC_UNCLASSIFIED' v3smt/src/money-domain.ts
+          grep -RInF "reportVersion:'1.0'" v3smt/src/money-domain.ts
+          grep -RInF 'appendMfpDailyReportAdjustment' v3smt/src/money-domain.ts
+          reject_matches grep -RInE --include='checkout-*.ts' --include='checkout-*.tsx' --include='money-*.ts' --include='money-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' '\bfetch\s*\(|new[[:space:]]+WebSocket\s*\(|setInterval\s*\(' v3smt/src
+          reject_matches grep -RInE --include='checkout-*.ts' --include='checkout-*.tsx' --include='money-*.ts' --include='money-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'from .*(v2local|v2smm)|localStorage|sessionStorage' v3smt/src
+          reject_matches grep -RInE --include='checkout-*.ts' --include='checkout-*.tsx' --include='money-*.ts' --include='money-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'class[[:space:]]+[A-Za-z0-9_]*(Pricing|Payment|Order|Print|BusinessDay)(Engine|Authority)' v3smt/src
+          grep -RInF "orderOperations:'STORE_KERNEL_CANONICAL_READBACK'" v3smt/src/state-authority.ts
+          grep -RInF "availabilityCapacity:'STORE_KERNEL_CANONICAL_READBACK'" v3smt/src/state-authority.ts
+          grep -RInF 'createMfpOrderOperationSession' v3smt/src/order-operations-domain.ts
+          grep -RInF 'submitFrontlineFormalCommand' v3smt/src/order-operations-domain.ts
+          grep -RInF 'readOperations' v3smt/src/order-operations-runtime.tsx
+          grep -RInF 'refetchInterval:false' v3smt/src/order-operations-runtime.tsx
+          grep -RInF 'data-order-operations-contract="SHARED_PAD_MOBILE"' v3smt/src/order-operations-workspace.tsx
+          grep -RInF '<MfpApplicationRuntime' v3smt/src/App.tsx
+          reject_matches grep -RInE --include='order-operations-*.ts' --include='order-operations-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' '\bfetch\s*\(|new[[:space:]]+WebSocket\s*\(|setInterval\s*\(|localStorage|sessionStorage' v3smt/src
+          reject_matches grep -RInE --include='order-operations-*.ts' --include='order-operations-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'from .*(v2local|v2smm)|SMM_INTENT_STORE|SMM.{0,20}HeadSeq|x-mfk-smm-session|mfk-smm-web' v3smt/src
+          reject_matches grep -RInE --include='order-operations-*.ts' --include='order-operations-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'class[[:space:]]+[A-Za-z0-9_]*(Order|Pricing|Payment|Print|Availability|Capacity)(Engine|Authority)' v3smt/src
+          reject_matches grep -RInF "commandType:'ORDER_CREATE'" v3smt/src/order-operations-domain.ts
+          grep -RInF "printJobs:'STORE_KERNEL_PRINT_ROUTER_DURABLE_PRINT_JOB_READBACK'" v3smt/src/state-authority.ts
+          grep -RInF "printTransport:'ANDROID_CARRIER_DURABLE_GATEWAY_READBACK'" v3smt/src/state-authority.ts
+          grep -RInF 'createMfpPrintHardwareSession' v3smt/src/print-hardware-domain.ts
+          grep -RInF "if(value==='UNKNOWN')return'AMBIGUOUS_AFTER_SEND'" v3smt/src/print-hardware-domain.ts
+          grep -RInF 'MFP_PRINT_AUTOMATIC_REDISPATCH_FORBIDDEN' v3smt/src/print-hardware-domain.ts
+          grep -RInF 'MFP_PRINT_DRAWER_POLICY_INVALID' v3smt/src/print-hardware-domain.ts
+          grep -RInF 'snapshot.lastJob?.dispatchAttemptId===dispatchAttemptId' v3smt/src/print-hardware-domain.ts
+          grep -RInF 'refetchInterval:false' v3smt/src/print-hardware-runtime.tsx v3smt/src/print-hardware-workspace.tsx
+          grep -RInF 'data-print-hardware-contract="SHARED_PAD_MOBILE"' v3smt/src/print-hardware-workspace.tsx
+          grep -RInF 'Transport Evidence ≠ Physical Paper Proof' v3smt/src/print-hardware-workspace.tsx
+          reject_matches grep -RInE --include='print-hardware-*.ts' --include='print-hardware-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' '\bfetch\s*\(|new[[:space:]]+WebSocket\s*\(|setInterval\s*\(|localStorage|sessionStorage' v3smt/src
+          reject_matches grep -RInE --include='print-hardware-*.ts' --include='print-hardware-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'from .*(v2local|v2smm)|SMM_INTENT_STORE|SMM.{0,20}HeadSeq|x-mfk-smm-session|mfk-smm-web' v3smt/src
+          reject_matches grep -RInE --include='print-hardware-*.ts' --include='print-hardware-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'class[[:space:]]+[A-Za-z0-9_]*(Print|Order|Payment|Pricing)(Engine|Authority)' v3smt/src
+          grep -RInF "externalIntent:'SERVER_PROVIDER_ADAPTER_CANONICAL_READBACK'" v3smt/src/state-authority.ts
+          grep -RInF "externalFormalAdmission:'STORE_KERNEL'" v3smt/src/state-authority.ts
+          grep -RInF "externalPaymentEvidence:'EVIDENCE_ONLY_NOT_PAYMENT_TRUTH'" v3smt/src/state-authority.ts
+          grep -RInF "externalProviderCredentials:'SERVER_PROVIDER_ADAPTER_ONLY'" v3smt/src/state-authority.ts
+          grep -RInF "externalCoordinator:'EVENT_DRIVEN_SINGLE_FLIGHT'" v3smt/src/state-authority.ts
+          grep -RInF 'createMfpExternalAdmissionSession' v3smt/src/external-domain.ts
+          grep -RInF 'createMfpExternalCoordinator' v3smt/src/external-domain.ts
+          grep -RInF 'submitFrontlineFormalCommand' v3smt/src/external-domain.ts
+          grep -RInF 'authority.readOrder(result.orderRef)' v3smt/src/external-domain.ts
+          grep -RInF 'for(let pass=0;pass<2;pass++)' v3smt/src/external-domain.ts
+          grep -RInF 'QRCode.toDataURL' v3smt/src/external-runtime.tsx
+          grep -RInF 'data-external-surface={surface}' v3smt/src/external-runtime.tsx
+          grep -RInF '<MfpExternalRuntime' v3smt/src/order-operations-runtime.tsx
+          reject_matches grep -RInE --include='external-*.ts' --include='external-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' '\bfetch\s*\(|setInterval\s*\(|visibilitychange|addEventListener\([^)]*focus|localStorage|sessionStorage' v3smt/src
+          reject_matches grep -RInE --include='external-*.ts' --include='external-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'from .*(v2local|v2smm)|SMM_INTENT_STORE|SMM.{0,20}HeadSeq|x-mfk-smm-session|mfk-smm-web' v3smt/src
+          reject_matches grep -RInE --include='external-*.ts' --include='external-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'class[[:space:]]+[A-Za-z0-9_]*(Order|Payment|Refund|Print|Capacity)(Engine|Authority)' v3smt/src
+          reject_matches grep -RInE --include='external-*.ts' --include='external-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' '(appSecret|signingKey|webhookSecret|longLivedBearer|providerBearer|Authorization:)' v3smt/src
+          reject_matches grep -RInE --include='external-*.ts' --include='external-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' '(URLSearchParams|searchParams|console\.(log|info|warn|error)).*(secret|credential|bearer|token)' v3smt/src
+          grep -RInF "target:'MFP_V3'" v3smt/vite.config.ts
+          grep -RInF 'build-identity.json' v3smt/vite.config.ts
+          grep -RInF "APP_ORIGIN='https://appassets.androidplatform.net'" v3smt/src/a9-runtime.ts
+          grep -RInF "FORMAL_COMMAND_ROUTER_SOURCE_VERIFIED" v3smt/src/a9-runtime.ts
+          grep -RInF "FORMAL_PRICING_AUTHORITY_DEPENDENCY_MISSING" v3smt/src/a9-runtime.ts
+          grep -RInF "FORMAL_TENDER_AUTHORITY_DEPENDENCY_MISSING" v3smt/src/a9-runtime.ts
+          grep -RInF "type:'mfp.store-kernel.command.v1'" v3smt/src/formal-business-native-transport.ts
+          grep -RInF "STORE_KERNEL_FORMAL_BUSINESS_AUTHORITY" carrier/android/app/src/main/java/com/morefunos/smt/storekernel/business/FormalBusinessCommandRouter.java
+          grep -RInF "STORE_KERNEL_DIRECT_COMMIT_FORBIDDEN" carrier/android/app/src/main/java/com/morefunos/smt/MainActivity.java
+          grep -RInF "MFP_NATIVE_MUTATION_DISABLED_PUBLIC" v3smt/src/a9-runtime.ts
+          grep -RInF 'signalMfpRuntimeReadyOnce' v3smt/src/App.tsx
+          grep -RInF 'data-check-center="A9"' v3smt/src/check-center.tsx
+          grep -RInF "status:'BLOCKED' as const" v3smt/src/a9-runtime.ts
+          grep -RInF 'MFP_A9_PHYSICAL_GATES' v3smt/src/a9-acceptance.ts
+          reject_matches grep -RInE --include='a9-*.ts' --include='check-center.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'from .*(v2local|v2smm)|store\.kernel\.commit\.v1|runtime\.update\.activate|runtime\.rollback|print\.(sunmi|lan)\.dispatch' v3smt/src
+          reject_matches grep -RInE --include='a9-*.ts' --include='check-center.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'console\.(log|info|warn|error)|staffSessionRef|providerSecret|paymentEvidence' v3smt/src
+          reject_matches grep -RInE --include='a9-*.ts' --include='check-center.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'setInterval\s*\(' v3smt/src
+          test -s v3smt/dist/build-identity.json
+          grep -F 'Cache-Control: no-store' v3smt/dist/_headers
+
+  native-router:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.3.1'
+      - name: Complete native unit and Room regression suite
+        working-directory: carrier/android
+        # Excludes the existing staged-web-bundle packaging prerequisite only, not unit suites.
+        # This is source/Room verification; it does not build or install a production carrier.
+        run: gradle :app:testDebugUnitTest -x verifySmtWebBundle --no-daemon
+      - name: Retain native execution reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mfp-v3-native-unit-evidence
+          path: |
+            carrier/android/app/build/test-results/testDebugUnitTest/**
+            carrier/android/app/build/reports/tests/testDebugUnitTest/**
+          if-no-files-found: warn

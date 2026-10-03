@@ -1,0 +1,324 @@
+import {useEffect,useMemo,useRef,useState,type CSSProperties} from 'react';
+
+import {
+  createMfpCheckoutSession,
+  createMfpStudentDiscountIntent,
+  type MfpCheckoutSession,
+  type MfpCheckoutSnapshot,
+} from './checkout-domain.ts';
+import type {MfpCheckoutRuntimeBinding} from './checkout-runtime.ts';
+import {MfpCheckoutWorkspace} from './checkout-workspace.tsx';
+import {
+  createMfpOrderingDomain,
+  markMfpDraftForFormalRevalidation,
+  type MfpComboSelectionInput,
+  type MfpOrderingCatalog,
+  type MfpOrderingDomain,
+  type MfpOrderingDraft,
+  type MfpOrderingDraftLine,
+  type MfpNormalizedOrderingIntent,
+  type MfpOrderingProduct,
+  type MfpOrderingSurface,
+  type MfpProductSelectionInput,
+} from './ordering-domain.ts';
+import {
+  DEFAULT_MFP_DISPLAY_SETTINGS,
+  loadMfpDisplaySettings,
+  mfpDisplaySettingsStyle,
+  saveMfpDisplaySettings,
+} from './ordering-owner-closure.ts';
+import {
+  MfpCartDraft,
+  MfpDisplaySettingsPanel,
+  MfpFastLanes,
+  MfpSilentGuidance,
+} from './ordering-owner-workspaces.tsx';
+import {MfpUnavailableState} from './operator-ui.tsx';
+import {isMfpFrontlineSessionEligible,type MfpSecurityPort} from './security-port.ts';
+import type {MfpSyncSnapshot} from './sync-port.ts';
+
+const money=new Intl.NumberFormat('zh-HK',{style:'currency',currency:'HKD'});
+const formatMoney=(minor:number|null)=>minor===null?'未有已發布價錢':money.format(minor/100);
+
+type Editor=
+  |Readonly<{kind:'product';productId:string;lineId?:string}>
+  |Readonly<{kind:'combo';comboId:string;lineId?:string}>
+  |null;
+
+function freshness(snapshot:MfpSyncSnapshot){
+  if(snapshot.state==='OFFLINE')return '離線 · 使用已儲存菜單';
+  if(snapshot.state==='LOCAL_LKG')return '使用已儲存菜單';
+  if(snapshot.state==='RECOVERING'||snapshot.state==='BEHIND')return '正在同步 · 暫用已儲存菜單';
+  if(snapshot.state==='READY')return '門店菜單已載入';
+  return '菜單尚未就緒';
+}
+
+function optionRecord(line?:MfpOrderingDraftLine){
+  return Object.fromEntries((line?.optionSelections??[]).map(selection=>[selection.optionSetId,[...selection.optionIds]]));
+}
+
+function comboRecord(line?:MfpOrderingDraftLine){
+  const out:Record<string,{subPoolId:string;choiceId:string}[]>={};
+  for(const selection of line?.comboSelections??[])(out[selection.groupId]??=[]).push({
+    subPoolId:selection.subPoolId,choiceId:selection.choiceId,
+  });
+  return out;
+}
+
+function ProductEditor({domain,draft,product,line,canDraft,onSave,onClose}:{
+  domain:MfpOrderingDomain;draft:MfpOrderingDraft;product:MfpOrderingProduct;line?:MfpOrderingDraftLine;
+  canDraft:boolean;onSave:(input:MfpProductSelectionInput)=>void;onClose:()=>void;
+}){
+  const [quantity,setQuantity]=useState(line?.quantity??1);
+  const [note,setNote]=useState(line?.note??'');
+  const [selected,setSelected]=useState<Record<string,string[]>>(()=>line?optionRecord(line):Object.fromEntries(
+    Object.entries(domain.defaultProductSelection(product.productId)).map(([id,ids])=>[id,[...ids]]),
+  ));
+  const input:MfpProductSelectionInput={
+    cartLineId:line?.cartLineId??'PREVIEW',productId:product.productId,quantity,note,optionSelections:selected,
+  };
+  const preview=useMemo(()=>{
+    try{
+      const next=line?domain.editProduct(draft,input,{allowIncomplete:true}):domain.addProduct(draft,input,{allowIncomplete:true});
+      return next.lines.find(row=>row.cartLineId===input.cartLineId)??null;
+    }catch{return null;}
+  },[domain,draft,input.cartLineId,input.productId,input.quantity,line,note,selected]);
+  const toggle=(setId:string,optionId:string,single:boolean,max:number)=>setSelected(current=>{
+    const values=current[setId]??[];
+    if(single)return {...current,[setId]:values.includes(optionId)?[]:[optionId]};
+    const next=values.includes(optionId)?values.filter(id=>id!==optionId):[...values,optionId];
+    return {...current,[setId]:next.slice(0,max)};
+  });
+  return <section className="mfp-config" role="dialog" aria-modal="true" aria-labelledby="mfp-product-config-title">
+    <header><div><small>餐點選項</small><h2 id="mfp-product-config-title">{product.name}</h2></div><button type="button" autoFocus aria-label="關閉商品設定" onClick={onClose}>×</button></header>
+    <div className="mfp-config-scroll">{product.imageUrl?<img className="mfp-config-media" src={product.imageUrl} alt={product.name}/>:null}
+    <div className="mfp-quantity" aria-label="數量"><span>{formatMoney(product.publishedUnitPrice?.amountMinor??null)}</span><button type="button" onClick={()=>setQuantity(Math.max(1,quantity-1))}>−</button><strong>{quantity}</strong><button type="button" onClick={()=>setQuantity(quantity+1)}>＋</button></div>
+    {product.optionSets.map(set=><fieldset key={set.id}>
+      <legend><strong>{set.name}</strong><span>{set.required?'必選':'可選'} · {set.selection==='SINGLE'?'單選':'多選'} · {set.min}–{set.max}</span></legend>
+      <div className="mfp-choice-grid">{set.options.map(option=>{
+        const active=(selected[set.id]??[]).includes(option.id);
+        return <button type="button" key={option.id} aria-pressed={active} disabled={!option.sellable}
+          className={active?'active':''} onClick={()=>toggle(set.id,option.id,set.selection==='SINGLE',set.max)}>
+          <b>{option.name}</b><small>{option.sellable?(option.priceAdjustment.amountMinor===0?'已發布 $0':formatMoney(option.priceAdjustment.amountMinor)):'暫停供應'}</small>
+        </button>;
+      })}</div>
+    </fieldset>)}
+    {!product.optionSets.length?<p className="mfp-empty-copy">此餐點毋須額外選項。</p>:null}
+    <label className="mfp-note">備註<textarea maxLength={200} value={note} onChange={event=>setNote(event.target.value)} placeholder="可留空"/></label></div>
+    <footer><div><small title="LOCAL_PREVIEW_FROM_PUBLISHED_FACTS">餐點預計金額</small><strong>{formatMoney(preview?.previewUnitMinor??null)}</strong>{preview?.issues.map(code=><span key={code}>{code}</span>)}</div>
+      <button type="button" disabled={!canDraft||preview?.state!=='READY'} onClick={()=>onSave(input)}>{line?'儲存修改':'加入本單'}</button>
+    </footer>
+  </section>;
+}
+
+function ComboEditor({domain,draft,comboId,line,canDraft,onSave,onClose}:{
+  domain:MfpOrderingDomain;draft:MfpOrderingDraft;comboId:string;line?:MfpOrderingDraftLine;
+  canDraft:boolean;onSave:(input:MfpComboSelectionInput)=>void;onClose:()=>void;
+}){
+  const combo=domain.catalog.combos.find(row=>row.id===comboId)!;
+  const pools=[combo.mainPoolId,...combo.addonPoolIds].filter((id):id is string=>Boolean(id))
+    .map(id=>domain.catalog.comboPools.find(pool=>pool.id===id)).filter((pool):pool is NonNullable<typeof pool>=>Boolean(pool));
+  const [quantity,setQuantity]=useState(line?.quantity??1);
+  const [note,setNote]=useState(line?.note??'');
+  const [selected,setSelected]=useState<Record<string,{subPoolId:string;choiceId:string}[]>>(()=>comboRecord(line));
+  const input:MfpComboSelectionInput={cartLineId:line?.cartLineId??'PREVIEW',comboId,quantity,note,comboSelections:selected};
+  const preview=useMemo(()=>{
+    try{
+      const next=line?domain.editCombo(draft,input,{allowIncomplete:true}):domain.addCombo(draft,input,{allowIncomplete:true});
+      return next.lines.find(row=>row.cartLineId===input.cartLineId)??null;
+    }catch{return null;}
+  },[domain,draft,input.cartLineId,input.comboId,input.quantity,line,note,selected]);
+  const toggle=(groupId:string,subPoolId:string,choiceId:string,max:number)=>setSelected(current=>{
+    const values=current[groupId]??[];
+    const exists=values.some(row=>row.subPoolId===subPoolId&&row.choiceId===choiceId);
+    const next=exists?values.filter(row=>row.subPoolId!==subPoolId||row.choiceId!==choiceId):[...values,{subPoolId,choiceId}];
+    return {...current,[groupId]:max===1?next.slice(-1):next.slice(0,max)};
+  });
+  return <section className="mfp-config" role="dialog" aria-modal="true" aria-labelledby="mfp-combo-config-title">
+    <header><div><small>套餐選項</small><h2 id="mfp-combo-config-title">{combo.name}</h2></div><button type="button" autoFocus aria-label="關閉套餐設定" onClick={onClose}>×</button></header>
+    <div className="mfp-config-scroll"><div className="mfp-quantity" aria-label="數量"><span>{formatMoney(combo.publishedBasePrice?.amountMinor??null)}</span><button type="button" onClick={()=>setQuantity(Math.max(1,quantity-1))}>−</button><strong>{quantity}</strong><button type="button" onClick={()=>setQuantity(quantity+1)}>＋</button></div>
+    {pools.flatMap(pool=>pool.groups.map(group=><fieldset key={pool.id+':'+group.id}>
+      <legend><strong>{group.name}</strong><span>{group.required?'必選':'可選'} · {group.min}–{group.max}</span></legend>
+      {group.subPools.map(subPool=><div key={subPool.id} className="mfp-sub-pool"><p><b>{subPool.name}</b><span>{formatMoney(subPool.priceAdjustment.amountMinor)}</span></p><div className="mfp-choice-grid">
+        {subPool.choices.map(choice=>{
+          const active=(selected[group.id]??[]).some(row=>row.subPoolId===subPool.id&&row.choiceId===choice.id);
+          return <button type="button" key={choice.id} aria-pressed={active} disabled={!choice.sellable} className={active?'active':''}
+            onClick={()=>toggle(group.id,subPool.id,choice.id,group.max)}><b>{choice.label}</b><small>{choice.sellable?formatMoney(choice.priceAdjustment.amountMinor):'暫停供應'}</small></button>;
+        })}
+      </div></div>)}
+    </fieldset>))}<label className="mfp-note">備註<textarea maxLength={200} value={note} onChange={event=>setNote(event.target.value)} placeholder="可留空"/></label></div>
+    <footer><div><small title="LOCAL_PREVIEW_FROM_PUBLISHED_FACTS">餐點預計金額</small><strong>{formatMoney(preview?.previewUnitMinor??null)}</strong>{preview?.issues.map(code=><span key={code}>{code}</span>)}</div>
+      <button type="button" disabled={!canDraft||!preview} onClick={()=>onSave(input)}>{line?'儲存修改':preview?.state==='READY'?'加入本單':'加入本單 · 選項未齊'}</button>
+    </footer>
+  </section>;
+}
+
+function ProductGrid({products,mode,onProduct}:{
+  products:readonly MfpOrderingProduct[];mode:'quick'|'normal';onProduct:(product:MfpOrderingProduct,mode:'quick'|'normal')=>void;
+}){
+  return <div className="mfp-product-grid">{products.length?products.map(product=>{
+    const enabled=product.sellable&&product.priceReady;
+    return <button type="button" key={product.productId} disabled={!enabled} onClick={()=>onProduct(product,mode)}>
+      {product.imageUrl?<img src={product.imageUrl} alt="" loading="lazy"/>:<span className="mfp-product-placeholder" aria-hidden="true">MFP</span>}
+      <span><b>{product.name}</b>{product.description?<small>{product.description}</small>:null}<strong>{enabled?formatMoney(product.publishedUnitPrice!.amountMinor):product.sellable?'價錢未準備':'暫停供應'}</strong></span>
+    </button>;
+  }):<p className="mfp-empty-copy">呢個分類未有可用商品。</p>}</div>;
+}
+
+export function MfpOrderingWorkspace({surface,catalog,security,syncSnapshot,checkout,onDiningIntent,onCheckConnection}:{
+  surface:MfpOrderingSurface;catalog:MfpOrderingCatalog|null;security:MfpSecurityPort;syncSnapshot:MfpSyncSnapshot;
+  checkout?:MfpCheckoutRuntimeBinding;onDiningIntent?:(intent:MfpNormalizedOrderingIntent)=>void;onCheckConnection?:()=>void;
+}){
+  const domain=useMemo(()=>catalog?createMfpOrderingDomain(catalog):null,[catalog]);
+  const [draft,setDraft]=useState<MfpOrderingDraft>({draftOnly:true,serviceMode:'takeaway',lines:[]});
+  const [selectedCategoryId,setSelectedCategoryId]=useState(catalog?.categories[0]?.id??'');
+  const [orderingMode,setOrderingMode]=useState<'quick'|'normal'>('quick');
+  const [editor,setEditor]=useState<Editor>(null);
+  const [heldDraft,setHeldDraft]=useState<MfpOrderingDraft|null>(null);
+  const [settingsOpen,setSettingsOpen]=useState(false);
+  const [displaySettings,setDisplaySettings]=useState(()=>typeof window==='undefined'?DEFAULT_MFP_DISPLAY_SETTINGS:loadMfpDisplaySettings(window.localStorage));
+  const [feedback,setFeedback]=useState('');
+  // One shared Pad/Mobile checkout owner: https://react.dev/learn/sharing-state-between-components
+  const [checkoutSession,setCheckoutSession]=useState<MfpCheckoutSession|null>(null);
+  const [checkoutSnapshot,setCheckoutSnapshot]=useState<MfpCheckoutSnapshot|null>(null);
+  const activeCheckoutSession=useRef<MfpCheckoutSession|null>(null);
+  const lineSequence=useRef(0);
+  const priorProjection=useRef(catalog?.source.projectionHash??null);
+  const securitySnapshot=security.getSnapshot();
+  const canDraft=isMfpFrontlineSessionEligible(securitySnapshot);
+  useEffect(()=>()=>{activeCheckoutSession.current=null;},[]);
+
+  useEffect(()=>{
+    try{if(typeof window!=='undefined')saveMfpDisplaySettings(window.localStorage,displaySettings);}
+    catch{/* Browser storage unavailable: keep the current presentation in memory. */}
+  },[displaySettings]);
+
+  useEffect(()=>{
+    if(!domain||!catalog)return;
+    if(priorProjection.current&&priorProjection.current!==catalog.source.projectionHash){
+      setDraft(current=>domain.reconcile(current,catalog));
+      setHeldDraft(current=>current?domain.reconcile(current,catalog):null);
+    }
+    priorProjection.current=catalog.source.projectionHash;
+    if(!catalog.categories.some(category=>category.id===selectedCategoryId))setSelectedCategoryId(catalog.categories[0]?.id??'');
+  },[catalog,domain,selectedCategoryId]);
+
+  if(!catalog||!domain)return <section className="mfp-ordering-unavailable" data-ordering-surface={surface}>
+    <MfpUnavailableState title="菜單尚未接駁" description="未取得門店已發布菜單，暫時未能點單。請檢查連線及門店設定。" code={syncSnapshot.lastError??"MFP_MENU_PROJECTION_UNAVAILABLE"} onCheckConnection={onCheckConnection}/>
+  </section>;
+
+  const products=catalog.products.filter(product=>product.categoryId===selectedCategoryId);
+  const openProduct=(product:MfpOrderingProduct,mode:'quick'|'normal')=>{
+    if(!canDraft){setFeedback('A2 SECURITY GATE · 只讀模式');setEditor({kind:'product',productId:product.productId});return;}
+    if(mode==='normal'||surface==='MFP_MOBILE'){setEditor({kind:'product',productId:product.productId});return;}
+    const input:MfpProductSelectionInput={
+      cartLineId:`LINE-${++lineSequence.current}`,productId:product.productId,quantity:1,
+      optionSelections:domain.defaultProductSelection(product.productId),
+    };
+    try{
+      const next=domain.addProduct(draft,input,{allowIncomplete:true});
+      setDraft(next);
+      setFeedback(next.lines.at(-1)?.state==='INCOMPLETE'?`${product.name} 已加入；必選尚未完成`:`${product.name} 已加入本單`);
+    }
+    catch{lineSequence.current--;setEditor({kind:'product',productId:product.productId});setFeedback('必選未完成，請先設定');}
+  };
+  const saveProduct=(input:MfpProductSelectionInput)=>{
+    const finalInput={...input,cartLineId:editor?.lineId??`LINE-${++lineSequence.current}`};
+    try{
+      setDraft(editor?.lineId?domain.editProduct(draft,finalInput):domain.addProduct(draft,finalInput));
+      setEditor(null);setFeedback('本單餐點已更新');
+    }catch(error){
+      if(!editor?.lineId)lineSequence.current--;
+      setFeedback(error instanceof Error?error.message:'MFP_ORDERING_DRAFT_UPDATE_FAILED');
+    }
+  };
+  const saveCombo=(input:MfpComboSelectionInput)=>{
+    const finalInput={...input,cartLineId:editor?.lineId??`LINE-${++lineSequence.current}`};
+    try{
+      setDraft(editor?.lineId?domain.editCombo(draft,finalInput,{allowIncomplete:true}):domain.addCombo(draft,finalInput,{allowIncomplete:true}));
+      setEditor(null);setFeedback('Combo 已加入本單');
+    }catch(error){
+      if(!editor?.lineId)lineSequence.current--;
+      setFeedback(error instanceof Error?error.message:'MFP_ORDERING_DRAFT_UPDATE_FAILED');
+    }
+  };
+  const startCheckout=()=>{
+    if(activeCheckoutSession.current)return;
+    if(!checkout){setFeedback('A5 FORMAL CHECKOUT BINDING UNAVAILABLE');return;}
+    try{
+      const intent=domain.normalize(draft);
+      const session=createMfpCheckoutSession({intent,authority:checkout.authority,security,tenders:checkout.tenders});
+      activeCheckoutSession.current=session;setFeedback('');
+      setCheckoutSession(session);setCheckoutSnapshot(session.getSnapshot());
+
+    }catch(error){setFeedback(error instanceof Error?error.message:'MFP_CHECKOUT_ENTRY_FAILED');}
+  };
+  const editLine=(line:MfpOrderingDraftLine)=>setEditor(line.kind==='PRODUCT'
+    ?{kind:'product',productId:line.productId!,lineId:line.cartLineId}
+    :{kind:'combo',comboId:line.comboId!,lineId:line.cartLineId});
+  const editorLine=editor?.lineId?draft.lines.find(line=>line.cartLineId===editor.lineId):undefined;
+  const editorProduct=editor?.kind==='product'?catalog.products.find(product=>product.productId===editor.productId):undefined;
+  const editorCombo=editor?.kind==='combo'?catalog.combos.find(combo=>combo.id===editor.comboId):undefined;
+  const editorBody=editor?.kind==='product'&&editorProduct
+    ?<ProductEditor key={editor.lineId??editor.productId} domain={domain} draft={draft} product={editorProduct} line={editorLine} canDraft={canDraft} onSave={saveProduct} onClose={()=>setEditor(null)}/>
+    :editor?.kind==='combo'&&editorCombo
+      ?<ComboEditor key={editor.lineId??editor.comboId} domain={domain} draft={draft} comboId={editorCombo.id} line={editorLine} canDraft={canDraft} onSave={saveCombo} onClose={()=>setEditor(null)}/>
+      :null;
+  const settingsBody=settingsOpen?<MfpDisplaySettingsPanel settings={displaySettings} onChange={setDisplaySettings} onClose={()=>setSettingsOpen(false)}/>:null;
+  if(checkoutSession&&checkoutSnapshot&&checkout){
+    const refresh=()=>{if(activeCheckoutSession.current===checkoutSession){setCheckoutSnapshot(checkoutSession.getSnapshot());setFeedback('');}};
+    const fail=(error:unknown)=>{if(activeCheckoutSession.current===checkoutSession){refresh();setFeedback(error instanceof Error?error.message:'MFP_CHECKOUT_ACTION_FAILED');}};
+    return <MfpCheckoutWorkspace surface={surface} intent={domain.normalize(draft)} snapshot={checkoutSnapshot} tenders={checkout.tenders} feedback={feedback} actions={{
+      onBack:()=>{
+        try{
+          const revalidate=checkoutSession.getSnapshot().draftRevalidationRequired;
+          checkoutSession.returnToOrder();
+          if(revalidate)setDraft(current=>markMfpDraftForFormalRevalidation(current));
+          activeCheckoutSession.current=null;setCheckoutSession(null);setCheckoutSnapshot(null);setFeedback('');
+        }catch(error){fail(error);}
+      },
+      onChannel:(channelId,identity)=>{
+        try{
+          checkoutSession.selectChannel(channelId,identity);refresh();
+          void checkoutSession.open().then(refresh).catch(fail);
+        }catch(error){fail(error);}
+      },
+      onTender:tenderId=>{try{checkoutSession.selectTender(tenderId);refresh();}catch(error){fail(error);}},
+      onCash:amountMinor=>{try{checkoutSession.setCashReceivedMinor(amountMinor);refresh();}catch(error){fail(error);}},
+      onStudentDiscount:(mode,studentCount,selected)=>{
+        const quote=checkoutSession.getSnapshot().quote;
+        if(!quote){fail(new Error('MFP_CHECKOUT_FORMAL_VALIDATION_REQUIRED'));return;}
+        try{
+          const intent=createMfpStudentDiscountIntent(quote,{mode,studentCount,selected});
+          const validation=checkoutSession.validateStudentDiscount(intent);refresh();
+          void validation.then(refresh).catch(fail);
+        }catch(error){fail(error);}
+      },
+      onFinalReview:()=>{try{checkoutSession.openFinalReview();refresh();}catch(error){fail(error);}},
+      onPaymentConfirm:()=>{const confirmation=checkoutSession.paymentConfirm();refresh();void confirmation.then(refresh).catch(fail);},
+    }}/>;
+  }
+  const cart=<MfpCartDraft domain={domain} catalog={catalog} draft={draft} heldDraft={heldDraft} canDraft={canDraft} onChange={setDraft} onHeldDraft={setHeldDraft} onEdit={editLine} onCheckout={startCheckout} onDining={onDiningIntent}/>;
+  const status=<div className="mfp-ordering-status"><span className={syncSnapshot.state==='OFFLINE'?'offline':''}>{freshness(syncSnapshot)}</span><span>{canDraft?`店員：${securitySnapshot.session?.displayName}`:'只讀模式 · 未有可用店員登入'}</span></div>;
+  const categories=<nav className="mfp-ordering-categories" aria-label="商品分類">{catalog.categories.map(category=><button type="button" key={category.id} aria-pressed={category.id===selectedCategoryId} className={category.id===selectedCategoryId?'active':''} onClick={()=>setSelectedCategoryId(category.id)}>{category.label}</button>)}</nav>;
+  const combos=catalog.combos.length?<section className="mfp-combo-strip"><header><b>套餐</b><span>選項以門店已發布菜單為準</span></header><div>{catalog.combos.map(combo=><button type="button" key={combo.id} disabled={!combo.sellable||!combo.priceReady} onClick={()=>setEditor({kind:'combo',comboId:combo.id})}><b>{combo.name}</b><span>{combo.publishedBasePrice?formatMoney(combo.publishedBasePrice.amountMinor):'價錢未準備'}</span></button>)}</div></section>:null;
+
+  const displayStyle=mfpDisplaySettingsStyle(displaySettings) as CSSProperties;
+  if(surface==='MFP_PAD')return <section className="mfp-ordering mfp-pad" data-ordering-surface="MFP_PAD" data-show-images={displaySettings.showImages} style={displayStyle}>
+    {status}<header className="mfp-ordering-head"><div><small>MFP PAD</small><h1>商品目錄</h1></div><div className="mfp-ordering-head-actions"><div className="mfp-ordering-mode" role="group" aria-label="點單模式"><button type="button" aria-pressed={orderingMode==='quick'} className={orderingMode==='quick'?'active':''} onClick={()=>setOrderingMode('quick')}>快速</button><button type="button" aria-pressed={orderingMode==='normal'} className={orderingMode==='normal'?'active':''} onClick={()=>setOrderingMode('normal')}>普通</button></div><button type="button" className="mfp-settings-button" onClick={()=>setSettingsOpen(true)}>顯示設定</button></div></header>
+    <div className="mfp-pad-layout"><aside>{categories}</aside><main><MfpSilentGuidance catalog={catalog} draft={draft}/><MfpFastLanes catalog={catalog} draft={draft} onEdit={editLine} onCombo={comboId=>setEditor({kind:'combo',comboId})}/><ProductGrid products={products} mode={orderingMode} onProduct={openProduct}/>{combos}</main>{cart}</div>
+    {editorBody?<div className="mfp-config-layer">{editorBody}</div>:null}{settingsBody?<div className="mfp-config-layer">{settingsBody}</div>:null}<output className="mfp-ordering-feedback" aria-live="polite">{feedback}</output>
+  </section>;
+
+  const intent=domain.normalize(draft);
+  const itemCount=draft.lines.reduce((count,line)=>count+line.quantity,0);
+  return <section className="mfp-ordering mfp-mobile" data-ordering-surface="MFP_MOBILE" data-show-images={displaySettings.showImages} style={displayStyle}>
+    {status}<header className="mfp-mobile-head"><div><small>門店點單</small><h1>點單</h1></div><button type="button" className="mfp-settings-button" onClick={()=>setSettingsOpen(true)}>顯示設定</button></header>
+    <main><MfpSilentGuidance catalog={catalog} draft={draft}/><MfpFastLanes catalog={catalog} draft={draft} onEdit={editLine} onCombo={comboId=>setEditor({kind:'combo',comboId})}/>{categories}<ProductGrid products={products} mode="normal" onProduct={openProduct}/>{combos}</main>
+    <details className="mfp-mobile-order-summary" aria-label="本單餐點">
+      <summary><span><b>本單餐點 · {itemCount} 件</b><small>{intent.checkoutReady?'可核對餐點及結帳':itemCount?'請完成必選項目':'先揀選餐點'}</small></span><strong>{formatMoney(intent.previewSubtotalMinor)}</strong><span className="mfp-summary-action">查看本單</span></summary>
+      <div className="mfp-mobile-order-summary-body">{cart}</div>
+    </details>
+    {editorBody?<div className="mfp-mobile-sheet">{editorBody}</div>:null}{settingsBody?<div className="mfp-mobile-sheet">{settingsBody}</div>:null}<output className="mfp-ordering-feedback" aria-live="polite">{feedback}</output>
+  </section>;
+}

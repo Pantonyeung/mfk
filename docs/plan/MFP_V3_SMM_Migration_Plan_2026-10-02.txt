@@ -1,0 +1,82 @@
+MFP V3｜MoreFun POS 統一重建 + SMM 取消併入方案｜2026-10-02
+
+Status: OWNER-DIRECTED EXECUTION PLAN
+Product: MoreFun POS
+Short name: MFP
+
+Product surfaces:
+MFP
+├─ MFP Pad
+└─ MFP Mobile
+
+Product decision:
+- SMM product identity is cancelled.
+- MFP Mobile absorbs valid SMM handheld UX/workflows.
+- SMM remains only as LEGACY_SMM transitional compatibility until MFP Mobile physical acceptance.
+- SMT remains temporarily as an internal Store Kernel / sync port identifier only; do not mass-rename protocols during the rebuild.
+
+Architecture:
+- MFP Pad + MFP Mobile = one codebase, one Staff/Device security model, one Store Kernel, one Formal Transaction Authority, one Pricing/Order/Payment/Fulfillment/Print authority, one Revision/Idempotency/Readback model and one P0 Sync semantics.
+- Layout/navigation/device ergonomics may differ; business authority may not.
+- No SMM_INTENT_STORE, no SMM HeadSeq, no SMM cloud order engine, no mobile formal commit authority.
+
+Recommended source naming:
+- external product: MoreFun POS
+- short name: MFP
+- source root: v3mfp/ (rename early while A0 is still small)
+- package: mfk-mfp-v3
+- surfaces: MFP_PAD / MFP_MOBILE
+- internal legacy port: SMT
+- compatibility only: LEGACY_SMM
+
+Stage model:
+A0 Foundation — fresh V3 shell, state-authority lock, zero polling, zero v2 client-state import, no production routing. DONE.
+A1 Store Kernel Seam — bounded query/command transport, submission identity, idempotency, commit/readback, UNKNOWN recovery.
+A2 Device + Staff Security — device identity, staff session, permissions, expiry/revocation, public/browser auth.
+A3 Sync + Offline — P0 HeadSeq/Delta/Checkpoint, Doorbell invalidation only, single-flight reconnect catch-up, LKG, zero periodic polling.
+A4 Ordering Surfaces — Pad + Mobile catalog/product/options/combo/cart/service mode, same business contracts.
+A5 Checkout + Money — quote/readback, formal submit, price/revision validation, cash/payment/tender, business day, duplicate protection.
+A6 Order Operations — orders, dining, add order/table ops, fulfillment, cancel/refund, delayed/exception, runtime sellability.
+A7 Print + Hardware + Recovery — Durable PrintJob/Print Router, receipt/production/packing/label, printer binding/health, LAN/WAN/app-kill/power recovery.
+A8 Customer + Keeta + External — customer pending, Keeta inbound/outbound, dedupe/mapping/late arrival/channel health/provider readback.
+A9 Public + Diagnostics + Physical Acceptance + Cutover — exact identity, Pad/Mobile acceptance, public MFP, printer/device acceptance, OTA/rollback, request-storm proof, cutover.
+
+Total:
+- A0–A9 = 10 stages
+- A0 complete
+- A1–A9 = 9 remaining implementation stages
+
+Transition:
+- v2local = feature freeze; rollback/security-critical/production-blocker fixes only.
+- v2smm = feature freeze; UX donor + legacy transitional only.
+- no new SMM state/authority.
+- legacy SMM cannot be removed until MFP Mobile is SOURCE_VERIFIED + PHYSICAL_VERIFIED and zero legacy dependency is proven.
+
+SMM decommission gate:
+1. MFP Mobile SOURCE_VERIFIED
+2. MFP Mobile PHYSICAL_VERIFIED
+3. formal order commit verified
+4. price / option / combo parity verified
+5. staff auth verified
+6. offline/reconnect verified
+7. print path verified
+8. Customer/Keeta regression green
+9. no SMM_INTENT_STORE
+10. no SMM HeadSeq
+11. no mfk-smm-web dependency
+12. explicit Owner decommission authorization
+
+Final authority:
+- Admin = Canonical Configuration / Governance Authority
+- MFP / Store Kernel = Formal Transaction / Store Operation Authority
+- MFP Pad = Store Kernel Surface
+- MFP Mobile = Store Kernel Surface
+- Customer = Published Projection Consumer + Order Intent Surface
+- Keeta = External Channel Adapter
+- Cloud = Transport / Projection / Readback
+- Print Edge = Hardware Execution
+- No surface becomes a second authority.
+
+Milestones:
+MFK_MORE_FUN_POS_V3_A0_A9_STAGE_MODEL_2026_10_02
+MFK_SMM_TO_MFP_MOBILE_MIGRATION_PLAN_2026_10_02

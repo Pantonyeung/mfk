@@ -1,0 +1,71 @@
+name: v3admin-ci
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'v3admin/**'
+      - 'contracts/admin-config-sync-v1.ts'
+      - 'contracts/pos-tender-policy-v1.ts'
+      - 'contracts/print-template-catalog-v1.ts'
+      - 'contracts/web-state-authority-v1.ts'
+      - 'COMMANDER_CURRENT.md'
+      - 'HANDOFF_CURRENT.md'
+      - 'docs/product/**'
+      - 'docs/implementation/**'
+      - '.github/mfk-change-manifest.json'
+      - '.github/workflows/v3admin-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'v3admin/**'
+      - 'contracts/admin-config-sync-v1.ts'
+      - 'contracts/pos-tender-policy-v1.ts'
+      - 'contracts/print-template-catalog-v1.ts'
+      - 'contracts/web-state-authority-v1.ts'
+      - 'COMMANDER_CURRENT.md'
+      - 'HANDOFF_CURRENT.md'
+      - 'docs/product/**'
+      - 'docs/implementation/**'
+      - '.github/mfk-change-manifest.json'
+      - '.github/workflows/v3admin-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  v3admin:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: v3admin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund --legacy-peer-deps --package-lock=false
+      - run: npm test
+      - run: npm run typecheck
+      - run: npm run build
+      - name: Verify serving release manifest exists
+        run: |
+          test -f dist/release.json
+          node -e "const x=require('./dist/release.json'); if(!x.releaseId||!x.sourceSha||!x.buildTime) process.exit(1)"
+      - name: Verify isolated preview-only routing
+        run: |
+          node <<'NODE'
+          const fs=require('node:fs');
+          const config=JSON.parse(fs.readFileSync('wrangler.jsonc','utf8'));
+          if(config.name!=='mfk-admin-v3-ui-preview')process.exit(1);
+          if(config.pages_build_output_dir!=='./dist')process.exit(1);
+          if(config.main||config.routes||config.route||config.workers_dev)process.exit(1);
+          const buckets=Array.isArray(config.r2_buckets)?config.r2_buckets:[];
+          if(buckets.length!==1||buckets[0].binding!=='PRODUCT_MEDIA'||buckets[0].bucket_name!=='mfk-admin-v3-product-media-preview')process.exit(1);
+          NODE
+          test ! -f DEPLOY_REQUEST
+          test ! -f PREVIEW_DEPLOY_TRIGGER
+          ! grep -R "admin.morefunos.com" -n src index.html package.json functions wrangler.jsonc | grep -v "vite.config.ts"
+      - name: Verify no v2 browser-state imports
+        run: |
+          ! grep -R "v2admin\|admin-local-store\|admin-sync-client\|canonical-hydrated.v1\|sync-status.v1" -n src --exclude='*.test.ts'

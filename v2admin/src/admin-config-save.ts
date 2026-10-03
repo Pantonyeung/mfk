@@ -2,6 +2,11 @@ import {validateAdminDraft,type AdminSessionDraft} from './admin-draft.tsx';
 import {createAdminRelease,readAdminStored,writeAdminStored,type AdminRelease} from './admin-local-store.ts';
 import {OPTION_SET_CENTER_STORAGE_KEYS,readOptionSetCenterState,validateOptionSetCenter,type OptionSetCenterState} from './admin-option-set-center.ts';
 import {DEFAULT_PRICING_PROMOTIONS,RICEBALL_DRINK_PROMOTION_STORAGE_KEY} from './admin-pricing-promotion-seed-r1.ts';
+import {
+  DEFAULT_MFK_POS_TENDER_POLICY,
+  validateMfkPosTenderPolicy,
+  type MfkPosTenderPolicy,
+} from '../../contracts/pos-tender-policy-v1.ts';
 
 export interface AdminSaveSuccess{
   readonly ok:true;
@@ -67,6 +72,17 @@ function validateKeetaMappings(catalog:AdminSessionDraft){
   return errors;
 }
 
+function readPosTenderPolicy():MfkPosTenderPolicy{
+  return validateMfkPosTenderPolicy(
+    readAdminStored('pos-tenders.v1',DEFAULT_MFK_POS_TENDER_POLICY),
+  );
+}
+
+function validatePosTenderPolicy(){
+  try{readPosTenderPolicy();return [] as string[];}
+  catch(error){return [error instanceof Error?error.message:'POS_TENDER_POLICY_INVALID'];}
+}
+
 export function validateAdminConfig(catalog:AdminSessionDraft,optionCenter?:OptionSetCenterState){
   const optionState=optionCenter??readOptionSetCenterState(catalog);
   return Object.freeze([
@@ -74,6 +90,7 @@ export function validateAdminConfig(catalog:AdminSessionDraft,optionCenter?:Opti
     ...validateOptionSetCenter(optionState),
     ...validateStaffConfig(),
     ...validateKeetaMappings(catalog),
+    ...validatePosTenderPolicy(),
   ]);
 }
 
@@ -93,6 +110,7 @@ export function collectAdminSnapshot(catalog:AdminSessionDraft,optionCenter?:Opt
     staff:readAdminStored('staff.v1',[]),
     channelPolicy:readAdminStored('channel-policy.keeta.v1',{}),
     customerChannelPolicy:readAdminStored('channel-policy.customer.v1',{enabled:false}),
+    posTenders:readPosTenderPolicy(),
     channelMapping:readAdminStored('channel-mapping.keeta.v1',[]),
     capacity:readAdminStored('capacity.v1',{}),
     presentation:Object.freeze({

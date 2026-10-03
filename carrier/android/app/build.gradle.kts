@@ -46,6 +46,7 @@ android {
     }
 
     compileOptions {
+        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
@@ -93,6 +94,7 @@ val verifySmtWebBundle by tasks.registering {
 tasks.named("preBuild").configure { dependsOn(verifySmtWebBundle) }
 
 dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.3")
     implementation("androidx.webkit:webkit:1.16.0")
     implementation("androidx.room:room-runtime:$roomVersion")
     implementation("com.sunmi:printerlibrary:1.0.18")

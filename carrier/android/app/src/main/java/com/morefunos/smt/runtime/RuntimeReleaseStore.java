@@ -9,6 +9,7 @@ import org.json.JSONObject;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -20,6 +21,7 @@ public final class RuntimeReleaseStore {
     private static final String RELEASES_DIRECTORY = "runtime/releases";
     private static final String ACTIVATION_FILE = "activation.json";
     public static final String PACKAGED_BASELINE_VERSION = "packaged-baseline";
+    private static final Object SHARED_STATE_LOCK = new Object();
 
     public static final class BootSelection {
         public final String releaseId;
@@ -49,53 +51,81 @@ public final class RuntimeReleaseStore {
     private final File runtimeRoot;
     private final File releasesDirectory;
     private final AtomicFile activationFile;
+    private final Object stateLock;
 
     public RuntimeReleaseStore(Context context) {
         this.runtimeRoot = new File(context.getFilesDir(), RUNTIME_ROOT);
         this.releasesDirectory = new File(context.getFilesDir(), RELEASES_DIRECTORY);
         this.activationFile = new AtomicFile(new File(runtimeRoot, ACTIVATION_FILE));
+        this.stateLock = SHARED_STATE_LOCK;
     }
 
-    public synchronized File releaseDirectory(String releaseId) {
-        return new File(releasesDirectory, requireReleaseId(releaseId));
+    public File releaseDirectory(String releaseId) {
+        final File directory = new File(releasesDirectory, requireReleaseId(releaseId));
+        try {
+            if (!releasesDirectory.getCanonicalFile().equals(directory.getCanonicalFile().getParentFile())) {
+                throw new IllegalArgumentException("RUNTIME_RELEASE_ID_INVALID");
+            }
+        } catch (IOException error) {
+            throw new IllegalArgumentException("RUNTIME_RELEASE_ID_INVALID", error);
+        }
+        return directory;
     }
 
-    public synchronized RuntimeActivationState snapshot() throws IOException {
-        return readState();
+    Object sharedStateLock() {
+        return stateLock;
     }
 
-    public synchronized RuntimeActivationState stageCandidate(String releaseId) throws IOException {
-        final String safeId = requireReleaseId(releaseId);
-        final File directory = releaseDirectory(safeId);
-        if (!new File(directory, "index.html").isFile()) throw new IOException("RUNTIME_CANDIDATE_ENTRYPOINT_MISSING");
-        final RuntimeActivationState current = readState();
-        final RuntimeActivationState next = new RuntimeActivationState(
-            current.currentReleaseId,
-            current.previousReleaseId,
-            safeId,
-            null,
-            false
-        );
-        writeState(next);
-        pruneUnreferencedReleases(next);
-        return next;
+    public RuntimeActivationState snapshot() throws IOException {
+        synchronized (stateLock) {
+            return readState();
+        }
     }
 
-    public synchronized RuntimeActivationState requestCandidateActivation() throws IOException {
-        final RuntimeActivationState current = readState();
-        if (current.candidateReleaseId == null) throw new IOException("RUNTIME_CANDIDATE_REQUIRED");
-        final RuntimeActivationState next = new RuntimeActivationState(
-            current.currentReleaseId,
-            current.previousReleaseId,
-            current.candidateReleaseId,
-            null,
-            true
-        );
-        writeState(next);
-        return next;
+    public RuntimeActivationState stageCandidate(String releaseId) throws IOException {
+        synchronized (stateLock) {
+            final String safeId = requireReleaseId(releaseId);
+            final File directory = releaseDirectory(safeId);
+            if (!new File(directory, "index.html").isFile()) {
+                throw new IOException("RUNTIME_CANDIDATE_ENTRYPOINT_MISSING");
+            }
+            final RuntimeActivationState current = readState();
+            final RuntimeActivationState next = new RuntimeActivationState(
+                current.currentReleaseId,
+                current.previousReleaseId,
+                safeId,
+                null,
+                false
+            );
+            writeState(next);
+            pruneUnreferencedReleases(next);
+            return next;
+        }
     }
 
-    public synchronized BootSelection prepareBoot() throws IOException {
+    public RuntimeActivationState requestCandidateActivation() throws IOException {
+        synchronized (stateLock) {
+            final RuntimeActivationState current = readState();
+            if (current.candidateReleaseId == null) throw new IOException("RUNTIME_CANDIDATE_REQUIRED");
+            final RuntimeActivationState next = new RuntimeActivationState(
+                current.currentReleaseId,
+                current.previousReleaseId,
+                current.candidateReleaseId,
+                null,
+                true
+            );
+            writeState(next);
+            return next;
+        }
+    }
+
+    public BootSelection prepareBoot() throws IOException {
+        synchronized (stateLock) {
+            return prepareBootLocked();
+        }
+    }
+
+    private BootSelection prepareBootLocked() throws IOException {
         RuntimeActivationState state = readState();
         String fallbackReason = null;
         String rejectedReleaseId = null;
@@ -136,42 +166,52 @@ public final class RuntimeReleaseStore {
         return selectionForStable(state, fallbackReason, rejectedReleaseId);
     }
 
-    public synchronized RuntimeActivationState confirmRuntimeReady(String releaseId) throws IOException {
-        final String safeId = requireReleaseId(releaseId);
-        final RuntimeActivationState state = readState();
-        if (state.bootingReleaseId == null) return state;
-        if (!safeId.equals(state.bootingReleaseId)) throw new IOException("RUNTIME_READY_RELEASE_MISMATCH");
-        final String previousReleaseId = safeId.equals(state.currentReleaseId) ? state.previousReleaseId : state.currentReleaseId;
-        final RuntimeActivationState next = new RuntimeActivationState(safeId, previousReleaseId, null, null, false);
-        writeState(next);
-        pruneUnreferencedReleases(next);
-        return next;
-    }
-
-    public synchronized RuntimeActivationState resetToPackagedBaseline() throws IOException {
-        activationFile.delete();
-        if (releasesDirectory.exists()) {
-            RuntimeBundleVerifier.deleteRecursively(releasesDirectory);
-            if (releasesDirectory.exists()) throw new IOException("RUNTIME_RELEASES_RESET_FAILED");
+    public RuntimeActivationState confirmRuntimeReady(String releaseId) throws IOException {
+        synchronized (stateLock) {
+            final String safeId = requireReleaseId(releaseId);
+            final RuntimeActivationState state = readState();
+            if (state.bootingReleaseId == null) return state;
+            if (!safeId.equals(state.bootingReleaseId)) throw new IOException("RUNTIME_READY_RELEASE_MISMATCH");
+            final String previousReleaseId = safeId.equals(state.currentReleaseId)
+                ? state.previousReleaseId
+                : state.currentReleaseId;
+            final RuntimeActivationState next = new RuntimeActivationState(
+                safeId, previousReleaseId, null, null, false
+            );
+            writeState(next);
+            pruneUnreferencedReleases(next);
+            return next;
         }
-        return RuntimeActivationState.empty();
     }
 
-    public synchronized RuntimeActivationState rollback() throws IOException {
-        final RuntimeActivationState state = readState();
-        if (state.previousReleaseId == null) throw new IOException("RUNTIME_PREVIOUS_RELEASE_REQUIRED");
-        final File previousDirectory = usableReleaseDirectory(state.previousReleaseId);
-        if (previousDirectory == null) throw new IOException("RUNTIME_PREVIOUS_RELEASE_UNAVAILABLE");
-        final RuntimeActivationState next = new RuntimeActivationState(
-            state.previousReleaseId,
-            state.currentReleaseId,
-            null,
-            null,
-            false
-        );
-        writeState(next);
-        pruneUnreferencedReleases(next);
-        return next;
+    public RuntimeActivationState resetToPackagedBaseline() throws IOException {
+        synchronized (stateLock) {
+            activationFile.delete();
+            if (releasesDirectory.exists()) {
+                RuntimeBundleVerifier.deleteRecursively(releasesDirectory);
+                if (releasesDirectory.exists()) throw new IOException("RUNTIME_RELEASES_RESET_FAILED");
+            }
+            return RuntimeActivationState.empty();
+        }
+    }
+
+    public RuntimeActivationState rollback() throws IOException {
+        synchronized (stateLock) {
+            final RuntimeActivationState state = readState();
+            if (state.previousReleaseId == null) throw new IOException("RUNTIME_PREVIOUS_RELEASE_REQUIRED");
+            final File previousDirectory = usableReleaseDirectory(state.previousReleaseId);
+            if (previousDirectory == null) throw new IOException("RUNTIME_PREVIOUS_RELEASE_UNAVAILABLE");
+            final RuntimeActivationState next = new RuntimeActivationState(
+                state.previousReleaseId,
+                state.currentReleaseId,
+                null,
+                null,
+                false
+            );
+            writeState(next);
+            pruneUnreferencedReleases(next);
+            return next;
+        }
     }
 
     private BootSelection selectionForStable(RuntimeActivationState state, String fallbackReason,
@@ -263,13 +303,14 @@ public final class RuntimeReleaseStore {
     }
 
     private RuntimeActivationState readState() throws IOException {
-        if (!activationFile.getBaseFile().isFile()) return RuntimeActivationState.empty();
         try (FileInputStream input = activationFile.openRead(); ByteArrayOutputStream bytes = new ByteArrayOutputStream()) {
             final byte[] buffer = new byte[4096];
             int count;
             while ((count = input.read(buffer)) != -1) bytes.write(buffer, 0, count);
             final String raw = bytes.toString(StandardCharsets.UTF_8.name());
             return RuntimeActivationState.fromJson(new JSONObject(raw));
+        } catch (FileNotFoundException error) {
+            return RuntimeActivationState.empty();
         } catch (JSONException error) {
             return RuntimeActivationState.empty();
         }
@@ -291,7 +332,8 @@ public final class RuntimeReleaseStore {
     }
 
     private static String requireReleaseId(String releaseId) {
-        if (releaseId == null || !releaseId.matches("[A-Za-z0-9._-]{1,96}")) {
+        if (releaseId == null || ".".equals(releaseId) || "..".equals(releaseId)
+            || !releaseId.matches("[A-Za-z0-9._-]{1,96}")) {
             throw new IllegalArgumentException("RUNTIME_RELEASE_ID_INVALID");
         }
         return releaseId;

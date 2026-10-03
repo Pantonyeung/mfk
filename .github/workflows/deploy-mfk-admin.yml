@@ -2,123 +2,135 @@ name: deploy-mfk-admin
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - 'v2admin/**'
-      - 'contracts/**'
-      - '!v2admin/BUILD_ID'
-      - '!v2admin/DEPLOY_REQUEST'
-      - '!v2admin/PREVIEW_DEPLOY_TRIGGER'
-      - '!v2admin/**/*.md'
+    inputs:
+      expected_sha:
+        description: Exact reviewed 40-character release branch HEAD
+        type: string
+        required: true
+      target:
+        description: Existing V3 service to verify or deploy
+        type: choice
+        options: [all, admin, pos, customer]
+        default: all
+        required: true
+      operation:
+        description: Preflight is read-only; deploy replaces code/assets on existing services
+        type: choice
+        options: [preflight, deploy]
+        default: preflight
+        required: true
+
+permissions:
+  contents: read
 
 concurrency:
   group: mfk-admin-production
   cancel-in-progress: false
 
 jobs:
-  deploy:
+  source:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: v2admin
+    timeout-minutes: 10
+    outputs:
+      matrix: ${{ steps.guard.outputs.matrix }}
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
-      - name: Verify exact source checkout
-        shell: bash
-        run: |
-          set -euo pipefail
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: npm install --no-audit --no-fund --legacy-peer-deps --package-lock=false
-      - run: npm test
-      - run: npm run build
+      - name: Test bounded release guards without Cloudflare credentials
+        run: node --test .github/scripts/test-v3-release-preflight.mjs
+      - name: Verify trusted manual branch, local HEAD and current remote HEAD
+        id: guard
         env:
-          MFK_SOURCE_SHA: ${{ github.sha }}
-      - name: Prepare mfk-admin runtime secrets
-        shell: bash
-        env:
-          KEETA_APP_SECRET: ${{ secrets.KEETA_APP_SECRET }}
-          KEETA_TOKEN_ENCRYPTION_KEY: ${{ secrets.KEETA_TOKEN_ENCRYPTION_KEY }}
-        run: |
-          node <<'NODE'
-          const fs = require('node:fs');
-          const required = ['KEETA_APP_SECRET', 'KEETA_TOKEN_ENCRYPTION_KEY'];
-          for (const name of required) {
-            if (!process.env[name]) {
-              console.error('Missing GitHub Actions secret: ' + name);
-              process.exit(1);
-            }
-          }
-          const encryptionKey = process.env.KEETA_TOKEN_ENCRYPTION_KEY.trim();
-          const keyBytes = Buffer.from(encryptionKey, 'base64');
-          if (!/^[A-Za-z0-9+/]{43}=$/.test(encryptionKey) || keyBytes.length !== 32) {
-            console.error('Invalid GitHub Actions secret: KEETA_TOKEN_ENCRYPTION_KEY must be Base64 for exactly 32 bytes');
-            process.exit(1);
-          }
-          fs.writeFileSync('.wrangler-secrets.json', JSON.stringify({
-            KEETA_APP_SECRET: process.env.KEETA_APP_SECRET,
-            KEETA_TOKEN_ENCRYPTION_KEY: encryptionKey,
-          }));
-          NODE
-      - name: Customer payment evidence R2 preflight
-        shell: bash
-        env:
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          R2_BUCKET: mfk-customer-payment-evidence
-        run: |
-          set -u
-          if npx --yes wrangler@latest r2 bucket info "$R2_BUCKET" --json >/tmp/mfk-r2-info.json 2>/tmp/mfk-r2-info.err; then
-            echo "R2 bucket visible to deploy token: $R2_BUCKET"
-            cat /tmp/mfk-r2-info.json
-          else
-            echo "::warning::Deploy token cannot verify R2 bucket. Continuing to Worker deploy; binding validation will fail closed if the bucket is still missing."
-            cat /tmp/mfk-r2-info.err || true
-          fi
+          GH_TOKEN: ${{ github.token }}
+        run: node .github/scripts/v3-release-preflight.mjs guard
 
-      - name: Wrangler deploy preflight
-        run: npx --yes wrangler@latest deploy --dry-run --outdir /tmp/mfk-admin-deploy-preflight
+  release:
+    needs: source
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.source.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Start sanitized per-target receipt
         env:
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          MFK_SOURCE_SHA: ${{ github.sha }}
-      - name: Deploy mfk-admin
-        run: npx --yes wrangler@latest deploy --secrets-file .wrangler-secrets.json --var MFK_SOURCE_SHA:$GITHUB_SHA
+          RELEASE_TARGET: ${{ matrix.target }}
+        run: node .github/scripts/v3-release-preflight.mjs init "$RELEASE_TARGET"
+      - name: Reverify exact source before dependency installation
         env:
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      - name: Production health and source readback
+          GH_TOKEN: ${{ github.token }}
+        run: node .github/scripts/v3-release-preflight.mjs guard
+      - name: Install exact release tooling before Cloudflare credentials
         shell: bash
-        env:
-          EXPECTED_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
-          node <<'NODE'
-          const expected=process.env.EXPECTED_SHA;
-          const endpoint='https://admin.morefunos.com/api/health';
-          const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
-          let last='no response';
-          for(let attempt=1;attempt<=12;attempt++){
-            try{
-              const response=await fetch(endpoint,{headers:{accept:'application/json','cache-control':'no-cache'}});
-              const body=await response.json();
-              last=JSON.stringify({status:response.status,body});
-              if(response.ok&&body?.ok===true&&body?.service==='mfk-admin'&&body?.sourceSha===expected){
-                console.log('RELEASED sourceSha='+body.sourceSha);
-                process.exit(0);
-              }
-            }catch(error){last=String(error);}
-            await sleep(5000);
-          }
-          console.error('Admin production readback mismatch: expected '+expected+'; last='+last);
-          process.exit(1);
-          NODE
-      - name: Remove temporary secret file
+          npm install --prefix "$RUNNER_TEMP/v3-release-tools" --no-save --package-lock=false --no-audit --no-fund wrangler@4.146.0
+      - name: Build and test selected surface before Cloudflare credentials
+        shell: bash
+        env:
+          RELEASE_TARGET: ${{ matrix.target }}
+          MFK_SOURCE_SHA: ${{ github.sha }}
+          MFP_SOURCE_SHA: ${{ github.sha }}
+          VITE_MFK_V3_CONFIG_WRITES_ENABLED: '0'
+          VITE_MFK_V3_PREVIEW_MODE: '0'
+          VITE_MFK_V3_R2_MEDIA_ENABLED: '0'
+          VITE_MFK_ADMIN_API_BASE: ''
+          VITE_MFK_V3_PREVIEW_API_BASE: ''
+        run: |
+          set -euo pipefail
+          case "$RELEASE_TARGET" in
+            admin) surface=v3admin ;;
+            pos) surface=v3smt ;;
+            customer) surface=v3customer ;;
+            *) exit 1 ;;
+          esac
+          (
+            cd "$surface"
+            npm install --no-audit --no-fund --legacy-peer-deps --package-lock=false
+            npm run typecheck
+            if [ "$RELEASE_TARGET" = customer ]; then
+              node --test test/acceptance-cutover.checks.mjs
+            else
+              npm test
+            fi
+            npm run build
+          )
+          git diff --quiet HEAD -- .
+          node .github/scripts/v3-release-preflight.mjs verify-build "$RELEASE_TARGET"
+      - name: Reverify current remote source before Cloudflare credential step
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node .github/scripts/v3-release-preflight.mjs guard
+      - name: Existing-service preflight and optional guarded deployment
+        env:
+          RELEASE_TARGET: ${{ matrix.target }}
+          GH_TOKEN: ${{ github.token }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: node .github/scripts/v3-release-preflight.mjs release "$RELEASE_TARGET"
+      - name: Finalize receipt even after partial failure
         if: always()
-        run: rm -f .wrangler-secrets.json
+        env:
+          RELEASE_TARGET: ${{ matrix.target }}
+          RELEASE_JOB_STATUS: ${{ job.status }}
+        run: node .github/scripts/v3-release-preflight.mjs finalize "$RELEASE_TARGET"
+      - name: Upload sanitized target evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v3-release-${{ matrix.target }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: release-evidence/${{ matrix.target }}/receipt.json
+          if-no-files-found: error
+          retention-days: 30

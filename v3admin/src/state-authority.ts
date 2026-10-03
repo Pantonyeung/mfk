@@ -1,13 +1,17 @@
 import {QueryClient} from '@tanstack/react-query';
-import Dexie,{type Table} from 'dexie';
 import {create} from 'zustand';
+
+export const V3_ADMIN_QUERY_ROOT=['mfk','admin-v3'] as const;
 
 export const V3_ADMIN_STATE_AUTHORITY=Object.freeze({
   server:'TANSTACK_QUERY',
-  outbox:'DEXIE_INDEXEDDB',
-  localDraft:'ZUSTAND_OR_REACT',
+  outbox:'CONDITIONAL_DEXIE_ONLY_IF_OFFLINE_COMMAND_IS_PRODUCT_APPROVED',
+  localDraft:'REACT_OR_ZUSTAND_NON_AUTHORITATIVE',
+  authPersistence:'MEMORY_ONLY',
+  canonicalValidation:'SHARED_ADMIN_CONFIG_CONTRACT',
   derivedServerStatusPersisted:false,
   v2StateModulesImported:false,
+  v2LocalStorageRead:false,
 } as const);
 
 export const v3AdminQueryClient=new QueryClient({
@@ -23,32 +27,16 @@ export const v3AdminQueryClient=new QueryClient({
   },
 });
 
-export interface V3PendingCommand{
-  id:string;
-  kind:string;
-  createdAt:string;
-  payload:unknown;
-}
-
-export class V3AdminOutboxDb extends Dexie{
-  pending!:Table<V3PendingCommand,string>;
-
-  constructor(){
-    super('mfk-admin-v3');
-    this.version(1).stores({
-      pending:'id,kind,createdAt',
-    });
-  }
-}
-
-export const v3AdminOutboxDb=new V3AdminOutboxDb();
-
 interface V3AdminUiState{
-  panel:'OVERVIEW'|'AUTHORITY';
-  setPanel:(panel:V3AdminUiState['panel'])=>void;
+  diagnosticsOpen:boolean;
+  setDiagnosticsOpen:(open:boolean)=>void;
+}
+
+export async function resetV3AdminServerQueries(client:QueryClient){
+  await client.resetQueries({queryKey:V3_ADMIN_QUERY_ROOT,exact:false});
 }
 
 export const useV3AdminUi=create<V3AdminUiState>(set=>({
-  panel:'OVERVIEW',
-  setPanel:panel=>set({panel}),
+  diagnosticsOpen:false,
+  setDiagnosticsOpen:diagnosticsOpen=>set({diagnosticsOpen}),
 }));

@@ -1,17 +1,25 @@
-# MFK agent entry
+# MFP agent entry
 
-- Current product identity is **MFK**. MoreFunOS is not the current product identity.
-- Before any change, read `COMMANDER_CURRENT.md` and `docs/control/MFK_CHANGE_CONTROL.md`, then verify live `main` and the current controlling recovery/checkpoint evidence.
-- If a controlling document conflicts with current repository evidence, **STOP** and report `GOVERNANCE_DRIFT`; do not guess, silently ignore the document, or let stale text override live evidence.
+- External product identity for the current rebuild program is **MoreFun POS (MFP)**.
+- Repository/internal historical prefixes may still use **MFK**; do not perform broad prefix renames during bounded Stage work.
+- MFP surfaces are **MFP Pad** and **MFP Mobile**.
+- **SMM product identity is cancelled**; legacy SMM is compatibility/UX-donor only and must not gain new authority, state, HeadSeq, session authority, or cloud order engine.
+- Internal **SMT** identifiers may remain temporarily in Store Kernel / sync protocol contracts until the MFP cutover naming migration.
+- Before any change, read `COMMANDER_CURRENT.md`, the controlling MFP plan, `docs/control/MFK_CHANGE_CONTROL.md`, and `HANDOFF_CURRENT.md`, then verify the declared parent SHA and live repository evidence.
+- For an explicitly declared MFP V3 execution branch, the branch-local current Commander/Handoff may supersede an older live-main execution pointer when that supersession is explicitly Owner-directed and recorded in those files. Do not silently infer supersession.
+- If current controlling documents conflict with verified source/runtime evidence, **STOP** and report `GOVERNANCE_DRIFT`.
 - One task owns one bounded capability. Stop before crossing scope.
 - Never commit directly to `main`.
 - No broad rollback or whole-tree replacement.
 - Do not change the existing Builder or OTA protocol without explicit Owner authority.
-- Do not create a second Order, Pricing, or Availability authority.
+- Do not create a second Store Kernel, Order, Pricing, Payment/Tender, Fulfillment, Print, Availability, Staff/Permission, or Device authority.
+- Admin remains the sole canonical authority for formally published configuration/policy data consumed by the Store Kernel/MFP.
+- MFP Pad and MFP Mobile are surfaces over the same business and security authorities; UI differences must not create backend authority differences.
+- No periodic business polling or auth polling may be introduced.
+- Doorbell is invalidation only, never truth.
 - If the required change exceeds declared paths or capability, stop and report it.
-- On completion, list changed files and run relevant regression tests.
+- On completion, list changed files, exact SHA, and relevant regression tests.
 - Default delivery is a Draft PR only.
-- Without explicit Owner `PROMOTE`, do not merge, deploy, or request OTA.
-- Admin is the sole canonical authority for formally published configuration/policy data consumed by SMT; do not create a second config authority.
-- Human-facing sync freshness uses Cloudflare publish time; do not use `Rxx`/revision labels as the acceptance or latest-state oracle.
-- Any Admin→SMT sync path must guarantee eventual convergence through doorbell + canonical pull + required reconcile fallback; a path that can permanently miss a formal Admin publish is invalid.
+- Without explicit Owner `PROMOTE`, do not merge, deploy, request OTA, cut over public routing, or decommission legacy services.
+- Human-facing sync freshness uses canonical publish time; do not use revision labels as the freshness oracle.
+- A formal sync path must guarantee eventual convergence through doorbell + canonical pull + bounded reconcile/reconnect recovery without periodic business polling.

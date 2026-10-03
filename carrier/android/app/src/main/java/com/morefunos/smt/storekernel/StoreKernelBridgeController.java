@@ -34,35 +34,10 @@ public final class StoreKernelBridgeController implements AutoCloseable {
             requestId = StoreKernelContract.requestId(request);
             final String correlatedRequestId = requestId;
             final String type = StoreKernelContract.type(request);
-            if (StoreKernelContract.COMMIT.equals(type)) {
-                complete(coordinator.commit(StoreKernelContract.parseCommit(request)), correlatedRequestId,
-                    StoreKernelTransactionCoordinator.CommitResult::toJson);
-            } else if (StoreKernelContract.COMMAND_RECEIPT_READ.equals(type)) {
-                complete(coordinator.readCommandReceipt(StoreKernelContract.parseCommandReceiptRead(request)), correlatedRequestId,
-                    StoreKernelTransactionCoordinator.CommandReceiptReadResult::toJson);
-            } else if (StoreKernelContract.AGGREGATE_SNAPSHOT.equals(type)) {
-                complete(coordinator.snapshot(StoreKernelContract.parseAggregateSnapshot(request)), correlatedRequestId,
-                    StoreKernelTransactionCoordinator.AggregateSnapshotResult::toJson);
-            } else if (StoreKernelContract.INBOX_APPEND.equals(type)) {
-                complete(coordinator.appendInbox(StoreKernelContract.parseInboxAppend(request)), correlatedRequestId,
-                    StoreKernelTransactionCoordinator.InboxAppendResult::toJson);
-            } else if (StoreKernelContract.OUTBOX_CLAIM.equals(type)) {
-                complete(coordinator.claimOutbox(StoreKernelContract.parseOutboxClaim(request)), correlatedRequestId,
-                    value -> StoreKernelTransactionCoordinator.outboxClaimJson(correlatedRequestId, value));
-            } else if (StoreKernelContract.OUTBOX_ACKNOWLEDGE.equals(type)) {
-                complete(coordinator.acknowledgeOutbox(StoreKernelContract.parseOutboxAcknowledge(request)), correlatedRequestId,
-                    ignored -> StoreKernelTransactionCoordinator.simpleCompletion(
-                        "store.kernel.outbox.ack.completed.v1",
-                        correlatedRequestId
-                    ));
-            } else if (StoreKernelContract.OUTBOX_RELEASE.equals(type)) {
-                complete(coordinator.releaseOutbox(StoreKernelContract.parseOutboxRelease(request)), correlatedRequestId,
-                    ignored -> StoreKernelTransactionCoordinator.simpleCompletion(
-                        "store.kernel.outbox.release.completed.v1",
-                        correlatedRequestId
-                    ));
-            } else if (StoreKernelContract.HEALTH.equals(type)) {
+            if (StoreKernelContract.HEALTH.equals(type)) {
                 complete(coordinator.health(), correlatedRequestId, value -> value.toJson(correlatedRequestId));
+            } else if (StoreKernelContract.isStoreKernelType(type) || type.startsWith("store.kernel.")) {
+                return errorJson(requestId, "STORE_KERNEL_BROWSER_OPERATION_FORBIDDEN");
             } else {
                 return errorJson(requestId, "STORE_KERNEL_OPERATION_UNSUPPORTED");
             }
