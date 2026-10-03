@@ -130,7 +130,10 @@ public final class RuntimeBundleVerifier {
     private RuntimeBundleMetadata metadataFromManifest(Manifest manifest, String archiveSha256) throws IOException {
         final Attributes attrs = manifest.getMainAttributes();
         final String releaseId = requireText(attrs.getValue(ATTR_RELEASE_ID), "RUNTIME_RELEASE_ID_REQUIRED");
-        if (!releaseId.matches("[A-Za-z0-9._-]{1,96}")) throw new IOException("RUNTIME_RELEASE_ID_INVALID");
+        if (".".equals(releaseId) || "..".equals(releaseId)
+            || !releaseId.matches("[A-Za-z0-9._-]{1,96}")) {
+            throw new IOException("RUNTIME_RELEASE_ID_INVALID");
+        }
         final String runtimeVersion = requireText(attrs.getValue(ATTR_RUNTIME_VERSION), "RUNTIME_VERSION_REQUIRED");
         final String channel = requireText(attrs.getValue(ATTR_CHANNEL), "RUNTIME_CHANNEL_REQUIRED");
         if (!channel.equals("stable") && !channel.equals("candidate") && !channel.equals("dev")) throw new IOException("RUNTIME_CHANNEL_INVALID");
