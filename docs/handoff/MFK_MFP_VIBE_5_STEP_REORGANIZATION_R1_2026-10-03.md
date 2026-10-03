@@ -131,3 +131,45 @@ Shell / Navigation
 
 MILESTONE：
 MFK_MFP_STEP3_DESIGN_READY_R1
+
+
+## DESIGN BASELINE UPDATE｜2026-10-03
+
+Owner 已提供並確認兩張既有設計稿作為後續 MFP Step 3 設計基準。
+
+### Reference A｜MFP Desktop POS
+用途：MFP 主操作介面的直接視覺／佈局基準。
+鎖定特徵：
+- 1920×1080 桌面 POS
+- 左側窄 Rail，高頻入口 icon 化
+- 頂部 Customer Pending / Keeta Order strip
+- 中央分類 + 商品 Grid
+- 右側固定 Cart
+- 藍白主色、柔和半透明／霧面卡片感
+- 圓角、低陰影、大 touch target
+- 藍色為主要操作色
+- 洋紅／紅只作 badge、Attention、警示
+- 商品圖保持高辨識度
+- 底部 Fast Lane 三區
+- Cart 清除使用低視覺權重垃圾桶，主要 CTA 保持突出
+
+### Reference B｜MoreFun Customer App
+用途：品牌視覺語言參考，不直接複製手機版 Layout 到 MFP。
+可共用品牌基因：
+- 淡天藍／白色基底
+- More Fun 藍色
+- 紫色作品牌輔助 accent
+- 柔和漸層
+- 大圓角
+- 乾淨留白
+- 品牌 Logo / IP / 生活感
+
+### 分界
+MFP 必須保持「專業餐飲 POS」；Customer App 的 3D IP、Hero 大圖、較強生活化／可愛感不可大量搬入 MFP 操作頁。
+MFP 只繼承品牌色、圓角、柔和層次與識別感；操作密度、資訊層級、字級與 touch target 以 Desktop POS Reference A 為最高優先。
+
+### Step 3 下一刀
+先做 MFP Ordering Main 的 Annotated Wireframe + Design Tokens，之後先做可點 HTML Prototype。
+
+MILESTONE：
+MFK_MFP_DESIGN_BASELINE_LOCKED_R1
