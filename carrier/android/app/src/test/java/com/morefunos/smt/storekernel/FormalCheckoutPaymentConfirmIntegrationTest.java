@@ -15,6 +15,7 @@ import com.morefunos.smt.storekernel.business.FormalBusinessCommandRouter;
 import com.morefunos.smt.storekernel.business.FormalCheckoutPaymentConfirmHandler;
 import com.morefunos.smt.storekernel.business.FormalCheckoutCommitFactory;
 import com.morefunos.smt.storekernel.business.FormalCheckoutRecords;
+import com.morefunos.smt.storekernel.business.FormalCanonicalOrderReadProducer;
 import com.morefunos.smt.storekernel.business.FormalSecurityAuthority;
 import com.morefunos.smt.storekernel.business.FormalCheckoutRecords.BusinessDay;
 import com.morefunos.smt.storekernel.business.FormalCheckoutRecords.DiscountDecision;
@@ -147,6 +148,61 @@ public final class FormalCheckoutPaymentConfirmIntegrationTest {
         assertTrue(receipt.found);
         assertEquals("COMMITTED", result.state);
         assertEquals(mapping.order().orderId(), result.orderRef);
+    }
+
+    @Test
+    public void canonicalOrderReadProducerProjectsCommittedOrderAndMissingIdentity() throws Exception {
+        final FormalBusinessCommandContract.CommandEnvelope command = command("FORGED-CLIENT-PRODUCT");
+        final Mapping mapping = FormalCheckoutRecords.map(facts(command));
+        final List<StoreKernelContract.AggregateReadDependency> dependencies = dependencies();
+        seed(dependencies);
+        coordinator.commit(FormalCheckoutCommitFactory.create(
+            command, mapping, dependencies, System.currentTimeMillis() + 60_000L
+        )).get(5, TimeUnit.SECONDS);
+
+        final FormalCanonicalOrderReadProducer producer = new FormalCanonicalOrderReadProducer(coordinator, "MF01");
+        final FormalCanonicalOrderReadProducer.CanonicalOrder order = producer
+            .readOrder(mapping.order().orderId())
+            .get(5, TimeUnit.SECONDS);
+
+        assertEquals(mapping.order().orderId(), order.orderId());
+        assertEquals("0001", order.displayNumber());
+        assertEquals("WALK_IN", order.source());
+        assertEquals(1L, order.revision());
+        assertEquals("IN_PROGRESS", order.fulfillmentState());
+        assertEquals("CASH", order.effectiveTenderId());
+        assertEquals(5_000L, order.recognizedAmountMinor());
+        assertEquals(0L, order.outstandingAmountMinor());
+        assertEquals("TAKEAWAY", order.serviceMode());
+        assertEquals(1, order.items().size());
+        assertEquals("DRINK-01", order.items().get(0).productId());
+        assertThrows(UnsupportedOperationException.class, order.items()::clear);
+        assertNull(producer.readOrder("ORDER-MISSING").get(5, TimeUnit.SECONDS));
+    }
+
+    @Test
+    public void canonicalOrderReadProducerRejectsEmbeddedRevisionDrift() throws Exception {
+        final FormalBusinessCommandContract.CommandEnvelope command = command("FORGED-CLIENT-PRODUCT");
+        final Mapping mapping = FormalCheckoutRecords.map(facts(command));
+        final List<StoreKernelContract.AggregateReadDependency> dependencies = dependencies();
+        seed(dependencies);
+        coordinator.commit(FormalCheckoutCommitFactory.create(
+            command, mapping, dependencies, System.currentTimeMillis() + 60_000L
+        )).get(5, TimeUnit.SECONDS);
+        final StoreKernelAggregateEntity stored = database.storeKernelDao().readAggregate(
+            "MF01", "ORDER", mapping.order().orderId()
+        );
+        assertEquals(1, database.storeKernelDao().compareAndSetAggregate(
+            "MF01", "ORDER", mapping.order().orderId(), 1, 2,
+            stored.stateJson, stored.stateHash, "2026-10-03T01:03:00Z"
+        ));
+
+        final FormalCanonicalOrderReadProducer producer = new FormalCanonicalOrderReadProducer(coordinator, "MF01");
+        final ExecutionException error = assertThrows(
+            ExecutionException.class,
+            () -> producer.readOrder(mapping.order().orderId()).get(5, TimeUnit.SECONDS)
+        );
+        assertEquals("MFP_ORDER_READBACK_REVISION_MISMATCH", error.getCause().getMessage());
     }
 
     @Test
