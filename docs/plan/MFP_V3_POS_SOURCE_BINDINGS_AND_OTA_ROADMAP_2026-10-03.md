@@ -102,6 +102,8 @@ Commit `3e53a26` implements the bounded non-Student cash assembler and closed co
 
 Real Room tests prove full rollback after an injected post-receipt failure, stale dependency rejection, transaction deadline rejection, one-winner display-sequence contention, lost-reply receipt recovery through the real Router gateway, duplicate replay, and file-backed database reopen without a second effect. These tests inject trusted source ports. They do not prove device enrollment, PIN verification, production POS tender/Student eligibility, physical printing, or public bridge activation.
 
+Commit `3c0cd77` closes the same-worker outbox reclaim race without a schema migration: claim already atomically increments and returns `attemptCount`; ACK and release now require that positive token and include it in the Room compare-and-set predicate. A stale callback from attempt 1 cannot acknowledge or release attempt 2. Every dispatcher must echo the claimed token; omission fails closed.
+
 The production bridge remains fail-closed until real MFK producers supply the exact security, pricing, tender, Business Day, and display-allocation snapshots. Non-Student cash behavior is implemented; Student requests continue to fail closed because the canonical eligibility and remaining money-policy decisions are unresolved.
 
 Known rejection paths must be durable and distinguishable from uncertainty. After any coordinator/transport exception, read back the receipt before returning `UNKNOWN`; stable Store Kernel conflicts map to durable known rejection only when no receipt exists and the failure is classified safe.

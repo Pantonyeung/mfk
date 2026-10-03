@@ -9,7 +9,7 @@ This document records the latest Owner direction, the first verified native slic
 - Original reviewed checkout: `48c7eca6c051e72562ea9974bc2c6465b8584a7b`
 - Isolated branch: `feat/MFP-V3-A9R-POS-KERNEL-R1-2026-10-03`
 - Verified prerequisite commit: `8c52b155fb75edd39e4018853ca3c4144682e179`
-- Latest verified native code commit: `3e53a26`
+- Latest verified native code commit: `3c0cd77` (`CHECKOUT_PAYMENT_CONFIRM` mapping: `3e53a26`)
 - Existing Draft PR reference: `#651`; this branch has not been pushed to it.
 - Existing A9 base authority: `69adb11215677d506545c5428f8deea4b89e7db2`
 
@@ -72,12 +72,13 @@ Latest scoped command:
 gradle.bat -p carrier/android :app:testDebugUnitTest -x verifySmtWebBundle --tests com.morefunos.smt.storekernel.business.* --tests com.morefunos.smt.storekernel.StoreKernelFormalReceiptTest --tests com.morefunos.smt.storekernel.FormalAdminConfigSourceIntegrationTest --no-daemon
 ```
 
-Latest full native result at `3e53a26`:
+Latest full native result at `3c0cd77`:
 
 - 11 suites
-- 82 tests passed
+- 85 tests passed
 - 0 failures, 0 errors, 0 skipped
 - 12 dedicated `FormalCheckoutPaymentConfirmIntegrationTest` cases using real Room
+- 25 `StoreKernelFormalReceiptTest` cases, including same-worker stale ACK/release lease races
 - `:app:assembleDebug -x verifySmtWebBundle --no-daemon`: successful, including desugaring, DEX, and APK packaging
 
 The checkout persistence tests use Room and cover atomic commit/replay, forged review rejection, incomplete and mismatched read sets, malformed/trailing normalized intent, dependency advance, deadline expiry, injected failure after receipt with full rollback, display-sequence contention, Router lost-reply recovery from a durable receipt, and close/reopen of a file-backed database. They are not FakeGateway-only tests. The trusted authorities in this suite are test-injected and are not production-source proof.
@@ -147,9 +148,9 @@ No live endpoint is changed by this branch.
 - Student discount still needs exact option/surcharge basis, odd-minor rounding, and stacking behavior against `riceballDrink`; the mapper does not invent those answers.
 - Electronic tender settlement still needs an explicit rule: staff-recorded evidence versus provider-verified success.
 - The native checkout handler ports still need real MFK producers for device/Owner/staff admission, formal quote/normalized intent, enabled POS tender, active Business Day, and display-sequence allocation. Public bridge registration stays fail-closed until all are available.
-- `MFP_ORDER_COMMITTED_V1` and `MFP_PAYMENT_CONFIRMED_V1` are now inserted atomically with deterministic identities, but dispatcher consumers and print/projection acknowledgement semantics remain separate stages. Current outbox lease completion also needs an attempt/generation token before stale callbacks can be considered race-safe.
+- `MFP_ORDER_COMMITTED_V1` and `MFP_PAYMENT_CONFIRMED_V1` are now inserted atomically with deterministic identities, but dispatcher consumers and print/projection acknowledgement semantics remain separate stages. Commit `3c0cd77` fences outbox ACK/release by the claim's monotonically increasing `attemptCount`; a callback from an expired lease cannot alter a reclaimed lease even when the worker identity is reused. Dispatchers must echo the claim item's positive `attemptCount` or fail closed.
 - No physical printer/device or live financial acceptance was run. Physical acceptance remains a separate gate.
 
 ## Next engineering action
 
-Bind real device/Owner/staff, formal quote, POS tender, Business Day, and display-sequence producers to the verified handler before enabling public `CHECKOUT_PAYMENT_CONFIRM`. In parallel, harden outbox lease ownership with an attempt token and continue one formal command family at a time through Orders/Dining readback and recovery. Do not claim production checkout, live payment, printer, or OTA acceptance from the test-injected source suite.
+Bind real device/Owner/staff, formal quote, POS tender, Business Day, and display-sequence producers to the verified handler before enabling public `CHECKOUT_PAYMENT_CONFIRM`. Continue one formal command family at a time through Orders/Dining readback and recovery, and update each outbox dispatcher to echo the claimed attempt token. Do not claim production checkout, live payment, printer, or OTA acceptance from the test-injected source suite.
