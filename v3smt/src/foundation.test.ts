@@ -78,8 +78,8 @@ describe('MFP V3 authority foundation',()=>{
     const state=read('./state-authority.ts');
     expect(checkout).toContain("commandType:'CHECKOUT_PAYMENT_CONFIRM'");
     expect(checkout).toContain('submitFrontlineFormalCommand');
-    expect(runtime).toContain("state:'UNKNOWN' as const");
-    expect(runtime).toContain('tenders:Object.freeze([])');
+    expect(runtime).toContain('createMfpFormalCheckoutNativeAuthority');
+    expect(runtime).toContain('tenders:nativeTenders');
     expect(state).toContain("paymentTender:'STORE_KERNEL'");
     expect(state).toContain("businessDayMoney:'STORE_KERNEL_CANONICAL_READBACK'");
     expect(money).toContain("reportVersion:'1.0'");

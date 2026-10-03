@@ -58,10 +58,10 @@ describe('MFP V3 A9R source authority gates',()=>{
     expect(transport).not.toMatch(/sendRaw|store\.kernel\.commit\.v1/);
   });
 
-  it('keeps Checkout fail-closed on missing formal Pricing and Tender authorities',()=>{
+  it('keeps Checkout source-bound but fail-closed on missing canonical admission and tender data',()=>{
     expect(contract).toContain('FORMAL_PRICING_AUTHORITY_DEPENDENCY_MISSING');
     expect(contract).toContain('FORMAL_TENDER_AUTHORITY_DEPENDENCY_MISSING');
-    expect(matrix).toContain('it does not mutate in this pass');
+    expect(matrix).toContain('public bridge is source-bound and fails closed');
   });
 
   it('imports no v2 runtime or SMM authority and adds no publish/cutover operation',()=>{

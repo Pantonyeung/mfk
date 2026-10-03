@@ -60,7 +60,7 @@ public final class FormalCheckoutRoomSecurityProducer
         FormalBusinessCommandContract.CommandEnvelope command
     ) {
         Objects.requireNonNull(command, "MFP_SECURITY_COMMAND_REQUIRED");
-        return read(command.storeId, command.deviceId, command.staffSessionRef);
+        return readAdmission(command.storeId, command.deviceId, command.staffSessionRef);
     }
 
     @Override
@@ -81,7 +81,7 @@ public final class FormalCheckoutRoomSecurityProducer
 
     private CompletableFuture<Decision> authorize(String storeId, String deviceId, String sessionRef) {
         try {
-            return read(storeId, deviceId, sessionRef).handle((ignored, error) -> error == null
+            return readAdmission(storeId, deviceId, sessionRef).handle((ignored, error) -> error == null
                 ? Decision.allowed()
                 : Decision.rejected(stableCode(error)));
         } catch (RuntimeException error) {
@@ -89,7 +89,7 @@ public final class FormalCheckoutRoomSecurityProducer
         }
     }
 
-    private CompletableFuture<SecuritySnapshot> read(
+    CompletableFuture<SecuritySnapshot> readAdmission(
         String storeId,
         String deviceId,
         String sessionRef

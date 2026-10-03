@@ -17,6 +17,7 @@
     "docs/superpowers/plans/2026-10-03-store-kernel-checkout-read-dependencies.md",
     "carrier/android/app/build.gradle.kts",
     "carrier/android/app/src/main/java/com/morefunos/smt/MainActivity.java",
+    "carrier/android/app/src/main/java/com/morefunos/smt/storekernel/StoreKernelBridgeController.java",
     "carrier/android/app/src/main/java/com/morefunos/smt/storekernel/StoreKernelContract.java",
     "carrier/android/app/src/main/java/com/morefunos/smt/storekernel/StoreKernelDao.java",
     "carrier/android/app/src/main/java/com/morefunos/smt/storekernel/StoreKernelTransactionCoordinator.java",
@@ -30,9 +31,15 @@
     "v3smt/src/a9r-requirements.test.ts",
     "v3smt/src/check-center.test.tsx",
     "v3smt/src/check-center.tsx",
+    "v3smt/src/checkout-domain.test.ts",
+    "v3smt/src/checkout-domain.ts",
+    "v3smt/src/checkout-runtime.ts",
     "v3smt/src/external-domain.test.ts",
+    "v3smt/src/foundation.test.ts",
     "v3smt/src/formal-business-native-transport.test.ts",
     "v3smt/src/formal-business-native-transport.ts",
+    "v3smt/src/ordering-workspace.tsx",
+    "v3smt/src/security-runtime.ts",
     "v3smt/src/store-kernel-port.test.ts",
     "v3smt/src/store-kernel-port.ts"
   ],
@@ -50,7 +57,9 @@
     "CHECKOUT_PAYMENT_CONFIRM derives one canonical non-Student cash Order and Payment transaction from trusted fresh native facts while the public production bridge remains fail closed.",
     "Outbox acknowledgement and release require the positive attemptCount returned by the current claim so stale callbacks cannot mutate a newer lease.",
     "Electronic tender records staff-confirmed visual-review evidence without claiming provider verification or storing a screenshot; cash records counted-cash evidence.",
-    "Parent Owner authorization is device-bound so logout revokes descendant staff access on that device without revoking independently authorized devices."
+    "Parent Owner authorization is device-bound so logout revokes descendant staff access on that device without revoking independently authorized devices.",
+    "The Android runtime can request a native formal quote and submit CHECKOUT_PAYMENT_CONFIRM only through the high-level formal bridge; canonical tender choices are returned from the same fresh tender-policy read.",
+    "The browser Store Kernel bridge exposes health only and rejects direct aggregate snapshots, receipts, inbox, and outbox operations."
   ],
   "non_goals": [
     "No client Order Pricing Payment Refund Dining Capacity or Print authority.",

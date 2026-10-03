@@ -109,7 +109,8 @@ public final class FormalQuoteRoomProducer {
         } catch (RuntimeException unbound) {
             throw failure("FORMAL_QUOTE_CURRENCY_UNBOUND");
         }
-        final List<String> acceptedTenders = enabledTenders(storeId, tender, request.tenderId);
+        final TenderPolicy tenderPolicy = enabledTenders(storeId, tender, request.tenderId);
+        final List<String> acceptedTenders = tenderPolicy.enabledTenderIds();
         final JSONObject adminState = object(admin.stateJson, "ADMIN_CONFIG_STORED_STATE_INVALID");
         final JSONObject catalog = object(
             object(adminState.opt("snapshot"), "ADMIN_CONFIG_STORED_STATE_INVALID").opt("catalog"),
@@ -252,6 +253,7 @@ public final class FormalQuoteRoomProducer {
                 0,
                 List.of()
             ),
+            tenderPolicy.enabledTenders(),
             validUntil
         );
         final StoreKernelContract.CommitRequest commit = commit(
@@ -345,7 +347,7 @@ public final class FormalQuoteRoomProducer {
         }
     }
 
-    private static List<String> enabledTenders(
+    private static TenderPolicy enabledTenders(
         String storeId,
         StoreKernelTransactionCoordinator.AggregateSnapshotItem item,
         String selectedTenderId
@@ -361,25 +363,29 @@ public final class FormalQuoteRoomProducer {
         final JSONArray rows = state.optJSONArray("tenders");
         if (rows == null) throw failure("FORMAL_POS_TENDER_POLICY_INVALID");
         final List<String> enabled = new ArrayList<>();
+        final List<TenderOption> enabledOptions = new ArrayList<>();
         final Set<String> ids = new HashSet<>();
         for (int index = 0; index < rows.length(); index++) {
             final JSONObject row = object(rows.opt(index), "FORMAL_POS_TENDER_POLICY_INVALID");
             final String id = text(row, "id", "FORMAL_POS_TENDER_POLICY_INVALID");
             if (!ids.add(id)) throw failure("FORMAL_POS_TENDER_POLICY_INVALID");
-            text(row, "label", "FORMAL_POS_TENDER_POLICY_INVALID");
+            final String label = text(row, "label", "FORMAL_POS_TENDER_POLICY_INVALID");
             final Object rawEnabled = row.opt("enabled");
             if (!(rawEnabled instanceof Boolean)) throw failure("FORMAL_POS_TENDER_POLICY_INVALID");
             final String kind = text(row, "kind", "FORMAL_POS_TENDER_POLICY_INVALID");
             if (!"CASH".equals(kind) && !"NON_CASH".equals(kind)) {
                 throw failure("FORMAL_POS_TENDER_POLICY_INVALID");
             }
-            if ((Boolean) rawEnabled) enabled.add(id);
+            if ((Boolean) rawEnabled) {
+                enabled.add(id);
+                enabledOptions.add(new TenderOption(id, label, kind));
+            }
         }
         if (enabled.isEmpty()) throw failure("FORMAL_POS_TENDER_POLICY_EMPTY");
         if (selectedTenderId != null && !enabled.contains(selectedTenderId)) {
             throw failure("FORMAL_QUOTE_TENDER_NOT_ENABLED");
         }
-        return enabled;
+        return new TenderPolicy(List.copyOf(enabled), List.copyOf(enabledOptions));
     }
 
     private static Product product(JSONObject catalog, String productId, String serviceMode) {
@@ -581,10 +587,22 @@ public final class FormalQuoteRoomProducer {
 
     private record Product(String name, long unitMinor, long serviceAdjustmentMinor) { }
 
+    private record TenderPolicy(
+        List<String> enabledTenderIds,
+        List<TenderOption> enabledTenders
+    ) { }
+
+    public record TenderOption(String id, String label, String kind) { }
+
     public record CreatedQuote(
         String state,
         Quote quote,
         DiscountDecision discountDecision,
+        List<TenderOption> enabledTenders,
         long validUntilEpochMs
-    ) { }
+    ) {
+        public CreatedQuote {
+            enabledTenders = List.copyOf(enabledTenders);
+        }
+    }
 }

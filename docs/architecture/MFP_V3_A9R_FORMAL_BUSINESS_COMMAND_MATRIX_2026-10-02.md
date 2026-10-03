@@ -1,6 +1,6 @@
 # MFP V3 A9R Formal Business Command Matrix — 2026-10-03 Update
 
-Status: `SOURCE_AND_ROOM_VERIFIED` for the R0 router and bounded non-Student cash checkout mapping. Production source/bridge binding remains fail-closed and in progress.
+Status: `SOURCE_AND_ROOM_VERIFIED` for the R0 router, bounded non-Student checkout, and Android bridge path. Canonical admission and POS tender population remain fail-closed and in progress.
 
 Authority owner: `STORE_KERNEL_FORMAL_BUSINESS_AUTHORITY`
 
@@ -20,7 +20,7 @@ The browser may submit only `mfp.store-kernel.command.v1`. It cannot name aggreg
 
 | Command | Required fresh canonical reads before a write | Expected revision source | Logical state owner | Current stable result |
 |---|---|---|---|---|
-| `CHECKOUT_PAYMENT_CONFIRM` | Receipt; device; device-bound parent Owner authorization; staff session; Admin configuration; formal quote; POS tender; active Business Day; display sequence | Exact seven native aggregate dependencies plus earliest deadline | One canonical Order/Payment transaction in the existing Store Kernel | Trusted-port non-Student cash path is `SOURCE_AND_ROOM_VERIFIED`; cash evidence must be `CASH_COUNTED`, electronic evidence must be `STAFF_CONFIRMED` and never provider-verified; public bridge remains fail-closed while real producers are unbound; Student requests reject until canonical policy exists |
+| `CHECKOUT_PAYMENT_CONFIRM` | Receipt; device; device-bound parent Owner authorization; staff session; Admin configuration; formal quote; POS tender; active Business Day; display sequence | Exact seven native aggregate dependencies plus earliest deadline | One canonical Order/Payment transaction in the existing Store Kernel | Room-backed non-Student path and high-level Android bridge are `SOURCE_AND_ROOM_VERIFIED`; missing admission/tender rows fail closed; cash uses `CASH_COUNTED`, electronic uses `STAFF_CONFIRMED`; Student requests reject until canonical policy exists |
 | `ORDER_FULFILLMENT_SET` | Security admission; canonical Order and fulfillment revision; receipt | Canonical Order revision | Existing canonical Order | `MFP_ORDER_OPERATIONS_PRODUCTION_BINDING_MISSING` |
 | `ORDER_MODIFICATION_REQUEST` | Security admission; canonical Order/payment facts and revision; receipt | Canonical Order revision | Existing canonical Order or formally linked adjustment | `MFP_ORDER_OPERATIONS_PRODUCTION_BINDING_MISSING` |
 | `ORDER_PAYMENT_CORRECTION` | Security admission; canonical Order/payment facts and revision; receipt | Canonical Payment/Order revision | Existing canonical Payment or linked correction | `MFP_ORDER_OPERATIONS_PRODUCTION_BINDING_MISSING` |
@@ -52,13 +52,13 @@ The native checkout assembler fresh-validates trusted security, normalized inten
 
 No Order, Payment, or outbox effect exists before Payment Confirm. Opening Checkout, changing channel/tender, and entering Final Review remain zero-commit client workflow. Student Discount intent never finalizes client-computed money and currently fails closed because canonical eligibility and remaining policy rules are not published.
 
-The production bridge remains unregistered until every trusted source producer is bound. Test-injected sources prove the mapping and transaction behavior only; they are not production-authentication, provider-payment, or screenshot evidence. Owner logout is device-local: revoking that device's parent authorization invalidates its descendant staff access while independently authorized devices remain unaffected.
+The public bridge is source-bound and fails closed unless canonical device, device-local Owner authorization, staff session, Admin configuration, and explicit POS tender policy records exist and pass fresh Room validation. The browser can request only a formal quote or submit/read a formal command; direct aggregate snapshot, receipt, inbox, outbox, and commit access is rejected. Integration fixtures prove the bridge mapping and transaction behavior only; they are not production-authentication, provider-payment, or screenshot evidence. Owner logout is device-local: revoking that device's parent authorization invalidates its descendant staff access while independently authorized devices remain unaffected.
 
 ## Next authorized engineering steps
 
 Continue bounded native source/adapter work without reviving V2 authority:
 
-1. bind real device/Owner/staff, quote, POS tender, Business Day, and display-sequence producers;
+1. populate device/Owner/staff admission through an approved credential/enrollment path and publish explicit POS tender policy from Admin;
 2. harden Print/OTA source recovery without live activation;
 3. freeze canonical Orders/Dining read production and revision ownership;
 4. register one further command family only after its complete read set, CAS/write set, receipt, outbox, and recovery behavior are proven.

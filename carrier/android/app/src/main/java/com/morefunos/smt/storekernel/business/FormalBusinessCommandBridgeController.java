@@ -11,8 +11,11 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.time.Instant;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.function.LongSupplier;
 
 public final class FormalBusinessCommandBridgeController implements AutoCloseable {
     public interface Notifier {
@@ -22,33 +25,76 @@ public final class FormalBusinessCommandBridgeController implements AutoCloseabl
     private final FormalBusinessCommandRouter router;
     private final Notifier notifier;
     private final StoreKernelTransactionCoordinator coordinator;
+    private final FormalCheckoutRoomSecurityProducer checkoutSecurity;
+    private final FormalQuoteRoomProducer quoteProducer;
+
+    private static final long DEFAULT_QUOTE_TTL_MS = 120_000L;
 
     public static FormalBusinessCommandBridgeController open(@NonNull Context context, @NonNull Notifier notifier) {
         final StoreKernelTransactionCoordinator coordinator = StoreKernelTransactionCoordinator.open(context);
-        final CoordinatorGateway gateway = new CoordinatorGateway(coordinator);
+        return createBound(coordinator, notifier, System::currentTimeMillis, DEFAULT_QUOTE_TTL_MS, coordinator);
+    }
+
+    public static FormalBusinessCommandBridgeController createBound(
+        StoreKernelTransactionCoordinator coordinator,
+        Notifier notifier,
+        LongSupplier clock,
+        long quoteTtlMs
+    ) {
+        return createBound(coordinator, notifier, clock, quoteTtlMs, null);
+    }
+
+    private static FormalBusinessCommandBridgeController createBound(
+        StoreKernelTransactionCoordinator coordinator,
+        Notifier notifier,
+        LongSupplier clock,
+        long quoteTtlMs,
+        StoreKernelTransactionCoordinator ownedCoordinator
+    ) {
+        final FormalCheckoutRoomSecurityProducer security = new FormalCheckoutRoomSecurityProducer(
+            coordinator,
+            clock
+        );
+        final FormalCheckoutPaymentConfirmHandler.Clock checkoutClock = new FormalCheckoutPaymentConfirmHandler.Clock() {
+            @Override public long epochMillis() { return clock.getAsLong(); }
+            @Override public Instant instant() { return Instant.ofEpochMilli(clock.getAsLong()); }
+        };
+        final FormalCheckoutPaymentConfirmHandler checkout = new FormalCheckoutPaymentConfirmHandler(
+            security,
+            new FormalCheckoutRoomPricingProducer(coordinator, clock),
+            new FormalCheckoutRoomTenderProducer(coordinator),
+            new FormalCheckoutRoomBusinessDayProducer(coordinator, clock),
+            checkoutClock
+        );
+        final Map<String, FormalBusinessCommandRouter.Handler> handlers = new LinkedHashMap<>(
+            FormalBusinessCommandRouter.blockedHandlers()
+        );
+        handlers.put("CHECKOUT_PAYMENT_CONFIRM", checkout);
         return new FormalBusinessCommandBridgeController(
-            new FormalBusinessCommandRouter(
-                gateway,
-                FormalSecurityAuthority.unbound(),
-                FormalBusinessCommandRouter.blockedHandlers()
-            ),
+            new FormalBusinessCommandRouter(new CoordinatorGateway(coordinator), security, handlers),
             notifier,
-            coordinator
+            ownedCoordinator,
+            security,
+            new FormalQuoteRoomProducer(coordinator, clock, quoteTtlMs)
         );
     }
 
     public FormalBusinessCommandBridgeController(FormalBusinessCommandRouter router, Notifier notifier) {
-        this(router, notifier, null);
+        this(router, notifier, null, null, null);
     }
 
     private FormalBusinessCommandBridgeController(
         FormalBusinessCommandRouter router,
         Notifier notifier,
-        StoreKernelTransactionCoordinator coordinator
+        StoreKernelTransactionCoordinator coordinator,
+        FormalCheckoutRoomSecurityProducer checkoutSecurity,
+        FormalQuoteRoomProducer quoteProducer
     ) {
         this.router = router;
         this.notifier = notifier;
         this.coordinator = coordinator;
+        this.checkoutSecurity = checkoutSecurity;
+        this.quoteProducer = quoteProducer;
     }
 
     public String handle(String rawMessage) {
@@ -59,6 +105,28 @@ public final class FormalBusinessCommandBridgeController implements AutoCloseabl
             requestId = raw.optString("requestId", "").trim();
             submissionId = raw.optString("submissionId", "").trim();
             final String type = raw.optString("type", "").trim();
+            if (FormalBusinessCommandContract.CHECKOUT_VALIDATION.equals(type)) {
+                if (checkoutSecurity == null || quoteProducer == null) {
+                    return error(requestId, "FORMAL_CHECKOUT_VALIDATION_UNBOUND");
+                }
+                final FormalBusinessCommandContract.CheckoutValidationRequest request =
+                    FormalBusinessCommandContract.parseCheckoutValidation(rawMessage);
+                completeQuote(
+                    checkoutSecurity.readAdmission(
+                        request.storeId,
+                        request.deviceId,
+                        request.staffSessionRef
+                    ).thenCompose(ignored -> {
+                        try {
+                            return quoteProducer.create(request.storeId, request.producerRequest());
+                        } catch (JSONException invalid) {
+                            return failedFuture(invalid);
+                        }
+                    }),
+                    request.requestId
+                );
+                return accepted(request.requestId);
+            }
             if (FormalBusinessCommandContract.COMMAND.equals(type)) {
                 final FormalBusinessCommandContract.CommandEnvelope command = FormalBusinessCommandContract.parseCommand(rawMessage);
                 complete(router.submit(command), command.requestId, command.submissionId);
@@ -81,6 +149,113 @@ public final class FormalBusinessCommandBridgeController implements AutoCloseabl
             }
             return error(requestId, code);
         }
+    }
+
+    private void completeQuote(
+        CompletableFuture<FormalQuoteRoomProducer.CreatedQuote> future,
+        String requestId
+    ) {
+        future.whenComplete((result, failure) -> {
+            try {
+                if (failure == null) {
+                    notifier.post(quoteResult(requestId, result).toString());
+                    return;
+                }
+                final String code = stableCode(failure, "");
+                notifier.post(knownQuoteRejection(code)
+                    ? quoteRejected(requestId, code).toString()
+                    : quoteUnknown(requestId).toString());
+            } catch (JSONException encodingError) {
+                notifier.post(error(requestId, "FORMAL_CHECKOUT_VALIDATION_ENCODING_FAILED"));
+            }
+        });
+    }
+
+    private static JSONObject quoteResult(
+        String requestId,
+        FormalQuoteRoomProducer.CreatedQuote result
+    ) throws JSONException {
+        final FormalCheckoutRecords.Quote quote = result.quote();
+        final org.json.JSONArray lines = new org.json.JSONArray();
+        for (FormalCheckoutRecords.Line line : quote.lines()) {
+            lines.put(new JSONObject()
+                .put("cartLineId", line.cartLineId())
+                .put("quantity", line.quantity())
+                .put("formalUnitMinor", line.formalUnitMinor())
+                .put("formalLineTotalMinor", line.formalLineTotalMinor())
+                .put("studentDiscountEligible", line.studentDiscountEligible()));
+        }
+        final org.json.JSONArray discounts = new org.json.JSONArray();
+        for (FormalCheckoutRecords.DiscountRow discount : quote.discounts()) {
+            final JSONObject row = new JSONObject()
+                .put("code", discount.code())
+                .put("amountMinor", discount.amountMinor());
+            if (discount.cartLineId() != null) row.put("cartLineId", discount.cartLineId());
+            if (discount.quantity() != null) row.put("quantity", discount.quantity());
+            discounts.put(row);
+        }
+        final org.json.JSONArray acceptedTenderIds = new org.json.JSONArray();
+        for (String tenderId : quote.acceptedTenderIds()) acceptedTenderIds.put(tenderId);
+        final org.json.JSONArray tenders = new org.json.JSONArray();
+        for (FormalQuoteRoomProducer.TenderOption tender : result.enabledTenders()) {
+            tenders.put(new JSONObject()
+                .put("id", tender.id())
+                .put("label", tender.label())
+                .put("enabled", true)
+                .put("kind", tender.kind()));
+        }
+        return quoteBase(requestId)
+            .put("state", "VALID")
+            .put("tenders", tenders)
+            .put("quote", new JSONObject()
+                .put("quoteRef", quote.quoteRef())
+                .put("formalRevision", revisionValue(quote.revision()))
+                .put("currency", quote.currency())
+                .put("lines", lines)
+                .put("discounts", discounts)
+                .put("formalSubtotalMinor", quote.subtotalMinor())
+                .put("formalDiscountMinor", quote.discountMinor())
+                .put("formalTotalDueMinor", quote.totalDueMinor())
+                .put("acceptedTenderIds", acceptedTenderIds)
+                .put("validatedAt", quote.validatedAt().toString()));
+    }
+
+    private static Object revisionValue(FormalCheckoutRecords.Revision revision) {
+        return revision.kind() == FormalCheckoutRecords.RevisionKind.NUMBER
+            ? Long.parseLong(revision.value())
+            : revision.value();
+    }
+
+    private static JSONObject quoteRejected(String requestId, String code) throws JSONException {
+        return quoteBase(requestId).put("state", "REJECTED").put("rejectionCode", code);
+    }
+
+    private static JSONObject quoteUnknown(String requestId) throws JSONException {
+        return quoteBase(requestId).put("state", "UNKNOWN").put("readbackRequired", true);
+    }
+
+    private static JSONObject quoteBase(String requestId) throws JSONException {
+        return new JSONObject()
+            .put("protocolVersion", FormalBusinessCommandContract.PROTOCOL_VERSION)
+            .put("type", FormalBusinessCommandContract.CHECKOUT_VALIDATION_RESULT)
+            .put("schema", FormalBusinessCommandContract.CHECKOUT_VALIDATION_RESULT)
+            .put("requestId", requestId);
+    }
+
+    private static boolean knownQuoteRejection(String code) {
+        if (code == null || !code.matches("^[A-Z0-9_:-]{1,160}$") || code.startsWith("STORE_KERNEL_")) {
+            return false;
+        }
+        return !code.endsWith("_ENCODING_FAILED")
+            && !code.endsWith("_HASH_UNAVAILABLE")
+            && !code.endsWith("_CLOCK_INVALID")
+            && !code.endsWith("_SNAPSHOT_INVALID");
+    }
+
+    private static <T> CompletableFuture<T> failedFuture(Throwable error) {
+        final CompletableFuture<T> future = new CompletableFuture<>();
+        future.completeExceptionally(error);
+        return future;
     }
 
     private void complete(

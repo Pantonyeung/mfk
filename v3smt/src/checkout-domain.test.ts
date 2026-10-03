@@ -8,6 +8,7 @@ import {
   mfpCashSettlement,
   parseMfpMoneyInput,
   type MfpFormalCheckoutAuthority,
+  type MfpFormalCheckoutValidationResult,
   type MfpFormalQuote,
 } from './checkout-domain.ts';
 import {markMfpDraftForFormalRevalidation,type MfpNormalizedOrderingIntent} from './ordering-domain.ts';
@@ -78,6 +79,7 @@ describe('MFP V3 A5 first RED — formal boundary',()=>{
 
     await value.checkout.open();
     value.checkout.selectChannel('WALK_IN');
+    await value.checkout.open();
     value.checkout.selectTender('CASH');
     value.checkout.setCashReceivedMinor(5000);
     value.checkout.openFinalReview();
@@ -107,7 +109,7 @@ describe('MFP V3 A5 first RED — formal boundary',()=>{
 
   it('returns to Order from Final Review with zero formal commits',async()=>{
     const value=fixture();await value.checkout.open();
-    value.checkout.selectChannel('WALK_IN');value.checkout.selectTender('FPS');value.checkout.openFinalReview();
+    value.checkout.selectChannel('WALK_IN');await value.checkout.open();value.checkout.selectTender('FPS');value.checkout.openFinalReview();
     value.checkout.returnToOrder();
     expect(value.checkout.getSnapshot()).toMatchObject({state:'NEW',finalReview:null});
     expect(value.submitFrontlineFormalCommand).not.toHaveBeenCalled();
@@ -118,7 +120,7 @@ describe('MFP V3 A5 checkout admission and canonical review',()=>{
   it('uses formal quote total rather than the local preview subtotal',async()=>{
     const value=fixture();
     await value.checkout.open();
-    value.checkout.selectChannel('WALK_IN');value.checkout.selectTender('FPS');
+    value.checkout.selectChannel('WALK_IN');await value.checkout.open();value.checkout.selectTender('FPS');
     expect(value.checkout.openFinalReview().formalTotalDueMinor).toBe(5000);
     expect(intent.previewSubtotalMinor).toBe(4800);
   });
@@ -141,6 +143,7 @@ describe('MFP V3 A5 checkout admission and canonical review',()=>{
   it('keeps channel and tender independent and does not require pickup code',async()=>{
     const value=fixture();await value.checkout.open();
     value.checkout.selectChannel('MORE_FUN_APP',{pickupCode:''});
+    await value.checkout.open();
     value.checkout.selectTender('FPS');
     expect(value.checkout.openFinalReview()).toMatchObject({channelId:'MORE_FUN_APP',tenderId:'FPS',sourceIdentity:{pickupCode:''}});
   });
@@ -151,6 +154,38 @@ describe('MFP V3 A5 checkout admission and canonical review',()=>{
     expect(()=>value.checkout.selectTender('ALIPAY')).toThrow('MFP_CHECKOUT_TENDER_UNAVAILABLE');
     value.checkout.selectTender('FPS');
     expect(value.checkout.getSnapshot().tenderId).toBe('FPS');
+  });
+
+  it('invalidates a channel-bound quote until the selected channel is revalidated',async()=>{
+    const value=fixture();
+    await value.checkout.open();
+    expect(value.checkout.getSnapshot()).toMatchObject({state:'VALID',quote:{quoteRef:'QUOTE-01'}});
+
+    value.checkout.selectChannel('WALK_IN');
+    expect(value.checkout.getSnapshot()).toMatchObject({state:'NEW',quote:null,channelId:'WALK_IN'});
+    expect(()=>value.checkout.openFinalReview()).toThrow('MFP_CHECKOUT_FORMAL_VALIDATION_REQUIRED');
+
+    await value.checkout.open();
+    expect(value.checkout.getSnapshot()).toMatchObject({state:'VALID',quote:{quoteRef:'QUOTE-01'},channelId:'WALK_IN'});
+  });
+
+  it('does not let an older validation response overwrite a newer channel validation',async()=>{
+    const value=fixture();
+    let resolveFirst!:(result:MfpFormalCheckoutValidationResult)=>void;
+    let resolveSecond!:(result:MfpFormalCheckoutValidationResult)=>void;
+    vi.mocked(value.authority.validateCheckout)
+      .mockImplementationOnce(()=>new Promise(resolve=>{resolveFirst=resolve;}))
+      .mockImplementationOnce(()=>new Promise(resolve=>{resolveSecond=resolve;}));
+
+    const first=value.checkout.open();
+    value.checkout.selectChannel('WALK_IN');
+    const second=value.checkout.open();
+    resolveSecond({state:'VALID',quote:Object.freeze({...quote,quoteRef:'QUOTE-NEW'})});
+    await second;
+    resolveFirst({state:'VALID',quote:Object.freeze({...quote,quoteRef:'QUOTE-OLD'})});
+    await first;
+
+    expect(value.checkout.getSnapshot()).toMatchObject({state:'VALID',quote:{quoteRef:'QUOTE-NEW'},channelId:'WALK_IN'});
   });
 });
 
@@ -170,7 +205,7 @@ describe('MFP V3 A5 cash and Student Discount intent',()=>{
 
   it('blocks CASH review when received cash is insufficient',async()=>{
     const value=fixture();await value.checkout.open();
-    value.checkout.selectChannel('WALK_IN');value.checkout.selectTender('CASH');value.checkout.setCashReceivedMinor(4999);
+    value.checkout.selectChannel('WALK_IN');await value.checkout.open();value.checkout.selectTender('CASH');value.checkout.setCashReceivedMinor(4999);
     expect(()=>value.checkout.openFinalReview()).toThrow('MFP_CHECKOUT_CASH_INSUFFICIENT');
   });
 
@@ -214,7 +249,7 @@ describe('MFP V3 A5 cash and Student Discount intent',()=>{
 
 describe('MFP V3 A5 terminal and UNKNOWN handling',()=>{
   it('reuses the same formal identity after UNKNOWN',async()=>{
-    const value=fixture();await value.checkout.open();value.checkout.selectChannel('WALK_IN');value.checkout.selectTender('FPS');value.checkout.openFinalReview();
+    const value=fixture();await value.checkout.open();value.checkout.selectChannel('WALK_IN');await value.checkout.open();value.checkout.selectTender('FPS');value.checkout.openFinalReview();
     value.submitFrontlineFormalCommand
       .mockResolvedValueOnce({schema:'mfp.store-kernel.submission.result.v1',submissionId:'SUB-01',state:'UNKNOWN',readbackRequired:true,retryPermitted:false})
       .mockResolvedValueOnce({schema:'mfp.store-kernel.submission.result.v1',submissionId:'SUB-01',state:'COMMITTED',commitId:'C',canonicalRevision:9});
@@ -231,7 +266,7 @@ describe('MFP V3 A5 terminal and UNKNOWN handling',()=>{
   });
 
   it.each(['COMMITTED','REJECTED'] as const)('keeps terminal %s stable without another submit',async terminal=>{
-    const value=fixture();await value.checkout.open();value.checkout.selectChannel('WALK_IN');value.checkout.selectTender('FPS');value.checkout.openFinalReview();
+    const value=fixture();await value.checkout.open();value.checkout.selectChannel('WALK_IN');await value.checkout.open();value.checkout.selectTender('FPS');value.checkout.openFinalReview();
     value.submitFrontlineFormalCommand.mockResolvedValueOnce(terminal==='COMMITTED'
       ?{schema:'mfp.store-kernel.submission.result.v1',submissionId:'SUB-01',state:'COMMITTED',commitId:'C',canonicalRevision:9}
       :{schema:'mfp.store-kernel.submission.result.v1',submissionId:'SUB-01',state:'REJECTED',rejectionCode:'TENDER_REJECTED'});

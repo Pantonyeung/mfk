@@ -28,6 +28,8 @@ public final class FormalBusinessCommandContract {
     public static final String COMMAND = "mfp.store-kernel.command.v1";
     public static final String SUBMISSION_READ = "mfp.store-kernel.submission.read.v1";
     public static final String RESULT = "mfp.store-kernel.submission.result.v1";
+    public static final String CHECKOUT_VALIDATION = "mfp.checkout.validation.request.v1";
+    public static final String CHECKOUT_VALIDATION_RESULT = "mfp.checkout.validation.result.v1";
     public static final String PRICING_DEPENDENCY_MISSING = "FORMAL_PRICING_AUTHORITY_DEPENDENCY_MISSING";
     public static final String TENDER_DEPENDENCY_MISSING = "FORMAL_TENDER_AUTHORITY_DEPENDENCY_MISSING";
 
@@ -35,6 +37,7 @@ public final class FormalBusinessCommandContract {
     private static final Set<String> FORBIDDEN_AGGREGATE_FIELDS;
     private static final Set<String> COMMAND_FIELDS;
     private static final Set<String> READ_FIELDS;
+    private static final Set<String> CHECKOUT_VALIDATION_FIELDS;
     private static final Map<String, String> COMMAND_DEPENDENCIES;
 
     static {
@@ -62,6 +65,13 @@ public final class FormalBusinessCommandContract {
         );
         READ_FIELDS = Collections.unmodifiableSet(readFields);
 
+        final Set<String> checkoutValidationFields = new LinkedHashSet<>();
+        Collections.addAll(checkoutValidationFields,
+            "protocolVersion", "type", "schema", "requestId", "storeId", "deviceId",
+            "staffSessionRef", "intent", "channelId", "tenderId", "studentDiscountIntent"
+        );
+        CHECKOUT_VALIDATION_FIELDS = Collections.unmodifiableSet(checkoutValidationFields);
+
         final Map<String, String> commands = new LinkedHashMap<>();
         commands.put("CHECKOUT_PAYMENT_CONFIRM", PRICING_DEPENDENCY_MISSING);
         commands.put("ORDER_FULFILLMENT_SET", "MFP_ORDER_OPERATIONS_PRODUCTION_BINDING_MISSING");
@@ -88,7 +98,7 @@ public final class FormalBusinessCommandContract {
     private FormalBusinessCommandContract() { }
 
     public static boolean isFormalType(String type) {
-        return COMMAND.equals(type) || SUBMISSION_READ.equals(type);
+        return COMMAND.equals(type) || SUBMISSION_READ.equals(type) || CHECKOUT_VALIDATION.equals(type);
     }
 
     public static Set<String> commandTypes() {
@@ -144,6 +154,34 @@ public final class FormalBusinessCommandContract {
         );
     }
 
+    public static CheckoutValidationRequest parseCheckoutValidation(String rawMessage) throws JSONException {
+        final JSONObject request = parseEnvelope(rawMessage);
+        rejectAggregateInjection(request);
+        requireExactFields(request, CHECKOUT_VALIDATION_FIELDS, "FORMAL_CHECKOUT_VALIDATION_FIELD_UNSUPPORTED");
+        requireProtocolAndType(request, CHECKOUT_VALIDATION);
+        if (!CHECKOUT_VALIDATION.equals(requiredIdentifier(
+            request,
+            "schema",
+            "FORMAL_CHECKOUT_VALIDATION_SCHEMA_INVALID"
+        ))) throw new IllegalArgumentException("FORMAL_CHECKOUT_VALIDATION_SCHEMA_INVALID");
+        final JSONObject intent = request.optJSONObject("intent");
+        if (intent == null) throw new IllegalArgumentException("FORMAL_CHECKOUT_VALIDATION_INTENT_INVALID");
+        final Object rawStudent = request.opt("studentDiscountIntent");
+        if (rawStudent != JSONObject.NULL && !(rawStudent instanceof JSONObject)) {
+            throw new IllegalArgumentException("FORMAL_CHECKOUT_VALIDATION_STUDENT_INTENT_INVALID");
+        }
+        return new CheckoutValidationRequest(
+            requiredIdentifier(request, "requestId", "FORMAL_CHECKOUT_VALIDATION_REQUEST_ID_INVALID"),
+            requiredIdentifier(request, "storeId", "FORMAL_CHECKOUT_VALIDATION_STORE_ID_INVALID"),
+            requiredIdentifier(request, "deviceId", "FORMAL_CHECKOUT_VALIDATION_DEVICE_ID_INVALID"),
+            requiredIdentifier(request, "staffSessionRef", "FORMAL_CHECKOUT_VALIDATION_STAFF_SESSION_INVALID"),
+            new JSONObject(intent.toString()),
+            nullableIdentifier(request, "channelId", "FORMAL_CHECKOUT_VALIDATION_CHANNEL_INVALID"),
+            nullableIdentifier(request, "tenderId", "FORMAL_CHECKOUT_VALIDATION_TENDER_INVALID"),
+            rawStudent == JSONObject.NULL ? null : new JSONObject(rawStudent.toString())
+        );
+    }
+
     private static JSONObject parseEnvelope(String rawMessage) throws JSONException {
         if (rawMessage == null || rawMessage.trim().isEmpty()) throw new IllegalArgumentException("FORMAL_COMMAND_MESSAGE_REQUIRED");
         if (rawMessage.getBytes(StandardCharsets.UTF_8).length > MAX_MESSAGE_BYTES) {
@@ -193,6 +231,11 @@ public final class FormalBusinessCommandContract {
         if (text.isEmpty() || !text.equals(text.trim()) || text.length() > 160) throw new IllegalArgumentException(code);
         for (int index = 0; index < text.length(); index++) if (Character.isISOControl(text.charAt(index))) throw new IllegalArgumentException(code);
         return text;
+    }
+
+    private static String nullableIdentifier(JSONObject value, String name, String code) {
+        final Object raw = value.opt(name);
+        return raw == JSONObject.NULL ? null : requiredIdentifier(value, name, code);
     }
 
     private static long requiredLong(JSONObject value, String name, String code) {
@@ -315,6 +358,51 @@ public final class FormalBusinessCommandContract {
             this.deviceId = deviceId;
             this.staffSessionRef = staffSessionRef;
             this.submissionId = submissionId;
+        }
+    }
+
+    public static final class CheckoutValidationRequest {
+        public final String requestId;
+        public final String storeId;
+        public final String deviceId;
+        public final String staffSessionRef;
+        public final JSONObject intent;
+        public final String channelId;
+        public final String tenderId;
+        public final JSONObject studentDiscountIntent;
+
+        CheckoutValidationRequest(
+            String requestId,
+            String storeId,
+            String deviceId,
+            String staffSessionRef,
+            JSONObject intent,
+            String channelId,
+            String tenderId,
+            JSONObject studentDiscountIntent
+        ) {
+            this.requestId = requestId;
+            this.storeId = storeId;
+            this.deviceId = deviceId;
+            this.staffSessionRef = staffSessionRef;
+            this.intent = intent;
+            this.channelId = channelId;
+            this.tenderId = tenderId;
+            this.studentDiscountIntent = studentDiscountIntent;
+        }
+
+        JSONObject producerRequest() throws JSONException {
+            return new JSONObject()
+                .put("schema", CHECKOUT_VALIDATION)
+                .put("intent", new JSONObject(intent.toString()))
+                .put("channelId", channelId == null ? JSONObject.NULL : channelId)
+                .put("tenderId", tenderId == null ? JSONObject.NULL : tenderId)
+                .put(
+                    "studentDiscountIntent",
+                    studentDiscountIntent == null
+                        ? JSONObject.NULL
+                        : new JSONObject(studentDiscountIntent.toString())
+                );
         }
     }
 

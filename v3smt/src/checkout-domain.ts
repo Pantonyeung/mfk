@@ -249,6 +249,7 @@ export function createMfpCheckoutSession(input:{
   let stableIdentity:Readonly<{submissionId:string;idempotencyKey:string}>|null=null;
   let stableCommand:Omit<MfpStoreKernelCommandEnvelope,'deviceId'|'staffSessionRef'>|null=null;
   let activeConfirm:Promise<MfpStoreKernelResult>|null=null;
+  let validationGeneration=0;
   const assertMutable=()=>{if(stableCommand||activeConfirm||result)throw new Error('MFP_CHECKOUT_FORMAL_SUBMISSION_LOCKED');};
 
   const snapshot=():MfpCheckoutSnapshot=>Object.freeze({
@@ -258,9 +259,17 @@ export function createMfpCheckoutSession(input:{
   const request=():MfpFormalCheckoutValidationRequest=>Object.freeze({
     schema:'mfp.checkout.validation.request.v1',intent:input.intent,channelId,tenderId,studentDiscountIntent,
   });
+  const invalidateFormalValidation=()=>{
+    const generation=++validationGeneration;
+    state='NEW';quote=null;rejectionCode=null;draftRevalidationRequired=false;finalReview=null;result=null;
+    return generation;
+  };
   const validate=async()=>{
+    assertMutable();
+    const generation=invalidateFormalValidation();
     if(!isMfpFrontlineSessionEligible(input.security.getSnapshot(),Date.parse(now())))throw new Error('MFP_CHECKOUT_SECURITY_NOT_ELIGIBLE');
     const validation=await input.authority.validateCheckout(request());
+    if(generation!==validationGeneration)return validation;
     finalReview=null;result=null;rejectionCode=null;draftRevalidationRequired=false;
     if(validation.state==='VALID'){
       quote=validateQuoteForIntent(validation.quote,input.intent);state='VALID';
@@ -279,7 +288,7 @@ export function createMfpCheckoutSession(input:{
     selectChannel(nextChannelId:MfpCheckoutChannelId,nextSourceIdentity:MfpCheckoutFinalReview['sourceIdentity']=Object.freeze({})){
       assertMutable();
       channelId=requiredText(nextChannelId,'MFP_CHECKOUT_CHANNEL_INVALID');
-      sourceIdentity=Object.freeze({...nextSourceIdentity});reopen();
+      sourceIdentity=Object.freeze({...nextSourceIdentity});invalidateFormalValidation();
     },
     selectTender(nextTenderId:string){
       assertMutable();
@@ -307,7 +316,7 @@ export function createMfpCheckoutSession(input:{
     },
     returnToOrder(){
       if(activeConfirm||state==='UNKNOWN'||state==='COMMITTED')throw new Error('MFP_CHECKOUT_FORMAL_SUBMISSION_LOCKED');
-      state='NEW';finalReview=null;
+      invalidateFormalValidation();
     },
     paymentConfirm(){
       if(activeConfirm)return activeConfirm;

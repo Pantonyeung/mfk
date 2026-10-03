@@ -246,9 +246,6 @@ export function MfpOrderingWorkspace({surface,catalog,security,syncSnapshot,chec
       const intent=domain.normalize(draft);
       const session=createMfpCheckoutSession({intent,authority:checkout.authority,security,tenders:checkout.tenders});
       setCheckoutSession(session);setCheckoutSnapshot(session.getSnapshot());
-      void session.open().then(()=>setCheckoutSnapshot(session.getSnapshot())).catch(error=>{
-        setCheckoutSnapshot(session.getSnapshot());setFeedback(error instanceof Error?error.message:'MFP_CHECKOUT_VALIDATION_FAILED');
-      });
     }catch(error){setFeedback(error instanceof Error?error.message:'MFP_CHECKOUT_ENTRY_FAILED');}
   };
   const editLine=(line:MfpOrderingDraftLine)=>setEditor(line.kind==='PRODUCT'
@@ -271,7 +268,12 @@ export function MfpOrderingWorkspace({surface,catalog,security,syncSnapshot,chec
         if(checkoutSession.getSnapshot().draftRevalidationRequired)setDraft(current=>markMfpDraftForFormalRevalidation(current));
         checkoutSession.returnToOrder();setCheckoutSession(null);setCheckoutSnapshot(null);
       },
-      onChannel:(channelId,identity)=>{try{checkoutSession.selectChannel(channelId,identity);refresh();}catch(error){fail(error);}},
+      onChannel:(channelId,identity)=>{
+        try{
+          checkoutSession.selectChannel(channelId,identity);refresh();
+          void checkoutSession.open().then(refresh).catch(fail);
+        }catch(error){fail(error);}
+      },
       onTender:tenderId=>{try{checkoutSession.selectTender(tenderId);refresh();}catch(error){fail(error);}},
       onCash:amountMinor=>{try{checkoutSession.setCashReceivedMinor(amountMinor);refresh();}catch(error){fail(error);}},
       onStudentDiscount:(mode,studentCount,selected)=>{
