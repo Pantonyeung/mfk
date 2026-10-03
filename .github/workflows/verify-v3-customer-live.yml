@@ -1,0 +1,54 @@
+name: verify-v3-customer-live
+
+on:
+  push:
+    branches:
+      - work/MFP-V3-CUSTOMER-PUBLIC-VERIFY-2026-10-03
+    paths:
+      - .github/workflows/verify-v3-customer-live.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-v3-customer-live
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify public V3 build identity and root page
+        env:
+          EXPECTED_SOURCE_COMMIT: a8d8ab76896574dbf3f0ab09a15ec2c11154ff98
+          EXPECTED_HOST: order.morefunos.com
+        run: |
+          set -euo pipefail
+          nonce="${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-$(date +%s)"
+          curl --fail --location --silent --show-error \
+            --retry 5 --retry-all-errors --retry-delay 2 \
+            --connect-timeout 15 --max-time 45 \
+            -H 'Cache-Control: no-cache' \
+            "https://${EXPECTED_HOST}/customer-build-identity.json?verify=${nonce}" \
+            -o identity.json
+          node --input-type=module <<'NODE'
+          import {readFile} from 'node:fs/promises';
+          const value=JSON.parse(await readFile('identity.json','utf8'));
+          if(value.surface!=='MFP_CUSTOMER_V3') throw new Error('LIVE_SURFACE_MISMATCH');
+          if(value.sourceCommit!==process.env.EXPECTED_SOURCE_COMMIT) throw new Error(`LIVE_SOURCE_COMMIT_MISMATCH_${value.sourceCommit}`);
+          if(value.sourceDirty!==false) throw new Error('LIVE_SOURCE_DIRTY');
+          if(!/^[a-f0-9]{64}$/.test(value.sourceDigest||'')) throw new Error('LIVE_SOURCE_DIGEST_INVALID');
+          if(!/^[a-f0-9]{64}$/.test(value.buildId||'')) throw new Error('LIVE_BUILD_ID_INVALID');
+          console.log(JSON.stringify(value));
+          await import('node:fs/promises').then(({appendFile})=>appendFile(process.env.GITHUB_STEP_SUMMARY,`## Customer V3 live verified\n\n- Host: https://${process.env.EXPECTED_HOST}\n- Source: \`${value.sourceCommit}\`\n- Build: \`${value.buildId}\`\n- Built: ${value.builtAt}\n`));
+          NODE
+          curl --fail --location --silent --show-error \
+            --retry 5 --retry-all-errors --retry-delay 2 \
+            --connect-timeout 15 --max-time 45 \
+            -H 'Cache-Control: no-cache' \
+            "https://${EXPECTED_HOST}/?verify=${nonce}" \
+            -o root.html
+          grep -Fq '<title>磨飯｜Customer V3 Long Home Preview</title>' root.html
+          grep -Eq '/assets/index-[A-Za-z0-9_-]+\.js' root.html
+          echo "CUSTOMER_PUBLIC_URL_VERIFIED"
