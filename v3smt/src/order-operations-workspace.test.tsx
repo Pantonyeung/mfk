@@ -27,13 +27,13 @@ describe('MFP V3 A6 operational workspace',()=>{
   it('A6-55 keeps More as a route shell into existing Money / Reporting truth',()=>{
     const html=renderToStaticMarkup(<MfpOrderOperationsWorkspace surface="MFP_PAD" page="MORE" {...props}/>);
     expect(html).toContain('data-more-tools-shell="A6"');
-    expect(html).toContain('Day Close');expect(html).toContain('Reports');
-    expect(html).toContain('使用現有 Money / Reporting');
+    expect(html).toContain('日結');expect(html).toContain('報表');
+    expect(html).toContain('尚未接駁');
   });
 
   it('A6-56 keeps Ordering, Orders, Dining and Sold-out in the primary touch navigation',()=>{
     const html=renderToStaticMarkup(<MfpOperationsNavigation surface="MFP_PAD" active="ORDERS" onNavigate={vi.fn()}/>);
-    for(const label of ['Ordering','Orders','Dining','Sold-out / Capacity','More / Tools'])expect(html).toContain(label);
+    for(const label of ['待處理','點單','訂單','堂食','設定'])expect(html).toContain(label);
     expect(html).toContain('aria-current="page"');
   });
 
@@ -41,6 +41,7 @@ describe('MFP V3 A6 operational workspace',()=>{
     const pad=renderToStaticMarkup(<MfpOrderOperationsWorkspace surface="MFP_PAD" page="ORDERS" {...props}/>);
     const mobile=renderToStaticMarkup(<MfpOrderOperationsWorkspace surface="MFP_MOBILE" page="ORDERS" {...props}/>);
     expect(pad).toContain('data-order-operations-contract="SHARED_PAD_MOBILE"');
+    expect(pad).toContain('<h1>訂單</h1>');
     expect(mobile).toContain('data-order-operations-contract="SHARED_PAD_MOBILE"');
     expect(pad.match(/class="mfp-order-lane"/g)).toHaveLength(3);
     expect(mobile).toContain('role="tablist"');
@@ -50,19 +51,44 @@ describe('MFP V3 A6 operational workspace',()=>{
   it('renders Waiting, the 3 × 3 table registry, Sold-out and independent channel thresholds',()=>{
     const dining=renderToStaticMarkup(<MfpOrderOperationsWorkspace surface="MFP_PAD" page="DINING" {...props} pendingDiningIntent={pendingIntent}/>);
     const capacity=renderToStaticMarkup(<MfpOrderOperationsWorkspace surface="MFP_PAD" page="AVAILABILITY" {...props}/>);
-    expect(dining).toContain('Waiting');expect(dining).toContain('3 × 3 枱位');expect(dining).toContain('戶外');
-    expect(dining).toContain('正式開單到');expect(dining).toContain('落單到 Waiting W013');
+    expect(dining).toContain('<h1>堂食</h1>');expect(dining).toContain('等位');expect(dining).toContain('3 × 3 枱位');expect(dining).toContain('戶外');
+    expect(dining).toContain('正式開單到');expect(dining).toContain('落單到等位單 W013');
     expect(capacity).toContain('批次售罄');expect(capacity).toContain('批次恢復');
-    expect(capacity).toContain('Third Party');expect(capacity).toContain('Own Platform');expect(capacity).toContain('有限 Override');
+    expect(capacity).toContain('第三方平台');expect(capacity).toContain('自家平台');expect(capacity).toContain('有限加量');
   });
 
   it('extends the Owner visual lock with a separate More hamburger, left detail, blue panels and touch-first Mobile',()=>{
     const source=readFileSync(new URL('./order-operations-workspace.tsx',import.meta.url),'utf8');
     const css=readFileSync(new URL('./styles.css',import.meta.url),'utf8');
-    expect(source.indexOf('mfp-more-tools-button')).toBeLessThan(source.indexOf('MFP high-frequency operations navigation'));
-    const orders=source.slice(source.indexOf('mfp-orders-layout'),source.indexOf('function tenderConfigs'));
+    expect(source).toContain('PENDING');
+    const orders=source.slice(source.indexOf('mfp-orders-layout'),source.indexOf('function SplitCheckoutPanel'));
     expect(orders.indexOf('<OrderDetail')).toBeLessThan(orders.indexOf('mfp-order-lanes'));
     expect(css).toContain('.mfp-application-runtime');expect(css).toContain('background:#087ee9');
     expect(css).toContain('.mfp-operations-nav-shell.mobile');expect(css).toContain('overflow-x:hidden');expect(css).toContain('min-height:50px');
+  });
+});
+
+describe('A6 canonical tender eligibility at Order actions',()=>{
+  const moneyActions=['更正付款','全額退款','部分退款'];
+  const button=(html:string,label:string)=>html.match(new RegExp(`<button\\b[^>]*>${label}</button>`))?.[0]??'';
+
+  it.each(['MFP_PAD','MFP_MOBILE'] as const)('does not infer enabled tenders from historical Orders when config is absent on %s',surface=>{
+    const html=renderToStaticMarkup(<MfpOrderOperationsWorkspace surface={surface} page="ORDERS" {...props} tenders={[]}/>);
+    for(const label of moneyActions)expect(button(html,label)).toContain('disabled=""');
+    expect(html).toContain('未有可用的正式付款方式');
+    expect(html).toContain('CASH'); // Historical receipt/display/filter evidence stays visible.
+    expect(button(html,'修改訂單')).not.toContain('disabled');
+    expect(button(html,'標記可取餐')).not.toContain('disabled');
+  });
+
+  it('keeps disabled canonical tenders unavailable even when matching a historical Order',()=>{
+    const html=renderToStaticMarkup(<MfpOrderOperationsWorkspace surface="MFP_PAD" page="ORDERS" {...props} tenders={[{id:'CASH',label:'現金',enabled:false}]}/>);
+    for(const label of moneyActions)expect(button(html,label)).toContain('disabled=""');
+  });
+
+  it('preserves enabled configured tender actions without requiring a match to historical tender IDs',()=>{
+    const html=renderToStaticMarkup(<MfpOrderOperationsWorkspace surface="MFP_PAD" page="ORDERS" {...props} tenders={[{id:'NEW-TENDER',label:'正式付款方式',enabled:true}]}/>);
+    for(const label of moneyActions){expect(button(html,label)).not.toBe('');expect(button(html,label)).not.toContain('disabled');}
+    expect(html).not.toContain('未有可用的正式付款方式');
   });
 });

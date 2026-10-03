@@ -249,6 +249,7 @@ export function createMfpCheckoutSession(input:{
   let stableIdentity:Readonly<{submissionId:string;idempotencyKey:string}>|null=null;
   let stableCommand:Omit<MfpStoreKernelCommandEnvelope,'deviceId'|'staffSessionRef'>|null=null;
   let activeConfirm:Promise<MfpStoreKernelResult>|null=null;
+  let validationGeneration=0;
   const assertMutable=()=>{if(stableCommand||activeConfirm||result)throw new Error('MFP_CHECKOUT_FORMAL_SUBMISSION_LOCKED');};
 
   const snapshot=():MfpCheckoutSnapshot=>Object.freeze({
@@ -259,17 +260,26 @@ export function createMfpCheckoutSession(input:{
     schema:'mfp.checkout.validation.request.v1',intent:input.intent,channelId,tenderId,studentDiscountIntent,
   });
   const validate=async()=>{
+    assertMutable();
     if(!isMfpFrontlineSessionEligible(input.security.getSnapshot(),Date.parse(now())))throw new Error('MFP_CHECKOUT_SECURITY_NOT_ELIGIBLE');
-    const validation=await input.authority.validateCheckout(request());
+    const generation=++validationGeneration;
+    quote=null;state='NEW';
     finalReview=null;result=null;rejectionCode=null;draftRevalidationRequired=false;
-    if(validation.state==='VALID'){
-      quote=validateQuoteForIntent(validation.quote,input.intent);state='VALID';
-    }else if(validation.state==='REJECTED'){
-      quote=null;rejectionCode=requiredText(validation.rejectionCode,'MFP_FORMAL_REJECTION_INVALID');draftRevalidationRequired=validation.revalidationRequired===true;state='REJECTED';
-    }else{
-      quote=null;state='UNKNOWN';
+    try{
+      const validation=await input.authority.validateCheckout(request());
+      if(generation!==validationGeneration)return validation;
+      if(validation.state==='VALID'){
+        quote=validateQuoteForIntent(validation.quote,input.intent);state='VALID';
+      }else if(validation.state==='REJECTED'){
+        rejectionCode=requiredText(validation.rejectionCode,'MFP_FORMAL_REJECTION_INVALID');draftRevalidationRequired=validation.revalidationRequired===true;state='REJECTED';
+      }else{
+        state='UNKNOWN';
+      }
+      return validation;
+    }catch(error){
+      if(generation===validationGeneration){quote=null;state='UNKNOWN';}
+      throw error;
     }
-    return validation;
   };
   const reopen=()=>{if(state==='FINAL_REVIEW')state='VALID';finalReview=null;};
 
@@ -306,8 +316,9 @@ export function createMfpCheckoutSession(input:{
       state='FINAL_REVIEW';return finalReview;
     },
     returnToOrder(){
-      if(activeConfirm||state==='UNKNOWN'||state==='COMMITTED')throw new Error('MFP_CHECKOUT_FORMAL_SUBMISSION_LOCKED');
-      state='NEW';finalReview=null;
+      if(activeConfirm||stableCommand&&state!=='REJECTED')throw new Error('MFP_CHECKOUT_FORMAL_SUBMISSION_LOCKED');
+      validationGeneration++;
+      state='NEW';quote=null;finalReview=null;
     },
     paymentConfirm(){
       if(activeConfirm)return activeConfirm;
@@ -325,7 +336,10 @@ export function createMfpCheckoutSession(input:{
         });
       }
       state='SUBMITTING';
-      const promise=input.security.submitFrontlineFormalCommand(stableCommand!).then(next=>{
+      const promise=Promise.resolve().then(()=>input.security.submitFrontlineFormalCommand(stableCommand!)).catch(():MfpStoreKernelResult=>Object.freeze({
+        schema:'mfp.store-kernel.submission.result.v1',submissionId:stableIdentity!.submissionId,
+        state:'UNKNOWN',readbackRequired:true,retryPermitted:false,
+      })).then(next=>{
         result=next;
         state=next.state==='COMMITTED'?'COMMITTED':next.state;
         return next;

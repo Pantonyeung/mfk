@@ -71,3 +71,41 @@ describe('MFP V3 A9R bounded formal native transport',()=>{
     expect(bridge.postMessage).not.toHaveBeenCalled();
   });
 });
+
+describe('formal native protocol isolation',()=>{
+  function harness(){
+    let listener:(event:{data:unknown})=>void=()=>{};
+    const posted:Record<string,unknown>[]=[];
+    const bridge:MfpNativeBridge={addEventListener(_type,value){listener=value;},removeEventListener(){},postMessage(raw){posted.push(JSON.parse(raw));}};
+    const reply=(value:Record<string,unknown>)=>listener({data:JSON.stringify({
+      protocolVersion:1,type:'mfp.store-kernel.submission.result.v1',schema:'mfp.store-kernel.submission.result.v1',
+      requestId:posted.at(-1)?.requestId,submissionId:command.submissionId,state:'REJECTED',rejectionCode:'EXPECTED_REVISION_STALE',...value,
+    })});
+    return {posted,reply,bridge,transport:createMfpFormalBusinessNativeTransport(environment(bridge))};
+  }
+
+  it('does not let extra runtime command fields change the bounded bridge operation',async()=>{
+    const value=harness();
+    const pending=value.transport.submitCommand({...command,type:'unexpected.operation',protocolVersion:9,requestId:'INJECTED',mutations:[]} as MfpStoreKernelCommandEnvelope);
+    value.reply({});await pending;
+    expect(value.posted[0]).toEqual({protocolVersion:1,type:'mfp.store-kernel.command.v1',...command,requestId:'mfp-formal-request-1'});
+  });
+
+  it.each([
+    {protocolVersion:2},
+    {schema:'foreign.result.v1'},
+    {submissionId:'SUB-OTHER'},
+  ])('does not settle on a wrong result identity or protocol: %j',async invalid=>{
+    const value=harness();let settled=false;
+    const pending=value.transport.submitCommand(command).then(result=>{settled=true;return result;});
+    value.reply(invalid);await Promise.resolve();
+    expect(settled).toBe(false);
+    value.reply({});await expect(pending).resolves.toMatchObject({state:'REJECTED',submissionId:command.submissionId});
+  });
+
+  it('ignores a foreign failure message with the same request ID',async()=>{
+    const value=harness();const pending=value.transport.submitCommand(command);
+    value.reply({type:'unrelated.failure',status:'failed',errorCode:'FOREIGN_FAILURE'});value.reply({});
+    await expect(pending).resolves.toMatchObject({state:'REJECTED',rejectionCode:'EXPECTED_REVISION_STALE'});
+  });
+});

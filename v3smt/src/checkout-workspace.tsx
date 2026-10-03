@@ -26,12 +26,13 @@ export interface MfpCheckoutWorkspaceActions{
   readonly onPaymentConfirm:()=>void;
 }
 
-export function MfpCheckoutWorkspace({surface,intent,snapshot,tenders,actions}:{
+export function MfpCheckoutWorkspace({surface,intent,snapshot,tenders,actions,feedback}:{
   surface:MfpOrderingSurface;
   intent:MfpNormalizedOrderingIntent;
   snapshot:MfpCheckoutSnapshot;
   tenders:readonly MfpTenderConfig[];
   actions:MfpCheckoutWorkspaceActions;
+  feedback?:string;
 }){
   const [cashInput,setCashInput]=useState(snapshot.cashReceivedMinor===null?'':String(snapshot.cashReceivedMinor/100));
   const [studentCount,setStudentCount]=useState(snapshot.studentDiscountIntent?.studentCount??0);
@@ -51,10 +52,11 @@ export function MfpCheckoutWorkspace({surface,intent,snapshot,tenders,actions}:{
   const layout=surface==='MFP_PAD'?'mfp-checkout-pad-layout':'mfp-checkout-mobile-steps';
   const processing=snapshot.state==='SUBMITTING';
   const selectionLocked=snapshot.submissionId!==null;
-  const backLocked=processing||snapshot.state==='UNKNOWN'||snapshot.state==='COMMITTED';
+  const backLocked=processing||selectionLocked&&(snapshot.state==='UNKNOWN'||snapshot.state==='COMMITTED');
 
   return <section className={`mfp-checkout ${surface==='MFP_PAD'?'mfp-checkout-pad':'mfp-checkout-mobile'}`} data-checkout-surface={surface}>
     <header><div><small>FORMAL CHECKOUT · STORE KERNEL AUTHORITY</small><h1>Checkout</h1></div><button type="button" disabled={backLocked} onClick={actions.onBack}>← 返回訂單</button></header>
+    {feedback?<output className="mfp-ordering-feedback" role="alert">{feedback}</output>:null}
     <div className={layout}>
       <aside className="mfp-checkout-summary" aria-label="完整訂單摘要">
         <h2>完整訂單摘要</h2>

@@ -77,7 +77,7 @@ export function MfpCheckCenterView({surface,url,diagnostics,onRefresh}:{
       </dl></article>
       <article className="mfp-check-bindings"><h2>BINDINGS</h2>{MFP_A9_BINDINGS.map(([name,code])=><div key={name}><span>{name}</span><Status ok={false} code={code}/></div>)}</article>
       <article><h2>STORE KERNEL</h2><Status ok={kernelOk} code={diagnostics.errors.storeKernel}/><dl>
-        <div><dt>Health</dt><dd>{field(kernel,'status')}</dd></div><div><dt>DB</dt><dd>{field(kernel,'database')}</dd></div>
+        <div><dt>Health</dt><dd>{field(kernel,'status')}</dd></div><div><dt>DB</dt><dd>{field(kernel,'databaseName')}</dd></div>
         <div><dt>Schema</dt><dd>{field(kernel,'schemaVersion')}</dd></div><div><dt>Journal</dt><dd>{field(kernel,'journalMode')}</dd></div>
         <div><dt>Synchronous</dt><dd>{field(kernel,'synchronous')}</dd></div><div><dt>Receipt readback</dt><dd>{kernelOk?'AVAILABLE':'BLOCKED'}</dd></div>
       </dl><small>The formal router is source-verified; Security, Pricing, Tender and domain handlers remain BLOCKED.</small></article>

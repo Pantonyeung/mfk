@@ -142,6 +142,8 @@ export function createMfpSecurityPort(input:{
   let device:MfpDeviceIdentity|undefined;
   let session:MfpStaffSession|undefined;
   let sessionState:MfpStaffSessionState='UNAUTHORIZED';
+  let sessionOperation=0;
+  let authenticationGeneration=0;
 
   const persistIdentity=async(value:MfpDeviceIdentity)=>{
     await input.metadataStore.write(Object.freeze({...value,status:'UNKNOWN'}));
@@ -181,13 +183,15 @@ export function createMfpSecurityPort(input:{
 
   const submit=async(command:UnboundCommand,requiredPermission?:string)=>{
     const {currentDevice,currentSession}=precheck(requiredPermission);
+    const generation=authenticationGeneration;
     if(!input.storeKernel)throw new Error('MFP_STORE_KERNEL_BINDING_UNAVAILABLE');
     const result=await input.storeKernel.submitFormalCommand(Object.freeze({
       ...command,
       deviceId:currentDevice.deviceId,
       staffSessionRef:currentSession.staffSessionRef,
     }));
-    if(result.state==='REJECTED'&&(result.rejectionCode==='UNAUTHORIZED'||result.rejectionCode.endsWith('_UNAUTHORIZED'))){
+    if(generation===authenticationGeneration&&result.state==='REJECTED'&&(result.rejectionCode==='UNAUTHORIZED'||result.rejectionCode.endsWith('_UNAUTHORIZED'))){
+      sessionOperation++;
       session=undefined;
       sessionState='UNAUTHORIZED';
     }
@@ -233,38 +237,50 @@ export function createMfpSecurityPort(input:{
       if(current.status!=='AUTHORIZED')throw new Error(current.status==='REVOKED'?'MFP_DEVICE_REVOKED':'MFP_DEVICE_UNKNOWN');
       text(staffId,'MFP_STAFF_ID_INVALID');
       text(proof,'MFP_STAFF_PROOF_INVALID');
-      const result=await input.authority.loginStaff({staffId,proof,deviceId:current.deviceId,storeId:current.storeId});
-      if(result.state!=='AUTHENTICATED'){
-        session=undefined;
-        sessionState=result.state;
-        return Object.freeze({state:result.state});
+      const operation=++sessionOperation;
+      authenticationGeneration++;
+      session=undefined;sessionState='UNKNOWN';
+      try{
+        const result=await input.authority.loginStaff({staffId,proof,deviceId:current.deviceId,storeId:current.storeId});
+        if(operation!==sessionOperation)return Object.freeze({state:'UNKNOWN' as const});
+        if(result.state!=='AUTHENTICATED'){
+          sessionState=result.state;
+          return Object.freeze({state:result.state});
+        }
+        const formalSession=validateSession(result.session,current);
+        sessionState=effectiveSessionState(formalSession,now());
+        session=sessionState==='AUTHENTICATED'?formalSession:undefined;
+        return session?Object.freeze({state:'AUTHENTICATED' as const,session}):Object.freeze({state:sessionState as Exclude<MfpStaffSessionState,'AUTHENTICATED'>});
+      }catch(error){
+        if(operation===sessionOperation){session=undefined;sessionState='UNKNOWN';}
+        throw error;
       }
-      const formalSession=validateSession(result.session,current);
-      sessionState=effectiveSessionState(formalSession,now());
-      session=sessionState==='AUTHENTICATED'?formalSession:undefined;
-      return session?Object.freeze({state:'AUTHENTICATED' as const,session}):Object.freeze({state:sessionState as Exclude<MfpStaffSessionState,'AUTHENTICATED'>});
     },
     async refreshStaffSession(){
       const current=requireDevice();
       if(!session)throw new Error('MFP_STAFF_SESSION_REQUIRED');
+      const active=session;
+      const operation=++sessionOperation;
       try{
         const readback=validateSession(await input.authority.readStaffSession({
-          staffSessionRef:session.staffSessionRef,
+          staffSessionRef:active.staffSessionRef,
           deviceId:current.deviceId,
           storeId:current.storeId,
         }),current);
+        if(operation!==sessionOperation)return sessionState;
+        if(readback.staffSessionRef!==active.staffSessionRef||readback.staffId!==active.staffId)throw new Error('MFP_STAFF_SESSION_IDENTITY_MISMATCH');
         sessionState=effectiveSessionState(readback,now());
         session=sessionState==='AUTHENTICATED'?readback:undefined;
         return sessionState;
       }catch(error){
-        session=undefined;
-        sessionState='UNKNOWN';
+        if(operation===sessionOperation){session=undefined;sessionState='UNKNOWN';}
         throw error;
       }
     },
     async logoutStaff(){
       const current=requireDevice();
       const active=session;
+      sessionOperation++;authenticationGeneration++;
       session=undefined;
       sessionState='UNAUTHORIZED';
       if(active)await input.authority.logoutStaff({

@@ -174,6 +174,9 @@ function deepFreeze<T>(value:T):T{
 }
 
 export function validateMfpCanonicalOrder(value:MfpCanonicalOrder):MfpCanonicalOrder{
+  const raw=value as unknown as Record<string,unknown>;
+  if(!raw||typeof raw!=='object'||Array.isArray(raw)||raw.draftOnly===true||raw.schema==='mfp.ordering.intent.draft.v1')throw new Error('MFP_ORDER_READBACK_INVALID');
+  if(value.lifecycleState!==undefined&&!['ACTIVE','COMPLETED','CANCELLED'].includes(value.lifecycleState))throw new Error('MFP_ORDER_READBACK_INVALID');
   requiredText(value.orderId,'MFP_ORDER_READBACK_INVALID');requiredText(value.displayNumber,'MFP_ORDER_READBACK_INVALID');
   requiredText(value.source,'MFP_ORDER_READBACK_INVALID');instant(value.createdAt,'MFP_ORDER_READBACK_INVALID');
   validRevision(value.revision,'MFP_ORDER_READBACK_INVALID');
@@ -188,9 +191,19 @@ export function validateMfpCanonicalOrder(value:MfpCanonicalOrder):MfpCanonicalO
     requiredText(item.lineId,'MFP_ORDER_READBACK_INVALID');requiredText(item.name,'MFP_ORDER_READBACK_INVALID');
     if(lines.has(item.lineId))throw new Error('MFP_ORDER_READBACK_INVALID');
     lines.add(item.lineId);positive(item.quantity,'MFP_ORDER_READBACK_INVALID');minor(item.unitMinor,'MFP_ORDER_READBACK_INVALID');
+    if(item.options!==undefined){
+      if(!Array.isArray(item.options))throw new Error('MFP_ORDER_READBACK_INVALID');
+      for(const option of item.options)requiredText(option,'MFP_ORDER_READBACK_INVALID');
+    }
     if(item.settledQuantity!==undefined&&(!Number.isSafeInteger(item.settledQuantity)||item.settledQuantity<0||item.settledQuantity>item.quantity))throw new Error('MFP_ORDER_READBACK_INVALID');
   }
-  if(value.dining?.seatedAt!==undefined)instant(value.dining.seatedAt,'MFP_ORDER_READBACK_INVALID');
+  if(value.dining!==undefined){
+    if(!value.dining||typeof value.dining!=='object')throw new Error('MFP_ORDER_READBACK_INVALID');
+    positive(value.dining.partySize,'MFP_ORDER_READBACK_INVALID');
+    if(value.dining.tableId!==undefined&&!MFP_DINING_TABLE_IDS.includes(value.dining.tableId as typeof MFP_DINING_TABLE_IDS[number]))throw new Error('MFP_ORDER_READBACK_INVALID');
+    if(value.dining.waitingId!==undefined)requiredText(value.dining.waitingId,'MFP_ORDER_READBACK_INVALID');
+    if(value.dining.seatedAt!==undefined)instant(value.dining.seatedAt,'MFP_ORDER_READBACK_INVALID');
+  }
   return deepFreeze(value);
 }
 
@@ -200,6 +213,7 @@ export function validateMfpOrderOperationsReadModel(value:MfpOrderOperationsRead
   instant(value.readAt,'MFP_ORDER_OPERATIONS_READBACK_INVALID');
   if(!Array.isArray(value.orders)||!Array.isArray(value.dining?.waiting)||!Array.isArray(value.dining?.tables)
     ||!Array.isArray(value.availability?.items)||!Array.isArray(value.capacity?.pools)||!Array.isArray(value.etaPolicy?.workloadBands))throw new Error('MFP_ORDER_OPERATIONS_READBACK_INVALID');
+  for(const revision of [value.dining.revision,value.availability.revision,value.capacity.revision,value.etaPolicy.revision])validRevision(revision,'MFP_ORDER_OPERATIONS_READBACK_INVALID');
   const orderIds=new Set<string>();
   for(const order of value.orders){
     validateMfpCanonicalOrder(order);
@@ -210,10 +224,17 @@ export function validateMfpOrderOperationsReadModel(value:MfpOrderOperationsRead
   if(tableIds.length!==MFP_DINING_TABLE_IDS.length||MFP_DINING_TABLE_IDS.some(id=>!tableIds.includes(id)))throw new Error('MFP_DINING_TABLE_REGISTRY_INVALID');
   for(const table of value.dining.tables){
     validRevision(table.revision,'MFP_ORDER_OPERATIONS_READBACK_INVALID');
+    requiredText(table.label,'MFP_ORDER_OPERATIONS_READBACK_INVALID');
+    if(!['AVAILABLE','OCCUPIED'].includes(table.state)||!['INDOOR','OUTDOOR'].includes(table.location))throw new Error('MFP_ORDER_OPERATIONS_READBACK_INVALID');
+    if(table.partySize!==undefined)positive(table.partySize,'MFP_ORDER_OPERATIONS_READBACK_INVALID');
     if(table.state==='OCCUPIED'&&(!table.orderId||!table.seatedAt))throw new Error('MFP_ORDER_OPERATIONS_READBACK_INVALID');
     if(table.seatedAt)instant(table.seatedAt,'MFP_ORDER_OPERATIONS_READBACK_INVALID');
   }
+  const waitingIds=new Set<string>();
   for(const waiting of value.dining.waiting){
+    if(waitingIds.has(waiting.waitingId))throw new Error('MFP_ORDER_OPERATIONS_READBACK_INVALID');
+    waitingIds.add(waiting.waitingId);
+    requiredText(waiting.displayNumber,'MFP_ORDER_OPERATIONS_READBACK_INVALID');
     requiredText(waiting.waitingId,'MFP_ORDER_OPERATIONS_READBACK_INVALID');positive(waiting.partySize,'MFP_ORDER_OPERATIONS_READBACK_INVALID');
     instant(waiting.createdAt,'MFP_ORDER_OPERATIONS_READBACK_INVALID');
   }
@@ -310,6 +331,31 @@ export interface MfpOrderOperationsReadPort{
   readOperations?():Promise<MfpOrderOperationsReadModel>;
 }
 
+/** A read-only seam for the existing native DTO. The caller supplies the trusted
+ * Store Kernel reader; this adapter does not manufacture records or bind transport. */
+export function createMfpOrderOperationsReadAdapter(input:Readonly<{
+  storeId:string;
+  readOperations:()=>Promise<unknown>;
+}>):Required<MfpOrderOperationsReadPort>{
+  const storeId=requiredText(input.storeId,'MFP_ORDER_OPERATION_STORE_ID_INVALID');
+  const readOperations=async()=>{
+    const raw=await input.readOperations();
+    if(!raw||typeof raw!=='object'||Array.isArray(raw)||(raw as Record<string,unknown>).schema!=='mfp.order-operations.read.v1')throw new Error('MFP_ORDER_OPERATIONS_READBACK_INVALID');
+    if((raw as Record<string,unknown>).storeId!==storeId)throw new Error('MFP_ORDER_OPERATIONS_STORE_MISMATCH');
+    try{
+      // Detach producer-owned objects before the retained validator freezes them.
+      return validateMfpOrderOperationsReadModel(structuredClone(raw) as MfpOrderOperationsReadModel);
+    }catch{throw new Error('MFP_ORDER_OPERATIONS_READBACK_INVALID');}
+  };
+  return Object.freeze({
+    readOperations,
+    async readOrder(orderId:string){
+      requiredText(orderId,'MFP_ORDER_READBACK_INVALID');
+      return (await readOperations()).orders.find(order=>order.orderId===orderId)??null;
+    },
+  });
+}
+
 export function createMfpRefundOperation(order:MfpCanonicalOrder,input:Readonly<{
   scope:'FULL'|'PARTIAL';amountMinor:number;refundTenderId:string;lineUnits?:readonly Readonly<{lineId:string;quantity:number}>[];
 }>):Extract<MfpOrderOperation,{kind:'REFUND'}>{
@@ -361,6 +407,11 @@ function commandForOperation(operation:MfpOrderOperation){
 
 function knownOrderId(operation:MfpOrderOperation){return 'orderId' in operation?operation.orderId:undefined;}
 
+function atLeastCommittedRevision(readRevision:string|number,committedRevision:string|number){
+  return readRevision===committedRevision
+    ||typeof readRevision==='number'&&typeof committedRevision==='number'&&readRevision>=committedRevision;
+}
+
 export function createMfpOrderOperationSession(input:{
   readonly storeId?:string;
   readonly operation:MfpOrderOperation;
@@ -370,10 +421,11 @@ export function createMfpOrderOperationSession(input:{
   readonly now?:()=>string;
 }){
   const operationId=requiredText(input.operationId,'MFP_ORDER_OPERATION_ID_INVALID');
-  const expectedRevision=validRevision(input.operation.expectedRevision);
+  const operation=deepFreeze(structuredClone(input.operation));
+  const expectedRevision=validRevision(operation.expectedRevision);
   const createdAt=(input.now??(()=>new Date().toISOString()))();
   if(!Number.isFinite(Date.parse(createdAt)))throw new Error('MFP_ORDER_OPERATION_TIME_INVALID');
-  const material=commandForOperation(input.operation);
+  const material=commandForOperation(operation);
   const command:Omit<MfpStoreKernelCommandEnvelope,'deviceId'|'staffSessionRef'>=Object.freeze({
     schema:'mfp.store-kernel.command.v1',storeId:requiredText(input.storeId??'MF01','MFP_ORDER_OPERATION_STORE_ID_INVALID'),
     submissionId:operationId,idempotencyKey:operationId,commandType:material.commandType,
@@ -381,19 +433,23 @@ export function createMfpOrderOperationSession(input:{
   });
   let active:Promise<MfpOrderOperationOutcome>|null=null;
   let terminal:MfpOrderOperationOutcome|null=null;
+  let committedReceipt:Extract<MfpStoreKernelResult,{state:'COMMITTED'}>|null=null;
 
   const committedReadback=async(result:Extract<MfpStoreKernelResult,{state:'COMMITTED'}>):Promise<MfpOrderOperationOutcome>=>{
-    const expectedOrderId=knownOrderId(input.operation)??(input.operation.kind==='ADMIT_DINING_ORDER'?result.orderRef:undefined);
-    if(knownOrderId(input.operation)&&result.orderRef!==undefined&&result.orderRef!==expectedOrderId)throw new Error('MFP_ORDER_OPERATION_IDENTITY_MISMATCH');
+    const expectedOrderId=knownOrderId(operation)??(operation.kind==='ADMIT_DINING_ORDER'?result.orderRef:undefined);
+    if(knownOrderId(operation)&&result.orderRef!==undefined&&result.orderRef!==expectedOrderId)throw new Error('MFP_ORDER_OPERATION_IDENTITY_MISMATCH');
     try{
+      if(operation.kind==='ADMIT_DINING_ORDER'&&!expectedOrderId)throw new Error('MFP_ORDER_OPERATION_READBACK_REQUIRED');
       if(expectedOrderId){
         const order=await input.authority.readOrder(expectedOrderId);
         if(!order||order.orderId!==expectedOrderId)throw new Error('MFP_ORDER_OPERATION_READBACK_REQUIRED');
+        if(!atLeastCommittedRevision(order.revision,result.canonicalRevision))throw new Error('MFP_ORDER_OPERATION_READBACK_REQUIRED');
         const outcome:MfpOrderOperationOutcome=Object.freeze({state:'COMMITTED',result,order:validateMfpCanonicalOrder(order),snapshot:null});
         terminal=outcome;return outcome;
       }
       if(!input.authority.readOperations)throw new Error('MFP_ORDER_OPERATIONS_READBACK_REQUIRED');
       const snapshot=validateMfpOrderOperationsReadModel(await input.authority.readOperations());
+      if((operation.kind==='CREATE_WAITING'||operation.kind==='ASSIGN_TABLE')&&!atLeastCommittedRevision(snapshot.dining.revision,result.canonicalRevision))throw new Error('MFP_ORDER_OPERATION_READBACK_REQUIRED');
       const outcome:MfpOrderOperationOutcome=Object.freeze({state:'COMMITTED',result,order:null,snapshot});
       terminal=outcome;return outcome;
     }catch{
@@ -404,8 +460,8 @@ export function createMfpOrderOperationSession(input:{
   const submit=()=>{
     if(active)return active;
     if(terminal)return Promise.resolve(terminal);
-    const task=input.security.submitFrontlineFormalCommand(command).then(result=>{
-      if(result.state==='COMMITTED')return committedReadback(result);
+    const task=(committedReceipt?Promise.resolve(committedReceipt):input.security.submitFrontlineFormalCommand(command)).then(result=>{
+      if(result.state==='COMMITTED'){committedReceipt=result;return committedReadback(result);}
       if(result.state==='REJECTED'){
         const outcome:MfpOrderOperationOutcome=Object.freeze({state:'REJECTED',result,order:null,snapshot:null});
         terminal=outcome;return outcome;

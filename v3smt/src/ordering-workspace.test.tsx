@@ -50,7 +50,8 @@ describe('MFP V3 A4 formal ordering workspaces',()=>{
     expect(html).toContain('data-ordering-surface="MFP_PAD"');
     expect(html).toContain('商品目錄');
     expect(html).toContain('招牌飯糰');
-    expect(html).toContain('Cart Draft');
+    expect(html).toContain('本單餐點');
+    expect(html).not.toContain('本單 #001');
     expect(html).toContain('LOCAL_PREVIEW_FROM_PUBLISHED_FACTS');
     expect(html).not.toContain('SESSION-NOT-RENDERED');
   });
@@ -60,8 +61,11 @@ describe('MFP V3 A4 formal ordering workspaces',()=>{
       surface="MFP_MOBILE" catalog={catalog} security={authenticatedSecurity} syncSnapshot={sync('READY')}
     />);
     expect(html).toContain('data-ordering-surface="MFP_MOBILE"');
-    expect(html).toContain('mfp-mobile-nav');
-    expect(html).toContain('查看購物車');
+    expect(html).toContain('mfp-mobile-order-summary');
+    expect(html).toContain('本單餐點');
+    expect(html).toContain('查看本單');
+    expect(html).not.toContain('mfp-mobile-nav');
+    expect(html).not.toContain('查看購物車');
     expect(html).toContain('招牌飯糰');
     expect(html).not.toContain('mfp-pad-layout');
   });
@@ -70,16 +74,18 @@ describe('MFP V3 A4 formal ordering workspaces',()=>{
     const html=renderToStaticMarkup(<MfpOrderingWorkspace
       surface="MFP_MOBILE" catalog={catalog} security={authenticatedSecurity} syncSnapshot={sync('OFFLINE')}
     />);
-    expect(html).toContain('OFFLINE / LOCAL_LKG');
+    expect(html).toContain('離線 · 使用已儲存菜單');
     expect(html).toContain('招牌飯糰');
   });
 
   it('shows no products when the A3 active projection is missing',()=>{
     const html=renderToStaticMarkup(<MfpOrderingWorkspace
-      surface="MFP_PAD" catalog={null} security={authenticatedSecurity}
+      surface="MFP_PAD" catalog={null} security={authenticatedSecurity} onCheckConnection={()=>{}}
       syncSnapshot={{...sync('UNINITIALIZED'),lkgAvailable:false,appliedSeq:null,headSeq:null}}
     />);
-    expect(html).toContain('暫時未有可用菜單');
+    expect(html).toContain('菜單尚未接駁');
+    expect(html).toContain('未取得門店已發布菜單');
     expect(html).not.toContain('招牌飯糰');
+    expect(html).toContain('檢查連線');
   });
 });

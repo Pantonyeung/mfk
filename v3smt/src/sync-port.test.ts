@@ -472,3 +472,370 @@ describe('MFP V3 A3 sync coordinator',()=>{
     expect(surfaces.MFP_MOBILE).toBe(sync);
   });
 });
+
+describe('MFP V3 sync convergence regressions',()=>{
+  it('preserves a newer entity when a stale DELETE arrives at the next port sequence',()=>{
+    const current=entities(entity('P1',{price:15},5));
+    const staleDelete:MfpSyncChange={...change(2,entity('P1',{},4)),op:'DELETE',payload:undefined,
+      payloadHash:fingerprintMfpSyncValue({entityType:'PRODUCT',entityId:'P1',op:'DELETE'})};
+    const result=applyMfpSyncChangeBatch(current,1,batch(1,[staleDelete],2));
+    expect(result.entities).toEqual(current);
+    expect(result.appliedSeq).toBe(2);
+  });
+
+  it('rechecks canonical HEAD when an unsequenced doorbell arrives during ACK',async()=>{
+    const before=projection(0);
+    const next=entity('P1',{price:11});
+    const expected=projection(1,entities(next),0);
+    const ackStarted=deferred<void>();
+    const ackGate=deferred<void>();
+    const store=new MemorySyncStore(before);
+    const wire=transport({
+      readHead:vi.fn().mockResolvedValueOnce(headFor(before)).mockResolvedValue(headFor(expected)),
+      readChanges:vi.fn(async()=>({kind:'DELTA' as const,batch:batch(0,[change(1,next)],1)})),
+      ackApplied:vi.fn().mockImplementationOnce(async()=>{ackStarted.resolve();await ackGate.promise;}),
+    });
+    const sync=coordinator({store,transport:wire});
+    await sync.restore();
+    const startup=sync.startup();
+    await ackStarted.promise;
+    expect(sync.doorbellReceived({type:'PORT_HEAD_AVAILABLE',port:'SMT',observedAt:'2026-10-02T06:01:00.000Z'})).toBe(startup);
+    ackGate.resolve();
+    await startup;
+    expect(store.current?.appliedSeq).toBe(1);
+    expect(sync.getSnapshot()).toMatchObject({state:'READY',headSeq:1,appliedSeq:1});
+    expect(wire.readHead).toHaveBeenCalledTimes(2);
+  });
+
+  it('converges when a valid delta advances beyond the just-read canonical HEAD',async()=>{
+    const before=projection(1,entities(entity('P1',{price:10},5)),0);
+    const atTwo=entity('P1',{price:11},6);
+    const atThree=entity('P1',{price:12},7);
+    const store=new MemorySyncStore(before);
+    const wire=transport({
+      readHead:vi.fn().mockResolvedValueOnce(headFor(projection(2,entities(atTwo),0)))
+        .mockResolvedValue(headFor(projection(3,entities(atThree),0))),
+      readChanges:vi.fn(async afterSeq=>({kind:'DELTA' as const,batch:batch(afterSeq,
+        [change(2,atTwo),change(3,atThree)].filter(item=>item.portSeq>afterSeq),3)})),
+    });
+    const sync=coordinator({store,transport:wire});
+    await sync.restore();
+    await expect(sync.startup()).resolves.toBeUndefined();
+    expect(store.current).toMatchObject({appliedSeq:3,entities:entities(atThree)});
+    expect(sync.getSnapshot()).toMatchObject({state:'READY',headSeq:3,appliedSeq:3});
+    expect(wire.ackApplied).toHaveBeenLastCalledWith(expect.objectContaining({appliedSeq:3}),context);
+  });
+
+  it('schedules one event-driven continuation for a new doorbell during the second pass',async()=>{
+    vi.useFakeTimers();
+    try{
+      const atOne=entity('P1',{price:11},1);
+      const atTwo=entity('P1',{price:12},2);
+      const states=[projection(0),projection(1,entities(atOne),0),projection(2,entities(atTwo),0)];
+      let reads=0;
+      const store=new MemorySyncStore();
+      const wire=transport({
+        readHead:vi.fn(async()=>headFor(states[Math.min(reads++,2)]!)),
+        readChanges:vi.fn(async afterSeq=>({kind:'DELTA' as const,batch:batch(afterSeq,
+          [change(afterSeq+1,afterSeq===0?atOne:atTwo)],afterSeq+1)})),
+        ackApplied:vi.fn(async ack=>{
+          if(ack.appliedSeq<2)void sync.doorbellReceived({type:'PORT_HEAD_AVAILABLE',port:'SMT',
+            advertisedHeadSeq:ack.appliedSeq+1,observedAt:'2026-10-02T06:01:00.000Z'});
+        }),
+      });
+      const sync=coordinator({store,transport:wire});
+      await sync.startup();
+      expect(wire.readHead).toHaveBeenCalledTimes(2);
+      expect(sync.getSnapshot()).toMatchObject({state:'BEHIND',appliedSeq:1});
+      expect(vi.getTimerCount()).toBe(1);
+      await vi.runOnlyPendingTimersAsync();
+      expect(store.current?.appliedSeq).toBe(2);
+      expect(sync.getSnapshot()).toMatchObject({state:'READY',headSeq:2,appliedSeq:2});
+      expect(wire.readHead).toHaveBeenCalledTimes(3);
+      expect(vi.getTimerCount()).toBe(0);
+      await vi.advanceTimersByTimeAsync(24*60*60*1000);
+      expect(wire.readHead).toHaveBeenCalledTimes(3);
+    }finally{vi.useRealTimers();}
+  });
+});
+
+describe('MFP V3 sync convergence safety boundaries',()=>{
+  it('still applies a current DELETE and a later UPSERT in source sequence order',()=>{
+    const current=entities(entity('P1',{price:15},5));
+    const deleted:MfpSyncChange={...change(2,entity('P1',{},6)),op:'DELETE',payload:undefined,
+      payloadHash:fingerprintMfpSyncValue({entityType:'PRODUCT',entityId:'P1',op:'DELETE'})};
+    const removed=applyMfpSyncChangeBatch(current,1,batch(1,[deleted],2));
+    expect(removed.entities).toEqual({});
+    const newer=entity('P1',{price:17},7);
+    expect(applyMfpSyncChangeBatch(removed.entities,2,batch(2,[change(3,newer)],3)))
+      .toEqual({entities:entities(newer),appliedSeq:3});
+  });
+
+  it('still rejects a malformed stale DELETE before ignoring its older revision',()=>{
+    const current=entities(entity('P1',{price:15},5));
+    const corrupt:MfpSyncChange={...change(2,entity('P1',{},4)),op:'DELETE',payload:undefined,payloadHash:'corrupt'};
+    expect(()=>applyMfpSyncChangeBatch(current,1,batch(1,[corrupt],2)))
+      .toThrow('MFP_SYNC_CHANGE_PAYLOAD_HASH_MISMATCH');
+  });
+
+  it.each([
+    ['protocol',{protocol:'MFK_CHECKPOINTED_DELTA_SYNC_PROTOCOL_V2'},'MFP_SYNC_CHANGE_SCHEMA_INVALID'],
+    ['schema',{schema:'MFK_PORT_CHANGE_V2'},'MFP_SYNC_CHANGE_SCHEMA_INVALID'],
+    ['identity',{storeId:'OTHER'},'MFP_SYNC_CHANGE_BATCH_NON_CONTIGUOUS'],
+    ['sequence',{portSeq:4},'MFP_SYNC_CHANGE_BATCH_NON_CONTIGUOUS'],
+    ['payload hash',{payloadHash:'corrupt'},'MFP_SYNC_CHANGE_PAYLOAD_HASH_MISMATCH'],
+  ])('rejects an invalid ahead-of-HEAD %s without committing the valid prefix',async(_name,overrides,error)=>{
+    const before=projection(1,entities(entity('P1',{price:10},1)),0);
+    const atTwo=entity('P1',{price:11},2);
+    const atThree=entity('P1',{price:12},3);
+    const invalid={...change(3,atThree),...overrides} as MfpSyncChange;
+    const store=new MemorySyncStore(before);
+    const wire=transport({
+      readHead:vi.fn(async()=>headFor(projection(2,entities(atTwo),0))),
+      readChanges:vi.fn(async()=>({kind:'DELTA' as const,batch:batch(1,[change(2,atTwo),invalid],4)})),
+    });
+    const sync=coordinator({store,transport:wire});
+    await sync.restore();
+    await expect(sync.startup()).rejects.toThrow(error);
+    expect(store.current).toBe(before);
+    expect(store.commits).toHaveLength(0);
+    expect(wire.ackApplied).not.toHaveBeenCalled();
+  });
+
+  it('still checks the HEAD projection hash before committing a valid advanced batch prefix',async()=>{
+    const before=projection(1,entities(entity('P1',{price:10},1)),0);
+    const atTwo=entity('P1',{price:11},2);
+    const atThree=entity('P1',{price:12},3);
+    const store=new MemorySyncStore(before);
+    const wire=transport({
+      readHead:vi.fn(async()=>headFor(projection(2,entities(atTwo),0),{projectionHash:'corrupt'})),
+      readChanges:vi.fn(async()=>({kind:'DELTA' as const,batch:batch(1,[change(2,atTwo),change(3,atThree)],3)})),
+    });
+    const sync=coordinator({store,transport:wire});
+    await sync.restore();
+    await expect(sync.startup()).rejects.toThrow('MFP_SYNC_PROJECTION_HASH_MISMATCH');
+    expect(store.current).toBe(before);
+    expect(store.commits).toHaveLength(0);
+    expect(wire.ackApplied).not.toHaveBeenCalled();
+  });
+
+  it('does not poll a static advertised head that canonical HEAD has not reached',async()=>{
+    vi.useFakeTimers();
+    try{
+      const current=projection(5);
+      const wire=transport({readHead:vi.fn(async()=>headFor(current))});
+      const sync=coordinator({store:new MemorySyncStore(current),transport:wire});
+      await sync.restore();
+      await sync.doorbellReceived({type:'PORT_HEAD_AVAILABLE',port:'SMT',advertisedHeadSeq:99,
+        observedAt:'2026-10-02T06:01:00.000Z'});
+      expect(sync.getSnapshot()).toMatchObject({state:'BEHIND',appliedSeq:5});
+      expect(vi.getTimerCount()).toBe(0);
+      await vi.advanceTimersByTimeAsync(24*60*60*1000);
+      expect(wire.readHead).toHaveBeenCalledTimes(2);
+    }finally{vi.useRealTimers();}
+  });
+
+  it('continues after a newly observed canonical delta tail outruns the second HEAD',async()=>{
+    vi.useFakeTimers();
+    try{
+      const versions=[1,2,3,4].map(revision=>entity('P1',{price:10+revision},revision));
+      const states=versions.map((value,index)=>projection(index+1,entities(value),0));
+      let read=0;
+      const store=new MemorySyncStore(states[0]);
+      const wire=transport({
+        readHead:vi.fn(async()=>headFor(states[Math.min(++read,3)]!)),
+        readChanges:vi.fn(async afterSeq=>{
+          const to=Math.min(afterSeq+2,4);
+          return {kind:'DELTA' as const,batch:batch(afterSeq,versions.slice(afterSeq,to)
+            .map((value,index)=>change(afterSeq+index+1,value)),to)};
+        }),
+      });
+      const sync=coordinator({store,transport:wire});
+      await sync.restore();
+      await sync.startup();
+      expect(store.current?.appliedSeq).toBe(3);
+      expect(sync.getSnapshot().state).toBe('BEHIND');
+      expect(vi.getTimerCount()).toBe(1);
+      await vi.runOnlyPendingTimersAsync();
+      expect(store.current?.appliedSeq).toBe(4);
+      expect(sync.getSnapshot()).toMatchObject({state:'READY',headSeq:4,appliedSeq:4});
+      expect(wire.readHead).toHaveBeenCalledTimes(3);
+      expect(vi.getTimerCount()).toBe(0);
+    }finally{vi.useRealTimers();}
+  });
+});
+
+function pendingContinuation(options:{unsequenced?:boolean;failure?:string}={}){
+  const atOne=entity('P1',{price:11},1);
+  const atTwo=entity('P1',{price:12},2);
+  const states=[projection(0),projection(1,entities(atOne),0),projection(2,entities(atTwo),0)];
+  let reads=0;
+  const store=new MemorySyncStore();
+  const wire=transport({
+    readHead:vi.fn(async()=>{
+      if(reads>=2&&options.failure)throw new Error(options.failure);
+      return headFor(states[Math.min(reads++,2)]!);
+    }),
+    readChanges:vi.fn(async afterSeq=>({kind:'DELTA' as const,batch:batch(afterSeq,
+      [change(afterSeq+1,afterSeq===0?atOne:atTwo)],afterSeq+1)})),
+    ackApplied:vi.fn(async ack=>{
+      if(ack.appliedSeq>=2)return;
+      for(let event=0;event<(options.unsequenced?20:1);event++)void sync.doorbellReceived({
+        type:'PORT_HEAD_AVAILABLE',port:'SMT',observedAt:'2026-10-02T06:01:00.000Z',
+        ...(options.unsequenced?{}:{advertisedHeadSeq:ack.appliedSeq+1}),
+      });
+    }),
+  });
+  const sync=coordinator({store,transport:wire});
+  return {sync,store,wire};
+}
+
+describe('MFP V3 yielded continuation boundaries',()=>{
+  it('coalesces repeated headless invalidations during both ACKs into one continuation',async()=>{
+    vi.useFakeTimers();
+    try{
+      const {sync,store,wire}=pendingContinuation({unsequenced:true});
+      await sync.startup();
+      expect(vi.getTimerCount()).toBe(1);
+      await vi.runOnlyPendingTimersAsync();
+      expect(store.current?.appliedSeq).toBe(2);
+      expect(sync.getSnapshot().state).toBe('READY');
+      expect(wire.readHead).toHaveBeenCalledTimes(3);
+      expect(vi.getTimerCount()).toBe(0);
+    }finally{vi.useRealTimers();}
+  });
+
+  it('cancels the queued continuation while offline and recovers on reconnect',async()=>{
+    vi.useFakeTimers();
+    try{
+      const {sync,store,wire}=pendingContinuation();
+      await sync.startup();
+      expect(vi.getTimerCount()).toBe(1);
+      sync.networkOffline();
+      expect(vi.getTimerCount()).toBe(0);
+      await vi.advanceTimersByTimeAsync(24*60*60*1000);
+      expect(wire.readHead).toHaveBeenCalledTimes(2);
+      expect(sync.getSnapshot()).toMatchObject({state:'OFFLINE',appliedSeq:1});
+      await sync.networkOnline();
+      expect(store.current?.appliedSeq).toBe(2);
+      expect(sync.getSnapshot().state).toBe('READY');
+    }finally{vi.useRealTimers();}
+  });
+
+  it('coalesces a manual catch-up with the pending continuation',async()=>{
+    vi.useFakeTimers();
+    try{
+      const {sync,wire}=pendingContinuation();
+      await sync.startup();
+      expect(vi.getTimerCount()).toBe(1);
+      await sync.manualCatchUp();
+      expect(sync.getSnapshot()).toMatchObject({state:'READY',appliedSeq:2});
+      expect(vi.getTimerCount()).toBe(0);
+      await vi.advanceTimersByTimeAsync(24*60*60*1000);
+      expect(wire.readHead).toHaveBeenCalledTimes(3);
+    }finally{vi.useRealTimers();}
+  });
+
+  it.each([
+    ['MFP_DEVICE_REVOKED','ERROR'],
+    ['SIMULATED_TRANSPORT_FAILURE','RECOVERING'],
+  ])('preserves LKG and stops without auto-retry when continuation fails with %s',async(failure,state)=>{
+    vi.useFakeTimers();
+    try{
+      const {sync,store,wire}=pendingContinuation({failure});
+      await sync.startup();
+      const lkg=store.current;
+      await vi.runOnlyPendingTimersAsync();
+      expect(store.current).toBe(lkg);
+      expect(sync.getSnapshot()).toMatchObject({state,appliedSeq:1,lastError:failure});
+      expect(vi.getTimerCount()).toBe(0);
+      await vi.advanceTimersByTimeAsync(24*60*60*1000);
+      expect(wire.readHead).toHaveBeenCalledTimes(3);
+    }finally{vi.useRealTimers();}
+  });
+
+  it('does not poll when canonical HEAD stays behind a previously returned tail',async()=>{
+    vi.useFakeTimers();
+    try{
+      const before=projection(1,entities(entity('P1',{price:10},1)),0);
+      const atTwo=entity('P1',{price:11},2);
+      const atThree=entity('P1',{price:12},3);
+      const store=new MemorySyncStore(before);
+      const wire=transport({
+        readHead:vi.fn(async()=>headFor(projection(2,entities(atTwo),0))),
+        readChanges:vi.fn(async()=>({kind:'DELTA' as const,batch:batch(1,[change(2,atTwo),change(3,atThree)],3)})),
+      });
+      const sync=coordinator({store,transport:wire});
+      await sync.restore();
+      await sync.startup();
+      expect(store.current).toMatchObject({appliedSeq:2,entities:entities(atTwo)});
+      expect(sync.getSnapshot()).toMatchObject({state:'BEHIND',headSeq:2,appliedSeq:2});
+      expect(vi.getTimerCount()).toBe(0);
+      await vi.advanceTimersByTimeAsync(24*60*60*1000);
+      expect(wire.readHead).toHaveBeenCalledTimes(2);
+    }finally{vi.useRealTimers();}
+  });
+});
+
+describe('MFP V3 same-store canonical HEAD monotonicity',()=>{
+  it('rejects a regressive HEAD before checkpoint rollback and recovers on a later fresh HEAD',async()=>{
+    const before=projection(5,entities(entity('P1',{price:500},5)),5);
+    const older=entities(entity('P1',{price:400},4));
+    const staleCheckpoint=checkpoint(4,older);
+    const next=entity('P1',{price:600},6);
+    const after=projection(6,entities(next),5);
+    const store=new MemorySyncStore(before);
+    const wire=transport({
+      readHead:vi.fn()
+        .mockResolvedValueOnce(headFor(projection(4,older,4),{checkpointHash:staleCheckpoint.checkpointHash}))
+        .mockResolvedValue(headFor(after)),
+      readCheckpoint:vi.fn(async()=>staleCheckpoint),
+      readChanges:vi.fn(async()=>({kind:'DELTA' as const,batch:batch(5,[change(6,next)],6)})),
+    });
+    const sync=coordinator({store,transport:wire});
+    await sync.restore();
+    await expect(sync.startup()).rejects.toThrow('MFP_SYNC_HEAD_REGRESSION');
+    expect(store.current).toBe(before);
+    expect(store.commits).toHaveLength(0);
+    expect(wire.readCheckpoint).not.toHaveBeenCalled();
+    expect(wire.readChanges).not.toHaveBeenCalled();
+    expect(wire.ackApplied).not.toHaveBeenCalled();
+    expect(sync.getSnapshot()).toMatchObject({state:'RECOVERING',appliedSeq:5,lkgAvailable:true,lastError:'MFP_SYNC_HEAD_REGRESSION'});
+    await sync.manualCatchUp();
+    expect(store.current).toMatchObject({appliedSeq:6,entities:entities(next)});
+    expect(sync.getSnapshot()).toMatchObject({state:'READY',headSeq:6,appliedSeq:6,lastError:null});
+  });
+
+  it('preserves the just-committed prefix when the second catch-up HEAD regresses',async()=>{
+    vi.useFakeTimers();
+    try{
+      const original=entity('P1',{price:100},1);
+      const next=entity('P1',{price:200},2);
+      const before=projection(1,entities(original),1);
+      const newer=projection(2,entities(next),1);
+      const staleCheckpoint=checkpoint(1,entities(original));
+      const store=new MemorySyncStore(before);
+      const wire=transport({
+        readHead:vi.fn().mockResolvedValueOnce(headFor(newer))
+          .mockResolvedValue(headFor(before,{checkpointHash:staleCheckpoint.checkpointHash})),
+        readChanges:vi.fn(async()=>({kind:'DELTA' as const,batch:batch(1,[change(2,next)],2)})),
+        readCheckpoint:vi.fn(async()=>staleCheckpoint),
+        ackApplied:vi.fn(async()=>{
+          void sync.doorbellReceived({type:'PORT_HEAD_AVAILABLE',port:'SMT',advertisedHeadSeq:3,
+            observedAt:'2026-10-02T06:01:00.000Z'});
+        }),
+      });
+      const sync=coordinator({store,transport:wire});
+      await sync.restore();
+      await expect(sync.startup()).rejects.toThrow('MFP_SYNC_HEAD_REGRESSION');
+      expect(store.current).toMatchObject({appliedSeq:2,entities:entities(next)});
+      expect(store.commits.map(value=>value.appliedSeq)).toEqual([2]);
+      expect(wire.readCheckpoint).not.toHaveBeenCalled();
+      expect(wire.ackApplied).toHaveBeenCalledTimes(1);
+      expect(sync.getSnapshot()).toMatchObject({state:'RECOVERING',appliedSeq:2,lastError:'MFP_SYNC_HEAD_REGRESSION'});
+      expect(vi.getTimerCount()).toBe(0);
+      await vi.advanceTimersByTimeAsync(24*60*60*1000);
+      expect(wire.readHead).toHaveBeenCalledTimes(2);
+    }finally{vi.useRealTimers();}
+  });
+});

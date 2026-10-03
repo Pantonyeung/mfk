@@ -35,6 +35,7 @@ on:
       - 'docs/acceptance/MFP_V3_A9_PHYSICAL_ACCEPTANCE_RUNBOOK_2026-10-02.md'
       - 'docs/acceptance/MFP_V3_A9_SOURCE_BINDING_AUDIT_2026-10-02.md'
       - '.github/workflows/v3smt-a0-foundation.yml'
+      - '.github/scripts/test-v3smt-guards.mjs'
   pull_request:
     paths:
       - '.github/mfk-change-manifest.json'
@@ -57,6 +58,7 @@ on:
       - 'docs/acceptance/MFP_V3_A9_PHYSICAL_ACCEPTANCE_RUNBOOK_2026-10-02.md'
       - 'docs/acceptance/MFP_V3_A9_SOURCE_BINDING_AUDIT_2026-10-02.md'
       - '.github/workflows/v3smt-a0-foundation.yml'
+      - '.github/scripts/test-v3smt-guards.mjs'
 
 permissions:
   contents: read
@@ -70,6 +72,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+      - name: Guard enforcement regression tests
+        run: node --test .github/scripts/test-v3smt-guards.mjs
       - name: Install
         working-directory: v3smt
         run: npm install --ignore-scripts --no-audit --no-fund
@@ -86,15 +90,48 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ! grep -RInE --include='*.ts' --include='*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'setInterval\s*\(' v3smt/src
-          ! grep -RInE --include='*.ts' --include='*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'from .*(v2local|v2smm)' v3smt/src
-          ! grep -RInE --include='*.ts' --include='*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'SMM_INTENT_STORE|SMM.{0,20}HeadSeq|x-mfk-smm-session|mfk-smm-web' v3smt/src
-          ! grep -RInE 'SMM_INTENT_STORE|SMM.{0,20}HeadSeq|x-mfk-smm-session|mfk-smm-web' v3smt/dist
-          ! grep -RInE --include='*.ts' --include='*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'console\.(log|info|warn|error).*\b(pin|proof|staffSessionRef|session)\b' v3smt/src
-          ! grep -RInE --include='*.ts' --include='*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' '(URLSearchParams|searchParams).*\b(staffSessionRef|session)\b' v3smt/src
-          ! grep -RInE --include='*.ts' --include='*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'localStorage.*\b(pin|proof|staffSessionRef|session)\b' v3smt/src
-          ! find v3smt -maxdepth 2 -iname 'wrangler*' | grep .
-          ! grep -RInE 'wrangler deploy|cloudflare deploy|workers_dev' v3smt
+          # grep returns 0 for a forbidden match, 1 for absence, and >1 on error.
+          # Explicit exits are required: bash errexit does not enforce !/if guards.
+          reject_matches() {
+            local status
+            if "$@"; then
+              printf 'Forbidden content detected by guard: ' >&2
+              printf '%q ' "$@" >&2
+              printf '\n' >&2
+              exit 1
+            else
+              status=$?
+              if (( status != 1 )); then
+                printf 'Guard scan failed (exit %s): ' "$status" >&2
+                printf '%q ' "$@" >&2
+                printf '\n' >&2
+                exit "$status"
+              fi
+            fi
+          }
+          reject_matches grep -RInE --include='*.ts' --include='*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'setInterval\s*\(' v3smt/src
+          reject_matches grep -RInE --include='*.ts' --include='*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'from .*(v2local|v2smm)' v3smt/src
+          reject_matches grep -RInE --include='*.ts' --include='*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'SMM_INTENT_STORE|SMM.{0,20}HeadSeq|x-mfk-smm-session|mfk-smm-web' v3smt/src
+          reject_matches grep -RInE 'SMM_INTENT_STORE|SMM.{0,20}HeadSeq|x-mfk-smm-session|mfk-smm-web' v3smt/dist
+          reject_matches grep -RInE --include='*.ts' --include='*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'console\.(log|info|warn|error).*\b(pin|proof|staffSessionRef|session)\b' v3smt/src
+          reject_matches grep -RInE --include='*.ts' --include='*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' '(URLSearchParams|searchParams).*\b(staffSessionRef|session)\b' v3smt/src
+          reject_matches grep -RInE --include='*.ts' --include='*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'localStorage.*\b(pin|proof|staffSessionRef|session)\b' v3smt/src
+          # Keep deployment filenames forbidden at every depth, including outputs.
+          # Assignment preserves find errors instead of hiding them in !/pipelines.
+          wrangler_paths=$(find v3smt -iname 'wrangler*' -print)
+          if [[ -n "$wrangler_paths" ]]; then
+            printf 'Forbidden deployment configuration:\n%s\n' "$wrangler_paths" >&2
+            exit 1
+          fi
+          # Only source assertion fixtures may mention forbidden deployment text.
+          # All other paths (config, dependencies and dist) keep the full scan,
+          # including hidden files and files that happen to have test suffixes.
+          reject_matches grep -RInE --exclude='*.test.ts' --exclude='*.test.tsx' 'wrangler deploy|cloudflare deploy|workers_dev' v3smt/src
+          for deploy_path in v3smt/* v3smt/.[!.]* v3smt/..?*; do
+            [[ -e "$deploy_path" || -L "$deploy_path" ]] || continue
+            [[ "$deploy_path" != v3smt/src ]] || continue
+            reject_matches grep -RInE 'wrangler deploy|cloudflare deploy|workers_dev' "$deploy_path"
+          done
           grep -RInF "formalTransaction:'STORE_KERNEL'" v3smt/src/state-authority.ts
           grep -RInF "pricing:'STORE_KERNEL'" v3smt/src/state-authority.ts
           grep -RInF 'createMfpSurfacePorts' v3smt/src/store-kernel-port.ts
@@ -109,10 +146,10 @@ jobs:
           grep -RInF 'createMfpSyncSurfacePorts' v3smt/src/sync-port.ts
           grep -RInF 'sync.resumed()' v3smt/src/sync-runtime.ts
           grep -RInF "durableProjection:'DEXIE_ATOMIC_LKG_BUNDLE_ONLY'" v3smt/src/state-authority.ts
-          ! grep -RInE --include='*.ts' --include='*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'doorbell\.(payload|entities|projection)' v3smt/src
-          ! grep -RInE --include='ordering-*.ts' --include='ordering-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' '\bfetch\s*\(|new[[:space:]]+WebSocket\s*\(|setInterval\s*\(|readHead\s*\(|readChanges\s*\(|readCheckpoint\s*\(' v3smt/src
-          ! grep -RInE --include='ordering-*.ts' --include='ordering-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'from .*(v2local|v2smm)|SMM_INTENT_STORE|SMM.{0,20}HeadSeq|x-mfk-smm-session|mfk-smm-web' v3smt/src
-          ! grep -RInE --include='ordering-domain.ts' '\b(orderId|displayNumber|paymentState|fulfillmentState|printState|COMMITTED)\b' v3smt/src
+          reject_matches grep -RInE --include='*.ts' --include='*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'doorbell\.(payload|entities|projection)' v3smt/src
+          reject_matches grep -RInE --include='ordering-*.ts' --include='ordering-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' '\bfetch\s*\(|new[[:space:]]+WebSocket\s*\(|setInterval\s*\(|readHead\s*\(|readChanges\s*\(|readCheckpoint\s*\(' v3smt/src
+          reject_matches grep -RInE --include='ordering-*.ts' --include='ordering-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'from .*(v2local|v2smm)|SMM_INTENT_STORE|SMM.{0,20}HeadSeq|x-mfk-smm-session|mfk-smm-web' v3smt/src
+          reject_matches grep -RInE --include='ordering-domain.ts' '\b(orderId|displayNumber|paymentState|fulfillmentState|printState|COMMITTED)\b' v3smt/src
           grep -RInF "pricing:'LOCAL_PREVIEW_FROM_PUBLISHED_FACTS'" v3smt/src/ordering-domain.ts
           grep -RInF 'createMfpOrderingSurfaceDomains' v3smt/src/ordering-domain.ts
           grep -RInF 'projectionStore.readActive()' v3smt/src/ordering-runtime.tsx
@@ -125,9 +162,9 @@ jobs:
           grep -RInF 'ELECTRONIC_UNCLASSIFIED' v3smt/src/money-domain.ts
           grep -RInF "reportVersion:'1.0'" v3smt/src/money-domain.ts
           grep -RInF 'appendMfpDailyReportAdjustment' v3smt/src/money-domain.ts
-          ! grep -RInE --include='checkout-*.ts' --include='checkout-*.tsx' --include='money-*.ts' --include='money-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' '\bfetch\s*\(|new[[:space:]]+WebSocket\s*\(|setInterval\s*\(' v3smt/src
-          ! grep -RInE --include='checkout-*.ts' --include='checkout-*.tsx' --include='money-*.ts' --include='money-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'from .*(v2local|v2smm)|localStorage|sessionStorage' v3smt/src
-          ! grep -RInE --include='checkout-*.ts' --include='checkout-*.tsx' --include='money-*.ts' --include='money-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'class[[:space:]]+[A-Za-z0-9_]*(Pricing|Payment|Order|Print|BusinessDay)(Engine|Authority)' v3smt/src
+          reject_matches grep -RInE --include='checkout-*.ts' --include='checkout-*.tsx' --include='money-*.ts' --include='money-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' '\bfetch\s*\(|new[[:space:]]+WebSocket\s*\(|setInterval\s*\(' v3smt/src
+          reject_matches grep -RInE --include='checkout-*.ts' --include='checkout-*.tsx' --include='money-*.ts' --include='money-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'from .*(v2local|v2smm)|localStorage|sessionStorage' v3smt/src
+          reject_matches grep -RInE --include='checkout-*.ts' --include='checkout-*.tsx' --include='money-*.ts' --include='money-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'class[[:space:]]+[A-Za-z0-9_]*(Pricing|Payment|Order|Print|BusinessDay)(Engine|Authority)' v3smt/src
           grep -RInF "orderOperations:'STORE_KERNEL_CANONICAL_READBACK'" v3smt/src/state-authority.ts
           grep -RInF "availabilityCapacity:'STORE_KERNEL_CANONICAL_READBACK'" v3smt/src/state-authority.ts
           grep -RInF 'createMfpOrderOperationSession' v3smt/src/order-operations-domain.ts
@@ -136,10 +173,10 @@ jobs:
           grep -RInF 'refetchInterval:false' v3smt/src/order-operations-runtime.tsx
           grep -RInF 'data-order-operations-contract="SHARED_PAD_MOBILE"' v3smt/src/order-operations-workspace.tsx
           grep -RInF '<MfpApplicationRuntime' v3smt/src/App.tsx
-          ! grep -RInE --include='order-operations-*.ts' --include='order-operations-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' '\bfetch\s*\(|new[[:space:]]+WebSocket\s*\(|setInterval\s*\(|localStorage|sessionStorage' v3smt/src
-          ! grep -RInE --include='order-operations-*.ts' --include='order-operations-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'from .*(v2local|v2smm)|SMM_INTENT_STORE|SMM.{0,20}HeadSeq|x-mfk-smm-session|mfk-smm-web' v3smt/src
-          ! grep -RInE --include='order-operations-*.ts' --include='order-operations-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'class[[:space:]]+[A-Za-z0-9_]*(Order|Pricing|Payment|Print|Availability|Capacity)(Engine|Authority)' v3smt/src
-          ! grep -RInF "commandType:'ORDER_CREATE'" v3smt/src/order-operations-domain.ts
+          reject_matches grep -RInE --include='order-operations-*.ts' --include='order-operations-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' '\bfetch\s*\(|new[[:space:]]+WebSocket\s*\(|setInterval\s*\(|localStorage|sessionStorage' v3smt/src
+          reject_matches grep -RInE --include='order-operations-*.ts' --include='order-operations-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'from .*(v2local|v2smm)|SMM_INTENT_STORE|SMM.{0,20}HeadSeq|x-mfk-smm-session|mfk-smm-web' v3smt/src
+          reject_matches grep -RInE --include='order-operations-*.ts' --include='order-operations-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'class[[:space:]]+[A-Za-z0-9_]*(Order|Pricing|Payment|Print|Availability|Capacity)(Engine|Authority)' v3smt/src
+          reject_matches grep -RInF "commandType:'ORDER_CREATE'" v3smt/src/order-operations-domain.ts
           grep -RInF "printJobs:'STORE_KERNEL_PRINT_ROUTER_DURABLE_PRINT_JOB_READBACK'" v3smt/src/state-authority.ts
           grep -RInF "printTransport:'ANDROID_CARRIER_DURABLE_GATEWAY_READBACK'" v3smt/src/state-authority.ts
           grep -RInF 'createMfpPrintHardwareSession' v3smt/src/print-hardware-domain.ts
@@ -150,9 +187,9 @@ jobs:
           grep -RInF 'refetchInterval:false' v3smt/src/print-hardware-runtime.tsx v3smt/src/print-hardware-workspace.tsx
           grep -RInF 'data-print-hardware-contract="SHARED_PAD_MOBILE"' v3smt/src/print-hardware-workspace.tsx
           grep -RInF 'Transport Evidence ≠ Physical Paper Proof' v3smt/src/print-hardware-workspace.tsx
-          ! grep -RInE --include='print-hardware-*.ts' --include='print-hardware-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' '\bfetch\s*\(|new[[:space:]]+WebSocket\s*\(|setInterval\s*\(|localStorage|sessionStorage' v3smt/src
-          ! grep -RInE --include='print-hardware-*.ts' --include='print-hardware-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'from .*(v2local|v2smm)|SMM_INTENT_STORE|SMM.{0,20}HeadSeq|x-mfk-smm-session|mfk-smm-web' v3smt/src
-          ! grep -RInE --include='print-hardware-*.ts' --include='print-hardware-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'class[[:space:]]+[A-Za-z0-9_]*(Print|Order|Payment|Pricing)(Engine|Authority)' v3smt/src
+          reject_matches grep -RInE --include='print-hardware-*.ts' --include='print-hardware-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' '\bfetch\s*\(|new[[:space:]]+WebSocket\s*\(|setInterval\s*\(|localStorage|sessionStorage' v3smt/src
+          reject_matches grep -RInE --include='print-hardware-*.ts' --include='print-hardware-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'from .*(v2local|v2smm)|SMM_INTENT_STORE|SMM.{0,20}HeadSeq|x-mfk-smm-session|mfk-smm-web' v3smt/src
+          reject_matches grep -RInE --include='print-hardware-*.ts' --include='print-hardware-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'class[[:space:]]+[A-Za-z0-9_]*(Print|Order|Payment|Pricing)(Engine|Authority)' v3smt/src
           grep -RInF "externalIntent:'SERVER_PROVIDER_ADAPTER_CANONICAL_READBACK'" v3smt/src/state-authority.ts
           grep -RInF "externalFormalAdmission:'STORE_KERNEL'" v3smt/src/state-authority.ts
           grep -RInF "externalPaymentEvidence:'EVIDENCE_ONLY_NOT_PAYMENT_TRUTH'" v3smt/src/state-authority.ts
@@ -166,11 +203,11 @@ jobs:
           grep -RInF 'QRCode.toDataURL' v3smt/src/external-runtime.tsx
           grep -RInF 'data-external-surface={surface}' v3smt/src/external-runtime.tsx
           grep -RInF '<MfpExternalRuntime' v3smt/src/order-operations-runtime.tsx
-          if grep -RInE --include='external-*.ts' --include='external-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' '\bfetch\s*\(|setInterval\s*\(|visibilitychange|addEventListener\([^)]*focus|localStorage|sessionStorage' v3smt/src; then exit 1; fi
-          if grep -RInE --include='external-*.ts' --include='external-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'from .*(v2local|v2smm)|SMM_INTENT_STORE|SMM.{0,20}HeadSeq|x-mfk-smm-session|mfk-smm-web' v3smt/src; then exit 1; fi
-          if grep -RInE --include='external-*.ts' --include='external-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'class[[:space:]]+[A-Za-z0-9_]*(Order|Payment|Refund|Print|Capacity)(Engine|Authority)' v3smt/src; then exit 1; fi
-          if grep -RInE --include='external-*.ts' --include='external-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' '(appSecret|signingKey|webhookSecret|longLivedBearer|providerBearer|Authorization:)' v3smt/src; then exit 1; fi
-          if grep -RInE --include='external-*.ts' --include='external-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' '(URLSearchParams|searchParams|console\.(log|info|warn|error)).*(secret|credential|bearer|token)' v3smt/src; then exit 1; fi
+          reject_matches grep -RInE --include='external-*.ts' --include='external-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' '\bfetch\s*\(|setInterval\s*\(|visibilitychange|addEventListener\([^)]*focus|localStorage|sessionStorage' v3smt/src
+          reject_matches grep -RInE --include='external-*.ts' --include='external-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'from .*(v2local|v2smm)|SMM_INTENT_STORE|SMM.{0,20}HeadSeq|x-mfk-smm-session|mfk-smm-web' v3smt/src
+          reject_matches grep -RInE --include='external-*.ts' --include='external-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'class[[:space:]]+[A-Za-z0-9_]*(Order|Payment|Refund|Print|Capacity)(Engine|Authority)' v3smt/src
+          reject_matches grep -RInE --include='external-*.ts' --include='external-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' '(appSecret|signingKey|webhookSecret|longLivedBearer|providerBearer|Authorization:)' v3smt/src
+          reject_matches grep -RInE --include='external-*.ts' --include='external-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' '(URLSearchParams|searchParams|console\.(log|info|warn|error)).*(secret|credential|bearer|token)' v3smt/src
           grep -RInF "target:'MFP_V3'" v3smt/vite.config.ts
           grep -RInF 'build-identity.json' v3smt/vite.config.ts
           grep -RInF "APP_ORIGIN='https://appassets.androidplatform.net'" v3smt/src/a9-runtime.ts
@@ -185,9 +222,9 @@ jobs:
           grep -RInF 'data-check-center="A9"' v3smt/src/check-center.tsx
           grep -RInF "status:'BLOCKED' as const" v3smt/src/a9-runtime.ts
           grep -RInF 'MFP_A9_PHYSICAL_GATES' v3smt/src/a9-acceptance.ts
-          ! grep -RInE --include='a9-*.ts' --include='check-center.tsx' 'from .*(v2local|v2smm)|store\.kernel\.commit\.v1|runtime\.update\.activate|runtime\.rollback|print\.(sunmi|lan)\.dispatch' v3smt/src
-          ! grep -RInE --include='a9-*.ts' --include='check-center.tsx' 'console\.(log|info|warn|error)|staffSessionRef|providerSecret|paymentEvidence' v3smt/src
-          ! grep -RInE --include='a9-*.ts' --include='check-center.tsx' 'setInterval\s*\(' v3smt/src
+          reject_matches grep -RInE --include='a9-*.ts' --include='check-center.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'from .*(v2local|v2smm)|store\.kernel\.commit\.v1|runtime\.update\.activate|runtime\.rollback|print\.(sunmi|lan)\.dispatch' v3smt/src
+          reject_matches grep -RInE --include='a9-*.ts' --include='check-center.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'console\.(log|info|warn|error)|staffSessionRef|providerSecret|paymentEvidence' v3smt/src
+          reject_matches grep -RInE --include='a9-*.ts' --include='check-center.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'setInterval\s*\(' v3smt/src
           test -s v3smt/dist/build-identity.json
           grep -F 'Cache-Control: no-store' v3smt/dist/_headers
 
@@ -205,4 +242,4 @@ jobs:
           gradle-version: '9.3.1'
       - name: Formal router native tests
         working-directory: carrier/android
-        run: gradle :app:testDebugUnitTest -x verifySmtWebBundle --tests 'com.morefunos.smt.storekernel.business.*' --tests 'com.morefunos.smt.storekernel.StoreKernelFormalReceiptTest' --no-daemon
+        run: gradle :app:testDebugUnitTest -x verifySmtWebBundle --tests 'com.morefunos.smt.storekernel.business.*' --tests 'com.morefunos.smt.storekernel.StoreKernelFormalReceiptTest' --tests 'com.morefunos.smt.storekernel.StoreKernelA9DiagnosticsContractTest' --no-daemon

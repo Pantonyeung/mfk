@@ -1,0 +1,5 @@
+{
+  "type": "store.kernel.health.v1",
+  "requestId": "mfp-v3-diagnostic-contract",
+  "protocolVersion": 1
+}
