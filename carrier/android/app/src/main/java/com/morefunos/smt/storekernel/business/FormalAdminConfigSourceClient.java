@@ -47,6 +47,7 @@ public final class FormalAdminConfigSourceClient {
         public final long sourceRevision;
         public final String sourceFingerprint;
         public final long aggregateRevision;
+        public final long tenderPolicyAggregateRevision;
         public final boolean replayed;
 
         private FetchResult(
@@ -54,17 +55,19 @@ public final class FormalAdminConfigSourceClient {
             long sourceRevision,
             String sourceFingerprint,
             long aggregateRevision,
+            long tenderPolicyAggregateRevision,
             boolean replayed
         ) {
             this.activePresent = activePresent;
             this.sourceRevision = sourceRevision;
             this.sourceFingerprint = sourceFingerprint;
             this.aggregateRevision = aggregateRevision;
+            this.tenderPolicyAggregateRevision = tenderPolicyAggregateRevision;
             this.replayed = replayed;
         }
 
         static FetchResult missing() {
-            return new FetchResult(false, 0, null, 0, false);
+            return new FetchResult(false, 0, null, 0, 0, false);
         }
 
         static FetchResult applied(FormalAdminConfigProducer.ApplyResult result) {
@@ -73,6 +76,7 @@ public final class FormalAdminConfigSourceClient {
                 result.sourceRevision,
                 result.sourceFingerprint,
                 result.aggregateRevision,
+                result.tenderPolicyAggregateRevision,
                 result.replayed
             );
         }

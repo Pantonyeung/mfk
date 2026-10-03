@@ -14,15 +14,19 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 
 /** Applies the canonical Admin active envelope to the existing Store Kernel database. */
 public final class FormalAdminConfigProducer {
     public static final String AGGREGATE_TYPE = "ADMIN_ACTIVE_CONFIGURATION";
+    public static final String TENDER_POLICY_AGGREGATE_TYPE = "POS_TENDER_POLICY";
+    public static final String TENDER_POLICY_SCHEMA = "mfp.pos-tender-policy.v1";
     public static final String SCHEMA = "MFK_ADMIN_CONFIG_SYNC_V1";
 
     private static final String OPERATION_ID = "STORE_KERNEL_ADMIN_CONFIG_PRODUCER";
@@ -52,19 +56,25 @@ public final class FormalAdminConfigProducer {
                 .put("type", StoreKernelContract.AGGREGATE_SNAPSHOT)
                 .put("requestId", requestId)
                 .put("storeId", storeId)
-                .put("keys", new JSONArray().put(new JSONObject()
-                    .put("aggregateType", AGGREGATE_TYPE)
-                    .put("aggregateId", storeId))));
+                .put("keys", new JSONArray()
+                    .put(new JSONObject()
+                        .put("aggregateType", AGGREGATE_TYPE)
+                        .put("aggregateId", storeId))
+                    .put(new JSONObject()
+                        .put("aggregateType", TENDER_POLICY_AGGREGATE_TYPE)
+                        .put("aggregateId", storeId))));
         } catch (JSONException impossible) {
             throw new IllegalStateException("ADMIN_CONFIG_SNAPSHOT_REQUEST_ENCODING_FAILED", impossible);
         }
         return coordinator.snapshot(snapshotRequest).thenCompose(snapshot -> {
-            if (snapshot.items.size() != 1) return failed("ADMIN_CONFIG_SNAPSHOT_INVALID");
+            if (snapshot.items.size() != 2) return failed("ADMIN_CONFIG_SNAPSHOT_INVALID");
             final StoreKernelTransactionCoordinator.AggregateSnapshotItem current = snapshot.items.get(0);
+            final StoreKernelTransactionCoordinator.AggregateSnapshotItem currentTender = snapshot.items.get(1);
+            boolean activeEnvelopeAlreadyStored = false;
             if (current.found) {
                 final Envelope active;
                 try {
-                    active = parseEnvelope(current.stateJson, storeId);
+                    active = parseEnvelope(current.stateJson, storeId, false);
                 } catch (RuntimeException error) {
                     return failed("ADMIN_CONFIG_STORED_STATE_INVALID");
                 }
@@ -75,15 +85,26 @@ public final class FormalAdminConfigProducer {
                     if (!envelope.fingerprint.equals(active.fingerprint)) {
                         return failed("ADMIN_CONFIG_SOURCE_REVISION_CONFLICT");
                     }
-                    return CompletableFuture.completedFuture(new ApplyResult(
-                        envelope.sourceRevision,
-                        envelope.fingerprint,
-                        current.revision,
-                        true
-                    ));
+                    activeEnvelopeAlreadyStored = true;
+                    if (tenderProjectionCurrent(currentTender, envelope)) {
+                        return CompletableFuture.completedFuture(new ApplyResult(
+                            envelope.sourceRevision,
+                            envelope.fingerprint,
+                            current.revision,
+                            currentTender.revision,
+                            true
+                        ));
+                    }
                 }
             }
-            return commit(envelope, current.revision, observedAt).handle((result, error) -> {
+            validateTenderPolicyTransition(currentTender, envelope);
+            return commit(
+                envelope,
+                current.revision,
+                currentTender.revision,
+                !activeEnvelopeAlreadyStored,
+                observedAt
+            ).handle((result, error) -> {
                 if (error == null) return CompletableFuture.completedFuture(result);
                 if (remainingRetries > 0 && isAggregateRevisionConflict(error)) {
                     return applyEnvelope(envelope, observedAt, remainingRetries - 1);
@@ -93,16 +114,39 @@ public final class FormalAdminConfigProducer {
         });
     }
 
-    private CompletableFuture<ApplyResult> commit(Envelope envelope, long expectedRevision, String observedAt) {
+    private CompletableFuture<ApplyResult> commit(
+        Envelope envelope,
+        long expectedRevision,
+        long expectedTenderRevision,
+        boolean writeAdminEnvelope,
+        String observedAt
+    ) {
         try {
-            final long nextRevision = Math.addExact(expectedRevision, 1);
-            final String commandId = "ADMIN-CONFIG-" + envelope.fingerprint;
+            final long nextRevision = writeAdminEnvelope
+                ? Math.addExact(expectedRevision, 1)
+                : expectedRevision;
+            final long nextTenderRevision = Math.addExact(expectedTenderRevision, 1);
+            final String commandId = "ADMIN-CONFIG-POS-TENDER-" + envelope.fingerprint;
             final JSONObject result = new JSONObject()
                 .put("schema", "mfp.admin-config.apply.result.v1")
                 .put("storeId", storeId)
                 .put("sourceRevision", envelope.sourceRevision)
                 .put("sourceFingerprint", envelope.fingerprint)
-                .put("aggregateRevision", nextRevision);
+                .put("aggregateRevision", nextRevision)
+                .put("tenderPolicyAggregateRevision", nextTenderRevision);
+            final JSONArray mutations = new JSONArray();
+            if (writeAdminEnvelope) {
+                mutations.put(new JSONObject()
+                    .put("aggregateType", AGGREGATE_TYPE)
+                    .put("aggregateId", storeId)
+                    .put("expectedRevision", expectedRevision)
+                    .put("state", new JSONObject(envelope.normalizedJson)));
+            }
+            mutations.put(new JSONObject()
+                .put("aggregateType", TENDER_POLICY_AGGREGATE_TYPE)
+                .put("aggregateId", storeId)
+                .put("expectedRevision", expectedTenderRevision)
+                .put("state", projectedTenderPolicy(envelope, nextTenderRevision)));
             final JSONObject rawCommit = new JSONObject()
                 .put("protocolVersion", StoreKernelContract.PROTOCOL_VERSION)
                 .put("type", StoreKernelContract.COMMIT)
@@ -115,17 +159,14 @@ public final class FormalAdminConfigProducer {
                 .put("result", result)
                 .put("traceId", "TRACE-" + commandId)
                 .put("committedAt", observedAt)
-                .put("mutations", new JSONArray().put(new JSONObject()
-                    .put("aggregateType", AGGREGATE_TYPE)
-                    .put("aggregateId", storeId)
-                    .put("expectedRevision", expectedRevision)
-                    .put("state", new JSONObject(envelope.normalizedJson))))
+                .put("mutations", mutations)
                 .put("outbox", new JSONArray());
             final StoreKernelContract.CommitRequest request = StoreKernelContract.parseCommit(rawCommit);
             return coordinator.commit(request).thenApply(committed -> new ApplyResult(
                 envelope.sourceRevision,
                 envelope.fingerprint,
                 nextRevision,
+                nextTenderRevision,
                 committed.replayed
             ));
         } catch (ArithmeticException error) {
@@ -136,6 +177,14 @@ public final class FormalAdminConfigProducer {
     }
 
     private static Envelope parseEnvelope(String rawEnvelope, String expectedStoreId) {
+        return parseEnvelope(rawEnvelope, expectedStoreId, true);
+    }
+
+    private static Envelope parseEnvelope(
+        String rawEnvelope,
+        String expectedStoreId,
+        boolean tenderPolicyRequired
+    ) {
         if (rawEnvelope == null || rawEnvelope.trim().isEmpty()) {
             throw new IllegalArgumentException("ADMIN_CONFIG_ENVELOPE_INVALID");
         }
@@ -163,6 +212,10 @@ public final class FormalAdminConfigProducer {
                 throw new IllegalArgumentException("ADMIN_CONFIG_CATALOG_REQUIRED");
             }
             final JSONObject snapshot = new JSONObject(rawSnapshot.toString());
+            final Object rawTenderPolicy = snapshot.opt("posTenders");
+            final TenderPolicy tenderPolicy = rawTenderPolicy == null && !tenderPolicyRequired
+                ? new TenderPolicy(0, new JSONArray())
+                : parseTenderPolicy(rawTenderPolicy);
             final JSONObject base = new JSONObject()
                 .put("schema", SCHEMA)
                 .put("storeId", storeId)
@@ -175,10 +228,125 @@ public final class FormalAdminConfigProducer {
                 throw new IllegalArgumentException("ADMIN_CONFIG_FINGERPRINT_MISMATCH");
             }
             final JSONObject normalized = new JSONObject(base.toString()).put("fingerprint", expectedFingerprint);
-            return new Envelope(revision, expectedFingerprint, normalized.toString());
+            return new Envelope(
+                revision,
+                expectedFingerprint,
+                normalized.toString(),
+                tenderPolicy.sourceRevision,
+                tenderPolicy.tenders
+            );
         } catch (JSONException error) {
             throw new IllegalArgumentException("ADMIN_CONFIG_ENVELOPE_INVALID", error);
         }
+    }
+
+    private static TenderPolicy parseTenderPolicy(Object raw) throws JSONException {
+        if (!(raw instanceof JSONObject)) {
+            throw new IllegalArgumentException("ADMIN_CONFIG_POS_TENDER_POLICY_REQUIRED");
+        }
+        final JSONObject policy = (JSONObject) raw;
+        if (!"MFK_POS_TENDER_POLICY_V1".equals(policy.optString("schema", null))) {
+            throw new IllegalArgumentException("ADMIN_CONFIG_POS_TENDER_SCHEMA_UNSUPPORTED");
+        }
+        final long sourceRevision = positiveLong(
+            policy.opt("revision"),
+            "ADMIN_CONFIG_POS_TENDER_REVISION_INVALID"
+        );
+        final JSONArray rawTenders = policy.optJSONArray("tenders");
+        if (rawTenders == null || rawTenders.length() > 64) {
+            throw new IllegalArgumentException("ADMIN_CONFIG_POS_TENDERS_INVALID");
+        }
+        final JSONArray tenders = new JSONArray();
+        final Set<String> ids = new HashSet<>();
+        for (int index = 0; index < rawTenders.length(); index++) {
+            final JSONObject row = rawTenders.optJSONObject(index);
+            if (row == null) throw new IllegalArgumentException("ADMIN_CONFIG_POS_TENDER_INVALID");
+            final String id = identifier(row.opt("id"), "ADMIN_CONFIG_POS_TENDER_ID_INVALID", 64);
+            if (!id.matches("[A-Z][A-Z0-9_]{0,63}")) {
+                throw new IllegalArgumentException("ADMIN_CONFIG_POS_TENDER_ID_INVALID");
+            }
+            if (!ids.add(id)) throw new IllegalArgumentException("ADMIN_CONFIG_POS_TENDER_ID_DUPLICATE");
+            final String label = identifier(row.opt("label"), "ADMIN_CONFIG_POS_TENDER_LABEL_INVALID", 80);
+            final Object enabled = row.opt("enabled");
+            if (!(enabled instanceof Boolean)) {
+                throw new IllegalArgumentException("ADMIN_CONFIG_POS_TENDER_ENABLED_INVALID");
+            }
+            final String kind = identifier(row.opt("kind"), "ADMIN_CONFIG_POS_TENDER_KIND_INVALID", 16);
+            if (!"CASH".equals(kind) && !"NON_CASH".equals(kind)) {
+                throw new IllegalArgumentException("ADMIN_CONFIG_POS_TENDER_KIND_INVALID");
+            }
+            tenders.put(new JSONObject()
+                .put("id", id)
+                .put("label", label)
+                .put("enabled", enabled)
+                .put("kind", kind));
+        }
+        return new TenderPolicy(sourceRevision, tenders);
+    }
+
+    private static JSONObject projectedTenderPolicy(Envelope envelope, long aggregateRevision) throws JSONException {
+        return new JSONObject()
+            .put("schema", TENDER_POLICY_SCHEMA)
+            .put("storeId", new JSONObject(envelope.normalizedJson).getString("storeId"))
+            .put("revision", aggregateRevision)
+            .put("adminSourceRevision", envelope.sourceRevision)
+            .put("adminSourceFingerprint", envelope.fingerprint)
+            .put("adminPolicyRevision", envelope.tenderPolicySourceRevision)
+            .put("tenders", new JSONArray(envelope.tenderRows.toString()));
+    }
+
+    private static boolean tenderProjectionCurrent(
+        StoreKernelTransactionCoordinator.AggregateSnapshotItem item,
+        Envelope envelope
+    ) {
+        if (!item.found) return false;
+        try {
+            final JSONObject state = new JSONObject(item.stateJson);
+            return TENDER_POLICY_SCHEMA.equals(state.optString("schema", null))
+                && storeIdFromEnvelope(envelope).equals(state.optString("storeId", null))
+                && state.optLong("revision", -1) == item.revision
+                && state.optLong("adminSourceRevision", -1) == envelope.sourceRevision
+                && envelope.fingerprint.equals(state.optString("adminSourceFingerprint", null))
+                && state.optLong("adminPolicyRevision", -1) == envelope.tenderPolicySourceRevision
+                && envelope.tenderRows.toString().equals(state.optJSONArray("tenders").toString());
+        } catch (Exception error) {
+            return false;
+        }
+    }
+
+    private static void validateTenderPolicyTransition(
+        StoreKernelTransactionCoordinator.AggregateSnapshotItem current,
+        Envelope incoming
+    ) {
+        if (!current.found) return;
+        final JSONObject state;
+        final TenderPolicy stored;
+        try {
+            state = new JSONObject(current.stateJson);
+            if (!state.has("adminPolicyRevision")) return;
+            if (!TENDER_POLICY_SCHEMA.equals(state.optString("schema", null))
+                || !storeIdFromEnvelope(incoming).equals(state.optString("storeId", null))
+                || state.optLong("revision", -1) != current.revision) {
+                throw new IllegalArgumentException("invalid stored policy identity");
+            }
+            stored = parseTenderPolicy(new JSONObject()
+                .put("schema", "MFK_POS_TENDER_POLICY_V1")
+                .put("revision", state.opt("adminPolicyRevision"))
+                .put("tenders", state.opt("tenders")));
+        } catch (Exception invalid) {
+            throw new IllegalStateException("ADMIN_CONFIG_STORED_POS_TENDER_POLICY_INVALID");
+        }
+        if (incoming.tenderPolicySourceRevision < stored.sourceRevision) {
+            throw new IllegalStateException("ADMIN_CONFIG_POS_TENDER_SOURCE_REVISION_ROLLBACK");
+        }
+        if (incoming.tenderPolicySourceRevision == stored.sourceRevision
+            && !incoming.tenderRows.toString().equals(stored.tenders.toString())) {
+            throw new IllegalStateException("ADMIN_CONFIG_POS_TENDER_SOURCE_REVISION_CONFLICT");
+        }
+    }
+
+    private static String storeIdFromEnvelope(Envelope envelope) throws JSONException {
+        return new JSONObject(envelope.normalizedJson).getString("storeId");
     }
 
     private static String identifier(Object raw, String code, int maxLength) {
@@ -309,11 +477,31 @@ public final class FormalAdminConfigProducer {
         final long sourceRevision;
         final String fingerprint;
         final String normalizedJson;
+        final long tenderPolicySourceRevision;
+        final JSONArray tenderRows;
 
-        Envelope(long sourceRevision, String fingerprint, String normalizedJson) {
+        Envelope(
+            long sourceRevision,
+            String fingerprint,
+            String normalizedJson,
+            long tenderPolicySourceRevision,
+            JSONArray tenderRows
+        ) {
             this.sourceRevision = sourceRevision;
             this.fingerprint = fingerprint;
             this.normalizedJson = normalizedJson;
+            this.tenderPolicySourceRevision = tenderPolicySourceRevision;
+            this.tenderRows = tenderRows;
+        }
+    }
+
+    private static final class TenderPolicy {
+        final long sourceRevision;
+        final JSONArray tenders;
+
+        TenderPolicy(long sourceRevision, JSONArray tenders) {
+            this.sourceRevision = sourceRevision;
+            this.tenders = tenders;
         }
     }
 
@@ -321,12 +509,24 @@ public final class FormalAdminConfigProducer {
         public final long sourceRevision;
         public final String sourceFingerprint;
         public final long aggregateRevision;
+        public final long tenderPolicyAggregateRevision;
         public final boolean replayed;
 
         ApplyResult(long sourceRevision, String sourceFingerprint, long aggregateRevision, boolean replayed) {
+            this(sourceRevision, sourceFingerprint, aggregateRevision, 0, replayed);
+        }
+
+        ApplyResult(
+            long sourceRevision,
+            String sourceFingerprint,
+            long aggregateRevision,
+            long tenderPolicyAggregateRevision,
+            boolean replayed
+        ) {
             this.sourceRevision = sourceRevision;
             this.sourceFingerprint = sourceFingerprint;
             this.aggregateRevision = aggregateRevision;
+            this.tenderPolicyAggregateRevision = tenderPolicyAggregateRevision;
             this.replayed = replayed;
         }
     }

@@ -31,7 +31,7 @@ public final class FormalAdminConfigSourceClientTest {
             },
             (body, observedAt) -> {
                 applied.add(body + "\n" + observedAt);
-                return CompletableFuture.completedFuture(new FormalAdminConfigProducer.ApplyResult(7, "fnv1a32:abcd", 3, false));
+                return CompletableFuture.completedFuture(new FormalAdminConfigProducer.ApplyResult(7, "fnv1a32:abcd", 3, 4, false));
             }
         );
 
@@ -43,6 +43,7 @@ public final class FormalAdminConfigSourceClientTest {
         assertEquals(7, result.sourceRevision);
         assertEquals("fnv1a32:abcd", result.sourceFingerprint);
         assertEquals(3, result.aggregateRevision);
+        assertEquals(4, result.tenderPolicyAggregateRevision);
         assertFalse(result.replayed);
     }
 

@@ -65,9 +65,18 @@ public final class FormalAdminConfigProducerTest {
         assertEquals(7, result.sourceRevision);
         assertEquals(envelope.getString("fingerprint"), result.sourceFingerprint);
         assertEquals(1, result.aggregateRevision);
+        assertEquals(1, result.tenderPolicyAggregateRevision);
         assertEquals(1, stored.revision);
         assertEquals(envelope.toString(), stored.stateJson);
-        assertEquals(1, database.storeKernelDao().aggregateCount());
+        final StoreKernelAggregateEntity tenderPolicy = tenderPolicy();
+        final JSONObject tenderState = new JSONObject(tenderPolicy.stateJson);
+        assertEquals(1, tenderPolicy.revision);
+        assertEquals("mfp.pos-tender-policy.v1", tenderState.getString("schema"));
+        assertEquals(envelope.getString("fingerprint"), tenderState.getString("adminSourceFingerprint"));
+        assertEquals(5, tenderState.getJSONArray("tenders").length());
+        assertEquals("CASH", tenderState.getJSONArray("tenders").getJSONObject(0).getString("id"));
+        assertEquals("WECHAT_PAY", tenderState.getJSONArray("tenders").getJSONObject(2).getString("id"));
+        assertEquals(2, database.storeKernelDao().aggregateCount());
         assertEquals(1, database.storeKernelDao().receiptCount());
         assertEquals(0, database.storeKernelDao().outboxCount());
         assertEquals(3, database.storeKernelDao().journalCount());
@@ -87,7 +96,8 @@ public final class FormalAdminConfigProducerTest {
         assertFalse(first.replayed);
         assertTrue(replay.replayed);
         assertEquals(first.aggregateRevision, replay.aggregateRevision);
-        assertEquals(1, database.storeKernelDao().aggregateCount());
+        assertEquals(first.tenderPolicyAggregateRevision, replay.tenderPolicyAggregateRevision);
+        assertEquals(2, database.storeKernelDao().aggregateCount());
         assertEquals(1, database.storeKernelDao().receiptCount());
         assertEquals(3, database.storeKernelDao().journalCount());
     }
@@ -106,9 +116,103 @@ public final class FormalAdminConfigProducerTest {
 
         assertEquals("ADMIN_CONFIG_SOURCE_REVISION_ROLLBACK", rollback.getCause().getMessage());
         assertEquals(2, next.aggregateRevision);
+        assertEquals(2, next.tenderPolicyAggregateRevision);
         assertEquals(2, activeConfig().revision);
+        assertEquals(2, tenderPolicy().revision);
         assertEquals(9, new JSONObject(activeConfig().stateJson).getLong("revision"));
         assertEquals(2, database.storeKernelDao().receiptCount());
+    }
+
+    @Test
+    public void missingOrMalformedTenderPolicyFailsBeforeAnyWrite() throws Exception {
+        final JSONObject missing = envelope(7, "tea");
+        missing.getJSONObject("snapshot").remove("posTenders");
+        refingerprint(missing);
+        final JSONObject duplicate = envelope(8, "coffee");
+        duplicate.getJSONObject("snapshot").getJSONObject("posTenders").getJSONArray("tenders")
+            .put(new JSONObject().put("id", "CASH").put("label", "Again").put("enabled", true).put("kind", "CASH"));
+        refingerprint(duplicate);
+
+        final IllegalArgumentException missingError = assertThrows(
+            IllegalArgumentException.class,
+            () -> producer.apply(missing.toString(), "2026-10-03T00:00:00.000Z")
+        );
+        final IllegalArgumentException duplicateError = assertThrows(
+            IllegalArgumentException.class,
+            () -> producer.apply(duplicate.toString(), "2026-10-03T00:00:00.000Z")
+        );
+
+        assertEquals("ADMIN_CONFIG_POS_TENDER_POLICY_REQUIRED", missingError.getMessage());
+        assertEquals("ADMIN_CONFIG_POS_TENDER_ID_DUPLICATE", duplicateError.getMessage());
+        assertEquals(0, database.storeKernelDao().aggregateCount());
+        assertEquals(0, database.storeKernelDao().receiptCount());
+    }
+
+    @Test
+    public void failureAfterFirstAggregateMutationRollsBackAdminAndTenderTogether() throws Exception {
+        coordinator.close();
+        coordinator = new StoreKernelTransactionCoordinator(
+            database,
+            StoreKernelTransactionCoordinator.FailurePoint.AFTER_AGGREGATE_MUTATION
+        );
+        producer = new FormalAdminConfigProducer(coordinator, "MF01");
+
+        final ExecutionException failure = assertThrows(
+            ExecutionException.class,
+            () -> producer.apply(envelope(7, "tea").toString(), "2026-10-03T00:00:00.000Z")
+                .get(5, TimeUnit.SECONDS)
+        );
+
+        assertEquals("STORE_KERNEL_TEST_FAILURE_AFTER_AGGREGATE_MUTATION", failure.getCause().getMessage());
+        assertEquals(0, database.storeKernelDao().aggregateCount());
+        assertEquals(0, database.storeKernelDao().receiptCount());
+    }
+
+    @Test
+    public void tenderPolicyChangeRequiresNewPolicyRevisionAndPreservesHistoricalPayment() throws Exception {
+        producer.apply(envelope(7, "tea").toString(), "2026-10-03T00:00:00.000Z").get(5, TimeUnit.SECONDS);
+        final String historicalPayment = new JSONObject()
+            .put("schema", "mfp.canonical-payment.v1")
+            .put("paymentId", "PAY-OLD")
+            .put("tenderId", "PAYME")
+            .toString();
+        database.storeKernelDao().insertAggregate(new StoreKernelAggregateEntity(
+            "MF01", "PAYMENT", "PAY-OLD", 1, historicalPayment, "payment-hash", "2026-10-03T00:00:30.000Z"
+        ));
+
+        final ExecutionException sameRevisionConflict = assertThrows(
+            ExecutionException.class,
+            () -> producer.apply(
+                envelope(8, "coffee", 1, false).toString(),
+                "2026-10-03T00:01:00.000Z"
+            ).get(5, TimeUnit.SECONDS)
+        );
+        assertEquals("ADMIN_CONFIG_POS_TENDER_SOURCE_REVISION_CONFLICT", sameRevisionConflict.getCause().getMessage());
+        assertEquals(1, activeConfig().revision);
+        assertEquals(1, tenderPolicy().revision);
+
+        final FormalAdminConfigProducer.ApplyResult next = producer.apply(
+            envelope(8, "coffee", 2, false).toString(),
+            "2026-10-03T00:02:00.000Z"
+        ).get(5, TimeUnit.SECONDS);
+        final JSONObject nextTender = new JSONObject(tenderPolicy().stateJson);
+
+        assertEquals(2, next.aggregateRevision);
+        assertEquals(2, next.tenderPolicyAggregateRevision);
+        assertEquals(2, nextTender.getLong("adminPolicyRevision"));
+        assertFalse(nextTender.getJSONArray("tenders").toString().contains("PAYME"));
+        assertEquals(historicalPayment, database.storeKernelDao().readAggregate("MF01", "PAYMENT", "PAY-OLD").stateJson);
+
+        final ExecutionException rollback = assertThrows(
+            ExecutionException.class,
+            () -> producer.apply(
+                envelope(9, "juice", 1, true).toString(),
+                "2026-10-03T00:03:00.000Z"
+            ).get(5, TimeUnit.SECONDS)
+        );
+        assertEquals("ADMIN_CONFIG_POS_TENDER_SOURCE_REVISION_ROLLBACK", rollback.getCause().getMessage());
+        assertEquals(2, activeConfig().revision);
+        assertEquals(2, tenderPolicy().revision);
     }
 
     @Test
@@ -153,14 +257,20 @@ public final class FormalAdminConfigProducerTest {
         final String fixture = "{\"schema\":\"MFK_ADMIN_CONFIG_SYNC_V1\",\"storeId\":\"MF01\",\"revision\":7,"
             + "\"publishedAt\":\"2026-10-03T00:00:00.000Z\",\"adminFingerprint\":\"admin-7-tea\","
             + "\"snapshot\":{\"catalog\":{\"marker\":\"tea\"},\"storeSettings\":{\"timezone\":\"Asia/Hong_Kong\","
-            + "\"currency\":\"HKD\"},\"businessDay\":{\"cutoff\":\"05:00\"},\"staffAuth\":{\"schema\":\"MFK_STAFF_AUTH_V1\"}},"
-            + "\"fingerprint\":\"fnv1a32:d8ba67b9\"}";
+            + "\"currency\":\"HKD\"},\"businessDay\":{\"cutoff\":\"05:00\"},\"staffAuth\":{\"schema\":\"MFK_STAFF_AUTH_V1\"},"
+            + "\"posTenders\":{\"schema\":\"MFK_POS_TENDER_POLICY_V1\",\"revision\":1,\"tenders\":["
+            + "{\"id\":\"CASH\",\"label\":\"Cash\",\"enabled\":true,\"kind\":\"CASH\"},"
+            + "{\"id\":\"ALIPAY\",\"label\":\"Alipay\",\"enabled\":true,\"kind\":\"NON_CASH\"},"
+            + "{\"id\":\"WECHAT_PAY\",\"label\":\"WeChat Pay\",\"enabled\":true,\"kind\":\"NON_CASH\"},"
+            + "{\"id\":\"FPS\",\"label\":\"FPS\",\"enabled\":true,\"kind\":\"NON_CASH\"},"
+            + "{\"id\":\"PAYME\",\"label\":\"PayMe\",\"enabled\":true,\"kind\":\"NON_CASH\"}]}},"
+            + "\"fingerprint\":\"fnv1a32:b1ce1779\"}";
 
         final FormalAdminConfigProducer.ApplyResult result = producer
             .apply(fixture, "2026-10-03T00:00:00.000Z")
             .get(5, TimeUnit.SECONDS);
 
-        assertEquals("fnv1a32:d8ba67b9", result.sourceFingerprint);
+        assertEquals("fnv1a32:b1ce1779", result.sourceFingerprint);
         assertEquals(7, result.sourceRevision);
     }
 
@@ -189,12 +299,30 @@ public final class FormalAdminConfigProducerTest {
         );
     }
 
+    private StoreKernelAggregateEntity tenderPolicy() {
+        return database.storeKernelDao().readAggregate(
+            "MF01",
+            "POS_TENDER_POLICY",
+            "MF01"
+        );
+    }
+
     private static JSONObject envelope(long revision, String marker) throws Exception {
+        return envelope(revision, marker, 1, true);
+    }
+
+    private static JSONObject envelope(
+        long revision,
+        String marker,
+        long tenderPolicyRevision,
+        boolean includePayMe
+    ) throws Exception {
         final JSONObject snapshot = new JSONObject()
             .put("catalog", new JSONObject().put("marker", marker))
             .put("storeSettings", new JSONObject().put("timezone", "Asia/Hong_Kong").put("currency", "HKD"))
             .put("businessDay", new JSONObject().put("cutoff", "05:00"))
-            .put("staffAuth", new JSONObject().put("schema", "MFK_STAFF_AUTH_V1"));
+            .put("staffAuth", new JSONObject().put("schema", "MFK_STAFF_AUTH_V1"))
+            .put("posTenders", posTenderPolicy(tenderPolicyRevision, includePayMe));
         final JSONObject base = new JSONObject()
             .put("schema", "MFK_ADMIN_CONFIG_SYNC_V1")
             .put("storeId", "MF01")
@@ -203,6 +331,33 @@ public final class FormalAdminConfigProducerTest {
             .put("adminFingerprint", "admin-" + revision + "-" + marker)
             .put("snapshot", snapshot);
         return new JSONObject(base.toString()).put("fingerprint", "fnv1a32:" + fnv1a32(javascriptJson(base)));
+    }
+
+    private static JSONObject posTenderPolicy() throws Exception {
+        return posTenderPolicy(1, true);
+    }
+
+    private static JSONObject posTenderPolicy(long revision, boolean includePayMe) throws Exception {
+        final JSONArray tenders = new JSONArray()
+            .put(tender("CASH", "Cash", true, "CASH"))
+            .put(tender("ALIPAY", "Alipay", true, "NON_CASH"))
+            .put(tender("WECHAT_PAY", "WeChat Pay", true, "NON_CASH"))
+            .put(tender("FPS", "FPS", true, "NON_CASH"));
+        if (includePayMe) tenders.put(tender("PAYME", "PayMe", true, "NON_CASH"));
+        return new JSONObject()
+            .put("schema", "MFK_POS_TENDER_POLICY_V1")
+            .put("revision", revision)
+            .put("tenders", tenders);
+    }
+
+    private static JSONObject tender(String id, String label, boolean enabled, String kind) throws Exception {
+        return new JSONObject().put("id", id).put("label", label).put("enabled", enabled).put("kind", kind);
+    }
+
+    private static void refingerprint(JSONObject envelope) throws Exception {
+        final JSONObject base = new JSONObject(envelope.toString());
+        base.remove("fingerprint");
+        envelope.put("fingerprint", "fnv1a32:" + fnv1a32(javascriptJson(base)));
     }
 
     private static String fnv1a32(String value) {

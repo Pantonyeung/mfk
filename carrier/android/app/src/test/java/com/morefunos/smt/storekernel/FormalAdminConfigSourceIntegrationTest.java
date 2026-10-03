@@ -34,8 +34,14 @@ public final class FormalAdminConfigSourceIntegrationTest {
     private static final String TYPESCRIPT_FIXTURE = "{\"schema\":\"MFK_ADMIN_CONFIG_SYNC_V1\",\"storeId\":\"MF01\",\"revision\":7,"
         + "\"publishedAt\":\"2026-10-03T00:00:00.000Z\",\"adminFingerprint\":\"admin-7-tea\","
         + "\"snapshot\":{\"catalog\":{\"marker\":\"tea\"},\"storeSettings\":{\"timezone\":\"Asia/Hong_Kong\","
-        + "\"currency\":\"HKD\"},\"businessDay\":{\"cutoff\":\"05:00\"},\"staffAuth\":{\"schema\":\"MFK_STAFF_AUTH_V1\"}},"
-        + "\"fingerprint\":\"fnv1a32:d8ba67b9\"}";
+        + "\"currency\":\"HKD\"},\"businessDay\":{\"cutoff\":\"05:00\"},\"staffAuth\":{\"schema\":\"MFK_STAFF_AUTH_V1\"},"
+        + "\"posTenders\":{\"schema\":\"MFK_POS_TENDER_POLICY_V1\",\"revision\":1,\"tenders\":["
+        + "{\"id\":\"CASH\",\"label\":\"Cash\",\"enabled\":true,\"kind\":\"CASH\"},"
+        + "{\"id\":\"ALIPAY\",\"label\":\"Alipay\",\"enabled\":true,\"kind\":\"NON_CASH\"},"
+        + "{\"id\":\"WECHAT_PAY\",\"label\":\"WeChat Pay\",\"enabled\":true,\"kind\":\"NON_CASH\"},"
+        + "{\"id\":\"FPS\",\"label\":\"FPS\",\"enabled\":true,\"kind\":\"NON_CASH\"},"
+        + "{\"id\":\"PAYME\",\"label\":\"PayMe\",\"enabled\":true,\"kind\":\"NON_CASH\"}]}},"
+        + "\"fingerprint\":\"fnv1a32:b1ce1779\"}";
 
     private StoreKernelDatabase database;
     private StoreKernelTransactionCoordinator coordinator;
@@ -66,8 +72,9 @@ public final class FormalAdminConfigSourceIntegrationTest {
 
         assertTrue(result.activePresent);
         assertEquals(7, result.sourceRevision);
-        assertEquals("fnv1a32:d8ba67b9", result.sourceFingerprint);
+        assertEquals("fnv1a32:b1ce1779", result.sourceFingerprint);
         assertEquals(1, stored.revision);
+        assertEquals(1, result.tenderPolicyAggregateRevision);
         assertEquals(7, new JSONObject(stored.stateJson).getLong("revision"));
         assertEquals(1, database.storeKernelDao().receiptCount());
         final FormalCheckoutSourceContracts.SourceFacts checkoutSource =
