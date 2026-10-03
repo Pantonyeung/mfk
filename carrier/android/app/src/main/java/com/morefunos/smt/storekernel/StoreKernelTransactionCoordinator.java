@@ -106,7 +106,12 @@ public final class StoreKernelTransactionCoordinator implements AutoCloseable {
 
     public CompletableFuture<Void> acknowledgeOutbox(StoreKernelContract.OutboxAcknowledgeRequest request) {
         return submit(() -> database.runInTransaction(() -> {
-            final int changed = dao.acknowledgeOutbox(request.eventId, request.leaseOwner, request.acknowledgedAt);
+            final int changed = dao.acknowledgeOutbox(
+                request.eventId,
+                request.leaseOwner,
+                request.attemptCount,
+                request.acknowledgedAt
+            );
             if (changed != 1) throw failure("STORE_KERNEL_OUTBOX_LEASE_CONFLICT");
             return null;
         }));
@@ -114,7 +119,12 @@ public final class StoreKernelTransactionCoordinator implements AutoCloseable {
 
     public CompletableFuture<Void> releaseOutbox(StoreKernelContract.OutboxReleaseRequest request) {
         return submit(() -> database.runInTransaction(() -> {
-            final int changed = dao.releaseOutbox(request.eventId, request.leaseOwner, request.errorCode);
+            final int changed = dao.releaseOutbox(
+                request.eventId,
+                request.leaseOwner,
+                request.attemptCount,
+                request.errorCode
+            );
             if (changed != 1) throw failure("STORE_KERNEL_OUTBOX_LEASE_CONFLICT");
             return null;
         }));

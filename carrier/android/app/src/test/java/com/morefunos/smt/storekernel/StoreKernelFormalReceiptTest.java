@@ -386,6 +386,91 @@ public final class StoreKernelFormalReceiptTest {
     }
 
     @Test
+    public void staleAcknowledgeCannotCompleteReclaimedLeaseWithSameWorkerIdentity() throws Exception {
+        coordinator.commit(commitRequest("LEASE-ACK", "ORDER", "ORDER-LEASE-ACK", 0)).get(5, TimeUnit.SECONDS);
+        final StoreKernelTransactionCoordinator.OutboxEnvelope first = coordinator.claimOutbox(
+            outboxClaim("CLAIM-ACK-1", "ORDER_COMMITTED", "WORKER-1", 1_000L)
+        ).get(5, TimeUnit.SECONDS).get(0);
+        final StoreKernelTransactionCoordinator.OutboxEnvelope second = coordinator.claimOutbox(
+            outboxClaim("CLAIM-ACK-2", "ORDER_COMMITTED", "WORKER-1", 1_100L)
+        ).get(5, TimeUnit.SECONDS).get(0);
+
+        assertEquals(1, first.attemptCount);
+        assertEquals(2, second.attemptCount);
+        final ExecutionException error = assertThrows(
+            ExecutionException.class,
+            () -> coordinator.acknowledgeOutbox(outboxAcknowledge(
+                "ACK-STALE", first.eventId, first.leaseOwner, first.attemptCount
+            )).get(5, TimeUnit.SECONDS)
+        );
+
+        assertEquals("STORE_KERNEL_OUTBOX_LEASE_CONFLICT", error.getCause().getMessage());
+        assertEquals("PROCESSING", database.storeKernelDao().readOutbox(first.eventId).status);
+        assertEquals(2, database.storeKernelDao().readOutbox(first.eventId).attemptCount);
+        coordinator.acknowledgeOutbox(outboxAcknowledge(
+            "ACK-CURRENT", second.eventId, second.leaseOwner, second.attemptCount
+        )).get(5, TimeUnit.SECONDS);
+        assertEquals("ACKNOWLEDGED", database.storeKernelDao().readOutbox(first.eventId).status);
+    }
+
+    @Test
+    public void staleReleaseCannotResetReclaimedLeaseWithSameWorkerIdentity() throws Exception {
+        coordinator.commit(commitRequest("LEASE-RELEASE", "ORDER", "ORDER-LEASE-RELEASE", 0)).get(5, TimeUnit.SECONDS);
+        final StoreKernelTransactionCoordinator.OutboxEnvelope first = coordinator.claimOutbox(
+            outboxClaim("CLAIM-RELEASE-1", "ORDER_COMMITTED", "WORKER-1", 1_000L)
+        ).get(5, TimeUnit.SECONDS).get(0);
+        final StoreKernelTransactionCoordinator.OutboxEnvelope second = coordinator.claimOutbox(
+            outboxClaim("CLAIM-RELEASE-2", "ORDER_COMMITTED", "WORKER-1", 1_100L)
+        ).get(5, TimeUnit.SECONDS).get(0);
+
+        final ExecutionException error = assertThrows(
+            ExecutionException.class,
+            () -> coordinator.releaseOutbox(outboxRelease(
+                "RELEASE-STALE", first.eventId, first.leaseOwner, first.attemptCount
+            )).get(5, TimeUnit.SECONDS)
+        );
+
+        assertEquals("STORE_KERNEL_OUTBOX_LEASE_CONFLICT", error.getCause().getMessage());
+        assertEquals("PROCESSING", database.storeKernelDao().readOutbox(first.eventId).status);
+        assertEquals(2, database.storeKernelDao().readOutbox(first.eventId).attemptCount);
+        coordinator.releaseOutbox(outboxRelease(
+            "RELEASE-CURRENT", second.eventId, second.leaseOwner, second.attemptCount
+        )).get(5, TimeUnit.SECONDS);
+        assertEquals("PENDING", database.storeKernelDao().readOutbox(first.eventId).status);
+    }
+
+    @Test
+    public void outboxCompletionRequiresPositiveAttemptToken() throws Exception {
+        final JSONObject acknowledge = new JSONObject()
+            .put("protocolVersion", StoreKernelContract.PROTOCOL_VERSION)
+            .put("type", StoreKernelContract.OUTBOX_ACKNOWLEDGE)
+            .put("requestId", "ACK-MISSING-ATTEMPT")
+            .put("eventId", "EVENT-1")
+            .put("leaseOwner", "WORKER-1")
+            .put("acknowledgedAt", "2026-10-03T00:00:01.000Z");
+        final JSONObject release = new JSONObject()
+            .put("protocolVersion", StoreKernelContract.PROTOCOL_VERSION)
+            .put("type", StoreKernelContract.OUTBOX_RELEASE)
+            .put("requestId", "RELEASE-ZERO-ATTEMPT")
+            .put("eventId", "EVENT-1")
+            .put("leaseOwner", "WORKER-1")
+            .put("attemptCount", 0)
+            .put("errorCode", "DELIVERY_RETRY");
+
+        final IllegalArgumentException missing = assertThrows(
+            IllegalArgumentException.class,
+            () -> StoreKernelContract.parseOutboxAcknowledge(acknowledge)
+        );
+        final IllegalArgumentException zero = assertThrows(
+            IllegalArgumentException.class,
+            () -> StoreKernelContract.parseOutboxRelease(release)
+        );
+
+        assertEquals("STORE_KERNEL_ATTEMPT_COUNT_INVALID", missing.getMessage());
+        assertEquals("STORE_KERNEL_ATTEMPT_COUNT_INVALID", zero.getMessage());
+    }
+
+    @Test
     public void expiredNativeCommitDeadlineRejectsBeforeAnyWrite() throws Exception {
         final AtomicLong nowEpochMs = new AtomicLong(2_000L);
         coordinator.close();
@@ -535,6 +620,56 @@ public final class StoreKernelFormalReceiptTest {
             List.of(),
             null
         );
+    }
+
+    private static StoreKernelContract.OutboxClaimRequest outboxClaim(
+        String requestId,
+        String eventType,
+        String leaseOwner,
+        long nowEpochMs
+    ) {
+        return new StoreKernelContract.OutboxClaimRequest(
+            requestId,
+            "MF01",
+            eventType,
+            leaseOwner,
+            nowEpochMs,
+            100L,
+            1,
+            "2026-10-03T00:00:00.000Z"
+        );
+    }
+
+    private static StoreKernelContract.OutboxAcknowledgeRequest outboxAcknowledge(
+        String requestId,
+        String eventId,
+        String leaseOwner,
+        int attemptCount
+    ) throws Exception {
+        return StoreKernelContract.parseOutboxAcknowledge(new JSONObject()
+            .put("protocolVersion", StoreKernelContract.PROTOCOL_VERSION)
+            .put("type", StoreKernelContract.OUTBOX_ACKNOWLEDGE)
+            .put("requestId", requestId)
+            .put("eventId", eventId)
+            .put("leaseOwner", leaseOwner)
+            .put("attemptCount", attemptCount)
+            .put("acknowledgedAt", "2026-10-03T00:00:01.000Z"));
+    }
+
+    private static StoreKernelContract.OutboxReleaseRequest outboxRelease(
+        String requestId,
+        String eventId,
+        String leaseOwner,
+        int attemptCount
+    ) throws Exception {
+        return StoreKernelContract.parseOutboxRelease(new JSONObject()
+            .put("protocolVersion", StoreKernelContract.PROTOCOL_VERSION)
+            .put("type", StoreKernelContract.OUTBOX_RELEASE)
+            .put("requestId", requestId)
+            .put("eventId", eventId)
+            .put("leaseOwner", leaseOwner)
+            .put("attemptCount", attemptCount)
+            .put("errorCode", "DELIVERY_RETRY"));
     }
 
     private void seedAggregate(String storeId, String aggregateType, String aggregateId, long revision) {

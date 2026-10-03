@@ -223,16 +223,21 @@ public final class StoreKernelContract {
 
     public static OutboxAcknowledgeRequest parseOutboxAcknowledge(JSONObject request) throws JSONException {
         requireType(request, OUTBOX_ACKNOWLEDGE);
+        final int attemptCount = requiredInt(request, "attemptCount");
+        if (attemptCount < 1) throw new IllegalArgumentException("STORE_KERNEL_ATTEMPT_COUNT_INVALID");
         return new OutboxAcknowledgeRequest(
             requiredIdentifier(request, "requestId"),
             requiredIdentifier(request, "eventId"),
             requiredIdentifier(request, "leaseOwner"),
+            attemptCount,
             requiredTimestamp(request, "acknowledgedAt")
         );
     }
 
     public static OutboxReleaseRequest parseOutboxRelease(JSONObject request) throws JSONException {
         requireType(request, OUTBOX_RELEASE);
+        final int attemptCount = requiredInt(request, "attemptCount");
+        if (attemptCount < 1) throw new IllegalArgumentException("STORE_KERNEL_ATTEMPT_COUNT_INVALID");
         final String errorCode = requiredIdentifier(request, "errorCode");
         if (!ERROR_CODE.matcher(errorCode).matches()) {
             throw new IllegalArgumentException("STORE_KERNEL_ERROR_CODE_INVALID");
@@ -241,6 +246,7 @@ public final class StoreKernelContract {
             requiredIdentifier(request, "requestId"),
             requiredIdentifier(request, "eventId"),
             requiredIdentifier(request, "leaseOwner"),
+            attemptCount,
             errorCode
         );
     }
@@ -671,12 +677,20 @@ public final class StoreKernelContract {
         public final String requestId;
         public final String eventId;
         public final String leaseOwner;
+        public final int attemptCount;
         public final String acknowledgedAt;
 
-        OutboxAcknowledgeRequest(String requestId, String eventId, String leaseOwner, String acknowledgedAt) {
+        OutboxAcknowledgeRequest(
+            String requestId,
+            String eventId,
+            String leaseOwner,
+            int attemptCount,
+            String acknowledgedAt
+        ) {
             this.requestId = requestId;
             this.eventId = eventId;
             this.leaseOwner = leaseOwner;
+            this.attemptCount = attemptCount;
             this.acknowledgedAt = acknowledgedAt;
         }
     }
@@ -685,12 +699,20 @@ public final class StoreKernelContract {
         public final String requestId;
         public final String eventId;
         public final String leaseOwner;
+        public final int attemptCount;
         public final String errorCode;
 
-        OutboxReleaseRequest(String requestId, String eventId, String leaseOwner, String errorCode) {
+        OutboxReleaseRequest(
+            String requestId,
+            String eventId,
+            String leaseOwner,
+            int attemptCount,
+            String errorCode
+        ) {
             this.requestId = requestId;
             this.eventId = eventId;
             this.leaseOwner = leaseOwner;
+            this.attemptCount = attemptCount;
             this.errorCode = errorCode;
         }
     }
