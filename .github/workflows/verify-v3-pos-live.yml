@@ -1,0 +1,88 @@
+name: verify-v3-pos-live
+
+on:
+  push:
+    branches:
+      - work/MFP-V3-POS-PUBLIC-VERIFY-2026-10-03
+    paths:
+      - .github/workflows/verify-v3-pos-live.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-v3-pos-live
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Verify public POS identity and boundaries
+        env:
+          EXPECTED_SOURCE_SHA: 2635a8b44794d9f736949fc2fe7c04c4d50ef594
+          EXPECTED_BUILD_ID: mfp-v3-2635a8b44794-test-acceptance
+          EXPECTED_HOST: smt.morefunos.com
+        run: |
+          set -euo pipefail
+          nonce="${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-$(date +%s)"
+          curl --fail --location --silent --show-error --retry 5 --retry-all-errors --retry-delay 2 \
+            -H 'Cache-Control: no-cache' "https://${EXPECTED_HOST}/__mfk/build?verify=${nonce}" -o build.json
+          curl --fail --location --silent --show-error --retry 5 --retry-all-errors --retry-delay 2 \
+            -H 'Cache-Control: no-cache' "https://${EXPECTED_HOST}/__mfk/health?verify=${nonce}" -o health.json
+          curl --fail --location --silent --show-error --retry 5 --retry-all-errors --retry-delay 2 \
+            -H 'Cache-Control: no-cache' "https://${EXPECTED_HOST}/?verify=${nonce}" -o root.html
+          api_status="$(curl --location --silent --show-error -o blocked.json -w '%{http_code}' -H 'Cache-Control: no-cache' "https://${EXPECTED_HOST}/api/orders?verify=${nonce}")"
+          test "${api_status}" = '503'
+          node --input-type=module <<'NODE'
+          import {readFile,appendFile} from 'node:fs/promises';
+          const build=JSON.parse(await readFile('build.json','utf8'));
+          const health=JSON.parse(await readFile('health.json','utf8'));
+          const blocked=JSON.parse(await readFile('blocked.json','utf8'));
+          if(build.product!=='MFK'||build.surface!=='SMT'||build.mode!=='TEST_ACCEPTANCE') throw new Error('POS_BUILD_MODE_INVALID');
+          if(build.sourceSha!==process.env.EXPECTED_SOURCE_SHA) throw new Error(`POS_SOURCE_MISMATCH_${build.sourceSha}`);
+          if(build.buildId!==process.env.EXPECTED_BUILD_ID) throw new Error(`POS_BUILD_ID_MISMATCH_${build.buildId}`);
+          if(build.authRequired!==false) throw new Error('POS_MUST_BE_ANONYMOUS');
+          for(const key of ['backendProxy','checkoutConnected','physicalPrintConnected','cashDrawerConnected']) if(health[key]!==false) throw new Error(`POS_CAPABILITY_MUST_BE_FALSE_${key}`);
+          if(blocked.code!=='MFP_V3_TEST_ACCEPTANCE_BACKEND_NOT_BOUND'||blocked.state!=='UNAVAILABLE') throw new Error('LEGACY_API_NOT_BLOCKED');
+          console.log(`LIVE_BUILD=${JSON.stringify(build)}`);
+          console.log(`LIVE_HEALTH=${JSON.stringify(health)}`);
+          await appendFile(process.env.GITHUB_STEP_SUMMARY,`## Formal POS V3 identity verified\n\n- Host: https://${process.env.EXPECTED_HOST}\n- Source: \`${build.sourceSha}\`\n- Build: \`${build.buildId}\`\n- Mode: \`${build.mode}\`\n- Anonymous: \`${!build.authRequired}\`\n- Legacy API proxy: \`${health.backendProxy}\`\n`);
+          NODE
+          grep -Fq '<title>MoreFun POS</title>' root.html
+
+      - name: Install browser verifier
+        run: |
+          npm init -y >/dev/null
+          npm install --no-save --no-audit --no-fund @playwright/test@1.55.0
+          npx playwright install --with-deps chromium
+
+      - name: Verify anonymous POS UI and truth labels
+        env:
+          VERIFY_URL: https://smt.morefunos.com
+        run: |
+          cat > pos-live.spec.js <<'TEST'
+          const {test,expect}=require('@playwright/test');
+          test('Formal POS V3 opens anonymously and states disconnected capabilities',async({page})=>{
+            const response=await page.goto(`${process.env.VERIFY_URL}/?verify=${Date.now()}`,{waitUntil:'domcontentloaded',timeout:45000});
+            expect(response?.status()).toBe(200);
+            await expect(page).toHaveTitle('MoreFun POS');
+            await expect(page.getByText('測試驗收模式').first()).toBeVisible({timeout:30000});
+            await expect(page.getByText('結帳：尚未接通正式交易').first()).toBeVisible();
+            await expect(page.getByText('打印：尚未接通實體打印').first()).toBeVisible();
+            await expect(page.getByText('後端：不代理舊系統 API').first()).toBeVisible();
+            await page.screenshot({path:'formal-pos-v3-live.png',fullPage:true});
+          });
+          TEST
+          npx playwright test pos-live.spec.js --reporter=line --workers=1
+          echo FORMAL_POS_PUBLIC_UI_VERIFIED
+
+      - name: Upload verification screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: formal-pos-v3-live-verification
+          path: formal-pos-v3-live.png
+          if-no-files-found: ignore
+          retention-days: 7
