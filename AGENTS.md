@@ -15,3 +15,8 @@
 - Admin is the sole canonical authority for formally published configuration/policy data consumed by SMT; do not create a second config authority.
 - Human-facing sync freshness uses Cloudflare publish time; do not use `Rxx`/revision labels as the acceptance or latest-state oracle.
 - Any Admin→SMT sync path must guarantee eventual convergence through doorbell + canonical pull + required reconcile fallback; a path that can permanently miss a formal Admin publish is invalid.
+
+## Parallel worker entry
+
+- Before any parallel-worker write, read [多 worker 開工必讀契約](docs/governance/MFK_MULTI_WORKER_START_CONTRACT.md) and acknowledge its task card, exact base SHA, contract version, and owned paths.
+- This collaboration contract does not grant implementation, merge, deploy, or OTA authority and does not replace the controls above.
