@@ -280,6 +280,10 @@
     "v3admin/src/full-preview-route-coverage.test.tsx",
     "v3admin/src/gate1-foundation.test.ts",
     "v3admin/src/linked-admin.tsx",
+    "v3admin/src/linked-option-mirror-disclosure.test.tsx",
+    "v3admin/src/linked-option-mirror-disclosure.tsx",
+    "v3admin/src/linked-option-mirror-plan.test.ts",
+    "v3admin/src/linked-option-mirror-plan.ts",
     "v3admin/src/linked-preservation-proof.test.tsx",
     "v3admin/src/linked-preservation-proof.tsx",
     "v3admin/src/linked-test-journey.test.ts",
@@ -568,6 +572,16 @@
       "mutation_gates": "OPTION_CHANGES_ADD_TO_CART_AND_SUBMIT_STILL_REQUIRE_FRESH_CATALOG",
       "regressions": "EXISTING_CASES_UNCHANGED_PLUS_HELD_REFRESH_POINTER_SEQUENCE; NO_RETRIES_OR_SKIPS",
       "authority_impact": "NONE"
+    },
+    "legacy_mirror_compatibility": {
+      "execution_base_sha": "350abdfb6033c5fe18fd830336344fdbffb6f723",
+      "scope": "LINKED_ADMIN_VISIBLE_READ_ONLY_DIAGNOSTIC_AND_EXPLICIT_SAFE_PLAN_TO_EXISTING_DRAFT",
+      "authority": "EXISTING_RAW_OPTION_CENTER_SETS_PRODUCT_LINKS_DEFAULTS_PRICES_UNCHANGED",
+      "unsafe_plans": "BLOCK_ORPHANS_AMBIGUITY_MALFORMED_AUTHORITY_OR_UNMATCHED_LEGACY_FACT_LOSS",
+      "validation": "UNCHANGED_EDIT_SOURCE_AND_PUBLISH_READINESS; EXACT_DECLARED_MIRROR_DIFF_PATHS",
+      "writes": "NO_AUTOMATIC_WRITE; EXPLICIT_EXISTING_REVISION_CHECKED_ISOLATED_DRAFT_ONLY; NO_ACTIVE_PUBLISH",
+      "live_evidence": "ACTUAL_LIVE_CLASSIFICATION_PENDING_VISIBLE_UI; SYNTHETIC_EDGE_TESTS_NOT_LIVE_REPAIR",
+      "source_impact": "ADMIN_UI_ONLY; NO_WORKER_WRAPPER_SHARED_CONTRACT_CONFIG_WORKFLOW_CHANGE"
     }
   }
 }
