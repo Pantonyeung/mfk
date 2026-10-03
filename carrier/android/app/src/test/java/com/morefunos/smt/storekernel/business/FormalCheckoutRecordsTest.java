@@ -34,17 +34,28 @@ import org.junit.Test;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public final class FormalCheckoutRecordsTest {
+    private static final String CANONICAL_INTENT = "{\"schema\":\"mfp.normalized-ordering-intent.v1\",\"lines\":[{\"cartLineId\":\"line-1\"}]}";
+    private static final String CANONICAL_INTENT_HASH = "336f12546a8c8a41053b761f6915ba15e245a85313fbb166ea5868429a82777c";
+
     @Test
-    public void mapsValidatedFactsToLinkedDeterministicRecordsButKeepsOutboxUnbound() {
+    public void carriesCanonicalNormalizedIntentInsteadOfOnlyAnOpaquePointer() {
+        assertTrue(Arrays.stream(Facts.class.getRecordComponents())
+            .anyMatch(component -> "validatedIntentJson".equals(component.getName())
+                && String.class.equals(component.getType())));
+    }
+
+    @Test
+    public void mapsValidatedFactsToLinkedDeterministicRecordsAndCanonicalOutbox() {
         final Facts facts = sample("store-1", "submission-1");
         final Mapping mapped = map(facts);
 
         assertEquals(facts, mapped.order().facts());
-        assertEquals("POS", mapped.order().source());
-        assertEquals("CONFIRMED", mapped.order().lifecycle());
+        assertEquals("WALK_IN", mapped.order().source());
+        assertEquals("ACTIVE", mapped.order().lifecycle());
         assertEquals("CONFIRMED", mapped.payment().status());
         assertEquals(mapped.order().orderId(), mapped.payment().orderId());
         assertEquals(1_500, mapped.payment().amountMinor());
@@ -55,9 +66,9 @@ public final class FormalCheckoutRecordsTest {
         assertFalse(mapped.order().orderId().equals(map(sample("store-2", "submission-1")).order().orderId()));
         assertFalse(map(sample("ab", "c")).order().orderId().equals(map(sample("a", "bc")).order().orderId()));
         assertSame(mapped, reconcile(mapped, facts));
-        assertEquals(OutboxBinding.UNBOUND, mapped.outboxBinding());
-        assertTrue(mapped.generatedOutboxEffects().isEmpty());
-        expectCode("CHECKOUT_RECORD_SCHEMA_AND_OUTBOX_UNBOUND", mapped::requireProductionReady);
+        assertEquals("CANONICAL_V1", mapped.outboxBinding().name());
+        assertEquals(2, mapped.generatedOutboxEffects().size());
+        mapped.requireProductionReady();
     }
 
     @Test
@@ -174,7 +185,7 @@ public final class FormalCheckoutRecordsTest {
         expectCode("SUBMISSION_FACTS_CONFLICT", () -> reconcile(mapped, new Facts(
             facts.phase(),
             new Submission("store-1", "submission-1", "other-idempotency", "a".repeat(64), "confirmation-1", facts.submission().confirmedAt()),
-            facts.security(), facts.validatedIntentRef(), facts.validatedIntentHash(), facts.channelId(), facts.sourceIdentity(),
+            facts.security(), facts.validatedIntentRef(), facts.validatedIntentHash(), facts.validatedIntentJson(), facts.channelId(), facts.sourceIdentity(),
             quote, facts.discountDecision(), facts.tender(), facts.day()
         )));
         final SecurityEvidence changedOwner = new SecurityEvidence(
@@ -182,13 +193,17 @@ public final class FormalCheckoutRecordsTest {
             facts.security().sessionRevision(), facts.security().staffId(), "other-owner-auth", Revision.numeric(2)
         );
         expectCode("SUBMISSION_FACTS_CONFLICT", () -> reconcile(mapped, new Facts(
-            facts.phase(), facts.submission(), changedOwner, facts.validatedIntentRef(), facts.validatedIntentHash(),
+            facts.phase(), facts.submission(), changedOwner, facts.validatedIntentRef(), facts.validatedIntentHash(), facts.validatedIntentJson(),
             facts.channelId(), facts.sourceIdentity(), quote, facts.discountDecision(), facts.tender(), facts.day()
         )));
         expectCode("SUBMISSION_FACTS_CONFLICT", () -> reconcile(mapped, new Facts(
-            facts.phase(), facts.submission(), facts.security(), facts.validatedIntentRef(), facts.validatedIntentHash(),
+            facts.phase(), facts.submission(), facts.security(), facts.validatedIntentRef(), facts.validatedIntentHash(), facts.validatedIntentJson(),
             facts.channelId(), facts.sourceIdentity(), quote, facts.discountDecision(), facts.tender(),
-            new BusinessDay("day-2", facts.day().businessDate(), facts.day().revision(), facts.day().classificationEvidenceRef())
+            new BusinessDay(
+                "day-2", facts.day().businessDate(), facts.day().revision(), facts.day().classificationEvidenceRef(),
+                facts.day().displayNumber(), facts.day().orderSequenceAggregateId(),
+                facts.day().orderSequenceExpectedRevision(), facts.day().allocatedOrderSequence()
+            )
         )));
         final ProposedPayment wrongPayment = map(sample("store-2", "submission-1")).payment();
         expectCode("STORED_MAPPING_INCONSISTENT", () -> reconcile(new Mapping(mapped.order(), wrongPayment), facts));
@@ -204,7 +219,7 @@ public final class FormalCheckoutRecordsTest {
                 List.of(), amount, 0, amount, List.of("FUTURE_NATIVE_TENDER"), facts.quote().validatedAt()
             );
             final Facts edgeFacts = new Facts(
-                facts.phase(), facts.submission(), facts.security(), facts.validatedIntentRef(), facts.validatedIntentHash(),
+                facts.phase(), facts.submission(), facts.security(), facts.validatedIntentRef(), facts.validatedIntentHash(), facts.validatedIntentJson(),
                 facts.channelId(), facts.sourceIdentity(), edge,
                 new DiscountDecision("no-discount-decision", Revision.text("policy"), DiscountMode.NONE, 0, List.of()),
                 new Tender("FUTURE_NATIVE_TENDER", TenderKind.NON_CASH, "native-evidence", amount, null, null),
@@ -226,7 +241,8 @@ public final class FormalCheckoutRecordsTest {
                 "owner-authorization-1", Revision.numeric(4)
             ),
             "validated-intent-1",
-            "b".repeat(64),
+            CANONICAL_INTENT_HASH,
+            CANONICAL_INTENT,
             "WALK_IN",
             new SourceIdentity(null, null, null),
             quote("quote-1", 2_000, 500, 1_500),
@@ -236,7 +252,8 @@ public final class FormalCheckoutRecordsTest {
             ),
             new Tender("CASH", TenderKind.CASH, "settlement-evidence-1", 1_500, 2_000L, 500L),
             new BusinessDay(
-                "day-1", LocalDate.parse("2026-10-03"), Revision.numeric(8), "classification-evidence-1"
+                "day-1", LocalDate.parse("2026-10-03"), Revision.numeric(8), "classification-evidence-1",
+                "0001", "day-1", 0, 1
             )
         );
     }
@@ -270,7 +287,7 @@ public final class FormalCheckoutRecordsTest {
 
     private static Facts copy(Facts facts, Phase phase, Quote quote, Tender tender) {
         return new Facts(
-            phase, facts.submission(), facts.security(), facts.validatedIntentRef(), facts.validatedIntentHash(),
+            phase, facts.submission(), facts.security(), facts.validatedIntentRef(), facts.validatedIntentHash(), facts.validatedIntentJson(),
             facts.channelId(), facts.sourceIdentity(), quote, facts.discountDecision(), tender, facts.day()
         );
     }

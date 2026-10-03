@@ -15,8 +15,7 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * Proposed native-only ORDER/PAYMENT values. No parser or browser may construct these facts, and
- * the deliberately unbound outbox prevents this class from claiming a production commit mapping.
+ * Native-only ORDER/PAYMENT values. No parser or browser may construct these facts.
  */
 public final class FormalCheckoutRecords {
     private FormalCheckoutRecords() { }
@@ -25,7 +24,7 @@ public final class FormalCheckoutRecords {
     public enum Phase { FINAL_REVIEW, UNKNOWN, VALIDATED_PAYMENT_CONFIRM }
     public enum TenderKind { CASH, NON_CASH }
     public enum DiscountMode { NONE, MANUAL, AUTO }
-    public enum OutboxBinding { UNBOUND }
+    public enum OutboxBinding { CANONICAL_V1 }
     public enum RevisionKind { TEXT, NUMBER }
 
     public record Revision(RevisionKind kind, String value) {
@@ -123,7 +122,11 @@ public final class FormalCheckoutRecords {
         String businessDayId,
         LocalDate businessDate,
         Revision revision,
-        String classificationEvidenceRef
+        String classificationEvidenceRef,
+        String displayNumber,
+        String orderSequenceAggregateId,
+        long orderSequenceExpectedRevision,
+        long allocatedOrderSequence
     ) { }
 
     public record Facts(
@@ -132,6 +135,7 @@ public final class FormalCheckoutRecords {
         SecurityEvidence security,
         String validatedIntentRef,
         String validatedIntentHash,
+        String validatedIntentJson,
         String channelId,
         SourceIdentity sourceIdentity,
         Quote quote,
@@ -154,17 +158,52 @@ public final class FormalCheckoutRecords {
         BusinessDay day
     ) { }
 
+    public record ProposedOutboxEffect(
+        String eventId,
+        String aggregateType,
+        String aggregateId,
+        long aggregateRevision,
+        String eventType
+    ) { }
+
     public record Mapping(ProposedOrder order, ProposedPayment payment) {
         public OutboxBinding outboxBinding() {
-            return OutboxBinding.UNBOUND;
+            return OutboxBinding.CANONICAL_V1;
         }
 
-        public List<Void> generatedOutboxEffects() {
-            return Collections.emptyList();
+        public List<ProposedOutboxEffect> generatedOutboxEffects() {
+            final Submission submission = order.facts().submission();
+            final List<ProposedOutboxEffect> effects = new ArrayList<>();
+            effects.add(new ProposedOutboxEffect(
+                identity("order-committed-event-v1", submission),
+                "ORDER",
+                order.orderId(),
+                1,
+                "MFP_ORDER_COMMITTED_V1"
+            ));
+            effects.add(new ProposedOutboxEffect(
+                identity("payment-confirmed-event-v1", submission),
+                "PAYMENT",
+                payment.paymentId(),
+                1,
+                "MFP_PAYMENT_CONFIRMED_V1"
+            ));
+            return immutable(effects);
         }
 
         public void requireProductionReady() {
-            throw new IllegalStateException("CHECKOUT_RECORD_SCHEMA_AND_OUTBOX_UNBOUND");
+            final List<ProposedOutboxEffect> effects = generatedOutboxEffects();
+            if (effects.size() != 2
+                || !"ORDER".equals(effects.get(0).aggregateType())
+                || !order.orderId().equals(effects.get(0).aggregateId())
+                || effects.get(0).aggregateRevision() != 1
+                || !"MFP_ORDER_COMMITTED_V1".equals(effects.get(0).eventType())
+                || !"PAYMENT".equals(effects.get(1).aggregateType())
+                || !payment.paymentId().equals(effects.get(1).aggregateId())
+                || effects.get(1).aggregateRevision() != 1
+                || !"MFP_PAYMENT_CONFIRMED_V1".equals(effects.get(1).eventType())) {
+                throw new IllegalStateException("CHECKOUT_RECORD_SCHEMA_AND_OUTBOX_INVALID");
+            }
         }
     }
 
@@ -174,7 +213,7 @@ public final class FormalCheckoutRecords {
         final String paymentId = identity("proposed-payment-v1", facts.submission());
         final Quote quote = facts.quote();
         return new Mapping(
-            new ProposedOrder(orderId, "POS", "CONFIRMED", facts),
+            new ProposedOrder(orderId, facts.channelId(), "ACTIVE", facts),
             new ProposedPayment(
                 paymentId,
                 orderId,
@@ -229,6 +268,12 @@ public final class FormalCheckoutRecords {
 
         identifier(facts.validatedIntentRef());
         hash(facts.validatedIntentHash());
+        if (facts.validatedIntentJson() == null
+            || facts.validatedIntentJson().isEmpty()
+            || facts.validatedIntentJson().getBytes(StandardCharsets.UTF_8).length > 131_072
+            || !facts.validatedIntentHash().equals(sha256(facts.validatedIntentJson()))) {
+            throw invalid("VALIDATED_INTENT_INVALID");
+        }
         identifier(facts.channelId());
         final SourceIdentity source = Objects.requireNonNull(facts.sourceIdentity());
         optionalIdentifier(source.customerPhone());
@@ -348,6 +393,14 @@ public final class FormalCheckoutRecords {
         Objects.requireNonNull(day.businessDate());
         revision(day.revision());
         identifier(day.classificationEvidenceRef());
+        identifier(day.displayNumber());
+        identifier(day.orderSequenceAggregateId());
+        if (day.orderSequenceExpectedRevision() < 0
+            || day.orderSequenceExpectedRevision() >= MAX_SAFE_INTEGER
+            || day.allocatedOrderSequence() < 1
+            || day.allocatedOrderSequence() > MAX_SAFE_INTEGER) {
+            throw invalid("ORDER_DISPLAY_ALLOCATION_INVALID");
+        }
     }
 
     private static void revision(Revision revision) {
@@ -445,6 +498,20 @@ public final class FormalCheckoutRecords {
             }
             final StringBuilder result = new StringBuilder(domain).append('-');
             for (byte item : digest.digest()) {
+                result.append(Character.forDigit((item >>> 4) & 15, 16));
+                result.append(Character.forDigit(item & 15, 16));
+            }
+            return result.toString();
+        } catch (NoSuchAlgorithmException impossible) {
+            throw new IllegalStateException("SHA256_UNAVAILABLE", impossible);
+        }
+    }
+
+    private static String sha256(String value) {
+        try {
+            final MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            final StringBuilder result = new StringBuilder(64);
+            for (byte item : digest.digest(value.getBytes(StandardCharsets.UTF_8))) {
                 result.append(Character.forDigit((item >>> 4) & 15, 16));
                 result.append(Character.forDigit(item & 15, 16));
             }
