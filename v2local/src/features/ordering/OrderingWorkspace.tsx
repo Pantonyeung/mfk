@@ -104,7 +104,7 @@ export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorks
   const serviceModes=view.serviceModes??{takeaway:true,dineIn:true};
   return <div className={`ordering-workspace${centerPanel?' panel-open':''}`}>
     <header className="ordering-flow-strip">
-      <QueueStrip title="待處理" kind="pending" orders={view.pendingOrders} onOpen={actions.onOpenQueueOrder}/>
+      <QueueStrip title="待處理訂單" kind="pending" orders={view.pendingOrders} onOpen={actions.onOpenQueueOrder}/>
       <QueueStrip title="Keeta" kind="active" orders={view.activeOrders} onOpen={actions.onOpenQueueOrder}/>
     </header>
 
@@ -113,14 +113,14 @@ export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorks
         <header className="ordering-center-panel-head"><div><small>點單工作台</small><strong>{centerPanel.title}</strong></div><button type="button" onClick={centerPanel.onClose}>×</button></header>
         <div className="ordering-center-panel-body">{centerPanel.body}</div>
       </section>:<>
-        {view.menuRevisionLabel?<div className="ordering-menu-local-status"><b>{view.menuRevisionLabel}</b><span>本機 Admin → POS</span></div>:null}
-        {view.operationalNotice?<div className="ordering-menu-local-status warning"><b>{view.operationalNotice}</b><span>Admin 營運提示</span></div>:null}
+        {view.menuRevisionLabel?<div className="ordering-menu-local-status" role="status"><b>{view.menuRevisionLabel}</b><span>本機 Admin → POS</span></div>:null}
+        {view.operationalNotice?<div className="ordering-menu-local-status warning" role="status"><b>{view.operationalNotice}</b><span>Admin 營運提示</span></div>:null}
         <section className="ordering-mode-bar" aria-label="點單模式">
           <span><b>點選模式</b><small>{view.frontlineGuidance?.headline
             ?view.frontlineGuidance.headline+(view.frontlineGuidance.body?' · '+view.frontlineGuidance.body:'')
             :view.orderingMode==='quick'?'快速加入；必選會進必選區補齊，強制顯示仍開設定':'每件商品都先開設定，必選即時完成'}</small></span>
           <div role="group" aria-label="快速或普通模式">
-            <button type="button" className={view.orderingMode==='quick'?'active':''} aria-pressed={view.orderingMode==='quick'} onClick={()=>actions.onChangeOrderingMode('quick')}>快速</button>
+            <button type="button" className={view.orderingMode==='quick'?'active':''} aria-pressed={view.orderingMode==='quick'} onClick={()=>actions.onChangeOrderingMode('quick')}>快捷</button>
             <button type="button" className={view.orderingMode==='normal'?'active':''} aria-pressed={view.orderingMode==='normal'} onClick={()=>actions.onChangeOrderingMode('normal')}>普通</button>
           </div>
         </section>
@@ -133,7 +133,7 @@ export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorks
 
     <aside key={view.cartPulseNonce} className={`ordering-cart${view.cartPulseNonce>0?' cart-updated':''}`} aria-label="購物車">
       <header className="ordering-cart-head">
-        <div className="ordering-cart-order-id"><small>{view.cart.contextLabel??'ORDER'}</small><strong>#{view.cart.orderId}</strong></div>
+        <div className="ordering-cart-order-id"><small>{view.cart.contextLabel??'流水號預覽'}</small><strong>#{view.cart.orderId}</strong></div>
         <div className="ordering-cart-head-actions">
           <div className="ordering-cart-view-toggle" role="group" aria-label="購物車檢視">
             <button type="button" className={view.cart.viewMode==='original'?'active':''} aria-pressed={view.cart.viewMode==='original'} onClick={()=>actions.onChangeCartView('original')}>原單</button>
@@ -147,7 +147,7 @@ export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorks
         {view.cart.lines.length?(view.cart.viewMode==='original'
           ?view.cart.lines.map((line,index)=><CartLineRow key={line.id} line={line} index={index} highlighted={view.highlightedCartLineId===line.id||Boolean(line.sourceLineIds?.includes(view.highlightedCartLineId??''))} actions={actions} availability={availability}/>)
           :<OrganizedCart lines={view.cart.lines} highlightedLineId={view.highlightedCartLineId} actions={actions} availability={availability}/>
-        ):<div className="ordering-cart-empty">購物車未有商品</div>}
+        ):<div className="ordering-cart-empty"><strong>購物車未有商品</strong><span>點選商品後會在此顯示</span></div>}
       </div>
       <div className="ordering-cart-facts"><span><small>小計</small><b>{view.cart.subtotalLabel}</b></span><span><small>包裝</small><b>{view.cart.packagingLabel}</b></span><span><small>折扣</small><b>{view.cart.discountLabel}</b></span></div>
       <div className="ordering-cart-total"><span>總計</span><strong>{view.cart.totalLabel}</strong></div>
@@ -155,7 +155,7 @@ export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorks
         {availability.holdCart?<button type="button" className="hold-dining-entry" onClick={actions.onHoldCart}>暫存／堂食</button>:<span/>}
         {availability.cancelCart?<button type="button" className="cart-clear-icon destructive" aria-label="清除訂單" title="清除訂單" onClick={actions.onCancelCart}><TrashGlyph/></button>:<span/>}
       </div>:availability.holdCart?<div className="ordering-cart-secondary-actions single"><button type="button" onClick={actions.onHoldCart}>取回訂單</button></div>:null}
-      <button type="button" className="ordering-checkout" aria-label={view.cart.primaryActionLabel??'結帳'} disabled={!view.cart.checkoutEnabled} onClick={actions.onCheckout}>{view.cart.primaryActionLabel??'結帳'}　{view.cart.totalLabel}</button>
+      <button type="button" className="ordering-checkout" aria-label={view.cart.primaryActionLabel??'結帳'} disabled={!view.cart.checkoutEnabled} onClick={actions.onCheckout}><span>{view.cart.primaryActionLabel??'結帳'}　{view.cart.totalLabel}</span><b aria-hidden="true">→</b></button>
     </aside>
 
     <footer className="ordering-workbar">{view.workItems.map(item=><button type="button" key={item.id} onClick={()=>actions.onOpenWorkItem(item.id)}><span>{item.label}</span>{item.count>0?<b>{item.count}</b>:null}</button>)}</footer>
