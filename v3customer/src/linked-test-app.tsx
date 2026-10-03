@@ -96,7 +96,7 @@ export function LinkedCustomerApp(){
           {catalogError?<p className="linked-error" role="alert">{catalogError} · 菜單暫時未可用</p>:!catalog?<p role="status">正在讀取已發布菜單…</p>:<>
             <p className="linked-time">後台發布時間：<time dateTime={catalog.publishedAt}>{new Date(catalog.publishedAt).toLocaleString('zh-HK')}</time></p>
             {catalog.products.length===0&&<p>共用測試菜單尚未有可顯示商品。</p>}
-            {catalog.categories.map(category=><section key={category.id}><h3>{category.name}</h3><div className="linked-products">{catalog.products.filter(p=>p.categoryId===category.id).map(p=><button key={p.id} type="button" disabled={!p.available||!model||!catalogReady} aria-label={`選擇 ${p.name}`} onClick={()=>setProductId(p.id)}><span><strong>{p.name}</strong><small>{p.description||'按此選擇數量及選項'}</small>{!p.available&&<small>{p.unavailableReason}</small>}</span><b>{p.priceMinor===null?'未可用':amount(p.priceMinor)}</b></button>)}</div></section>)}
+            {catalog.categories.map(category=><section key={category.id}><h3>{category.name}</h3><div className="linked-products">{catalog.products.filter(p=>p.categoryId===category.id).map(p=><button key={p.id} type="button" disabled={!p.available||!model} aria-label={`選擇 ${p.name}`} onClick={()=>setProductId(p.id)}><span><strong>{p.name}</strong><small>{p.description||'按此選擇數量及選項'}</small>{!p.available&&<small>{p.unavailableReason}</small>}</span><b>{p.priceMinor===null?'未可用':amount(p.priceMinor)}</b></button>)}</div></section>)}
           </>}
         </section>
         {catalog&&product&&<ProductOptions key={`${catalog.fingerprint}:${product.id}`} product={product} catalog={catalog} ready={catalogReady} onClose={()=>setProductId(null)} onAdd={line=>{setCart(previous=>[...previous,line]);setProductId(null);}}/>}

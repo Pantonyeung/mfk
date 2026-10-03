@@ -346,6 +346,7 @@
     "v3customer/test/linked-customer.spec.ts",
     "v3customer/test/linked-doorbell.checks.mjs",
     "v3customer/test/linked-model.checks.mjs",
+    "v3customer/test/linked-selection-race.checks.mjs",
     "v3customer/test/linked-worker.checks.mjs",
     "v3customer/test/visual-home.spec.ts",
     "v3customer/tsconfig.json",
@@ -547,7 +548,7 @@
     },
     "bounded_shared_correction": "Canonical REJECTED takes precedence over prior SEEN in public state projection; no schema or persistence change",
     "customer_recovery": "Explicit new test request requires fresh canonical SEEN/REJECTED and atomically archives prior immutable intent; unknown/pending/persistence conflict keeps current identity",
-    "browser_acceptance": "LOCAL_BROWSER_BLOCKED; SIX_CUSTOMER_BROWSER_REGRESSIONS_REQUIRED_IN_BRANCH_CI; PUBLIC_E2E_PARENT_OWNED",
+    "browser_acceptance": "LOCAL_BROWSER_BLOCKED; SIX_EXISTING_CUSTOMER_BROWSER_CASES_PLUS_DETERMINISTIC_REFRESH_CLICK_RACE_REQUIRED_IN_BRANCH_CI; PUBLIC_E2E_PARENT_OWNED",
     "preservation_evidence": {
       "execution_base_sha": "1808bda83d935e1161329c4f07aeeb9187bc51c7",
       "mode": "READ_ONLY_EXISTING_ADMIN_HEALTH_METADATA_PROJECTION",
@@ -559,6 +560,14 @@
       "ui": "EXPLICIT_REFRESH_ONLY; NO_BACKGROUND_POLLING",
       "consumer_source_changes": "NONE",
       "acceptance": "PARENT_LIVE_BEFORE_AFTER_CAPTURE_REQUIRED"
+    },
+    "customer_ci_correction": {
+      "execution_base_sha": "de6d091f9b1dd93ed6080a100302a2ac74683179",
+      "failed_run_id": 37138044911,
+      "scope": "READ_ONLY_PRODUCT_OPTIONS_NAVIGATION_REMAINS_RESPONSIVE_DURING_CANONICAL_REFRESH",
+      "mutation_gates": "OPTION_CHANGES_ADD_TO_CART_AND_SUBMIT_STILL_REQUIRE_FRESH_CATALOG",
+      "regressions": "EXISTING_CASES_UNCHANGED_PLUS_HELD_REFRESH_POINTER_SEQUENCE; NO_RETRIES_OR_SKIPS",
+      "authority_impact": "NONE"
     }
   }
 }

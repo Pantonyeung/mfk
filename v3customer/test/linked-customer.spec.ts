@@ -4,11 +4,12 @@ const storageKey='mfp:v3:linked-test:customer:request:v1';
 async function setup(page:any){
   let current:any=structuredClone(catalog),catalogReads=0,statusReads=0,submits:any[]=[],failSubmit=false;
   const records=new Map<string,any>(),reviews=new Map<string,string>();
+  let catalogHold:Promise<void>|null=null,releaseCatalog:(()=>void)|null=null,pendingCatalog=0;
   const sockets=new Set<any>();
   await page.routeWebSocket('**/api/v3-test/*-events',(ws:any)=>{sockets.add(ws);ws.onClose(()=>sockets.delete(ws));});
   await page.route('**/api/v3-test/**',async(route:any)=>{
     const path=new URL(route.request().url()).pathname;
-    if(path.endsWith('/catalog')){catalogReads++;return route.fulfill({json:current});}
+    if(path.endsWith('/catalog')){catalogReads++;if(catalogHold){pendingCatalog++;await catalogHold;pendingCatalog--;}return route.fulfill({json:current});}
     const body=route.request().postDataJSON();
     if(path.endsWith('/submit')){submits.push(body);if(!records.has(body.submissionId)){records.set(body.submissionId,body);reviews.set(body.submissionId,'UNSEEN');}if(failSubmit)return route.abort('failed');}
     if(path.endsWith('/readback'))statusReads++;
@@ -16,7 +17,7 @@ async function setup(page:any){
     if(!record)return route.fulfill({status:404,json:{state:'UNKNOWN'}});
     return route.fulfill({status:path.endsWith('/submit')?202:200,json:{submissionId:record.submissionId,state:review==='REJECTED'?'REJECTED':'PENDING_SMT',reviewState:review,reviewedAt:null,message:'server status',formalOrderCreated:false,paymentConfirmed:false}});
   });
-  return {get submits(){return submits;},get catalogReads(){return catalogReads;},get statusReads(){return statusReads;},setReview:(v:string,id?:string)=>{for(const key of id?[id]:records.keys())reviews.set(key,v);},setCatalog:(v:any)=>current=v,fail:(v:boolean)=>failSubmit=v,signal:()=>sockets.forEach(ws=>ws.send(JSON.stringify({state:'PAID',priceMinor:1}))),close:()=>sockets.forEach(ws=>ws.close())};
+  return {get pendingCatalog(){return pendingCatalog;},holdCatalog:()=>{catalogHold=new Promise<void>(resolve=>releaseCatalog=resolve);},releaseCatalog:()=>{catalogHold=null;releaseCatalog?.();releaseCatalog=null;},get submits(){return submits;},get catalogReads(){return catalogReads;},get statusReads(){return statusReads;},setReview:(v:string,id?:string)=>{for(const key of id?[id]:records.keys())reviews.set(key,v);},setCatalog:(v:any)=>current=v,fail:(v:boolean)=>failSubmit=v,signal:()=>sockets.forEach(ws=>ws.send(JSON.stringify({state:'PAID',priceMinor:1}))),close:()=>sockets.forEach(ws=>ws.close())};
 }
 async function add(page:any){await page.getByRole('button',{name:'選擇 測試飯糰'}).click();await expect(page.getByLabel('正常')).toBeChecked();await page.getByLabel('加飯').check();await page.getByRole('button',{name:'加入測試購物籃'}).click();}
 test('server products/options, repeated click, reload, doorbell and canonical status are truthful',async({page})=>{
@@ -52,4 +53,29 @@ test('explicit new test request requires seen status and preserves old request a
   api.setReview('REJECTED',second.submissionId);api.signal();await expect(page.getByTestId('request-status')).toContainText('REJECTED');
   const retained=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)!),storageKey);expect(retained.history).toEqual([first]);expect(retained.active).toEqual(second);
   await page.getByRole('region',{name:'先前測試要求'}).locator('summary').click();await page.getByRole('button',{name:'讀取先前要求狀態'}).click();await expect(page.getByRole('status').filter({hasText:'最近讀回：SEEN'})).toBeVisible();
+});
+
+test('catalog refresh during a native product click preserves navigation and keeps mutation closed',async({page})=>{
+  const api=await setup(page);await page.goto('/');await add(page);
+  const submit=page.getByRole('button',{name:'送出測試要求',exact:true});
+  await expect(submit).toBeEnabled();
+  const product=page.getByRole('button',{name:'選擇 測試飯糰'});
+  await expect(product).toBeEnabled();await product.hover();
+  api.holdCatalog();
+  try{
+    await page.mouse.down();
+    await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
+    await expect.poll(()=>api.pendingCatalog).toBeGreaterThan(0);
+    await expect(submit).toBeDisabled(); // Observe the React invalidation commit before pointer-up.
+    await page.mouse.up();
+    await expect(page.getByLabel('正常')).toBeChecked();
+    await expect(page.getByLabel('正常')).toBeDisabled();
+    await expect(page.getByRole('button',{name:'加入測試購物籃'})).toBeDisabled();
+    await expect(page.getByRole('button',{name:'送出測試要求',exact:true})).toBeDisabled();
+  }finally{api.releaseCatalog();}
+  await expect(page.getByLabel('正常')).toBeEnabled();
+  await expect(page.getByLabel('正常')).toBeChecked();
+  await page.getByRole('button',{name:'加入測試購物籃'}).click();
+  await expect(page.getByRole('button',{name:'移除 測試飯糰'})).toHaveCount(2);
+  expect(api.submits).toHaveLength(0);
 });
