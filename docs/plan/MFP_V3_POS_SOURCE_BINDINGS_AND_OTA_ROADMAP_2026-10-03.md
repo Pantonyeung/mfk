@@ -91,14 +91,18 @@ Initial exact transaction mapping:
 
 | Record | Identity | Required contents |
 |---|---|---|
-| `ORDER` aggregate | deterministic per store + submission | source `POS`, business day, staff/device, normalized lines and selections, source fact IDs/revisions, subtotal, discount, total due, tender, lifecycle, created/confirmed timestamps |
+| `ORDER` aggregate | deterministic per store + submission | business source such as `WALK_IN`, source platform `POS`, allocated display number, business day, staff/device, normalized lines and selections, source fact IDs/revisions, subtotal, discount, total due, tender, lifecycle, created/confirmed timestamps |
 | `PAYMENT` aggregate | deterministic per store + submission | linked Order, tender, formal amount, cash received/change when applicable, status `CONFIRMED`, confirmation timestamp, no provider credential |
 | command receipt | formal submission identity | canonical `COMMITTED` result, commit sequence/revision, deterministic Order reference |
 | outbox | deterministic event IDs | Order committed and payment confirmed projections; print dispatch may only be requested after this commit and remains separately idempotent |
 
 No Order/payment/outbox row is written before Payment Confirm. Duplicate submission replay cannot emit a second outbox event.
 
-Commit `a2a3194732ee10b136eb488dad408d0442e6546a` freezes a proposed native-only Order/Payment mapping with deterministic store/submission identities, exact safe-integer totals, cash/change consistency, tender membership, business-day evidence, Owner-parented security evidence, immutable lists, and replay conflict checks. It deliberately emits no outbox effects and `requireProductionReady()` always rejects with `CHECKOUT_RECORD_SCHEMA_AND_OUTBOX_UNBOUND`. Therefore this mapping cannot yet be used to return `COMMITTED`.
+Commit `3e53a26` implements the bounded non-Student cash assembler and closed commit mapping behind trusted native ports. It validates the canonical normalized intent and client review against fresh security, quote, tender, and Business Day snapshots; attaches exactly seven native read dependencies and the earliest freshness deadline; and commits the Business-Day display sequence, canonical Order, linked Payment, durable receipt, and two deterministic outbox events in the existing coordinator transaction. The canonical Order shape matches the retained Orders read contract.
+
+Real Room tests prove full rollback after an injected post-receipt failure, stale dependency rejection, transaction deadline rejection, one-winner display-sequence contention, lost-reply receipt recovery through the real Router gateway, duplicate replay, and file-backed database reopen without a second effect. These tests inject trusted source ports. They do not prove device enrollment, PIN verification, production POS tender/Student eligibility, physical printing, or public bridge activation.
+
+The production bridge remains fail-closed until real MFK producers supply the exact security, pricing, tender, Business Day, and display-allocation snapshots. Non-Student cash behavior is implemented; Student requests continue to fail closed because the canonical eligibility and remaining money-policy decisions are unresolved.
 
 Known rejection paths must be durable and distinguishable from uncertainty. After any coordinator/transport exception, read back the receipt before returning `UNKNOWN`; stable Store Kernel conflicts map to durable known rejection only when no receipt exists and the failure is classified safe.
 
