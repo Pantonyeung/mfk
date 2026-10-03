@@ -15,7 +15,9 @@ import com.morefunos.smt.storekernel.business.FormalCheckoutRecords.Tender;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
@@ -209,11 +211,12 @@ public final class FormalCheckoutPaymentConfirmHandler implements FormalBusiness
                 prepared.day().day()
             );
             final Mapping mapping = FormalCheckoutRecords.map(facts);
-            final List<StoreKernelContract.AggregateReadDependency> dependencies = new ArrayList<>();
-            dependencies.addAll(partial.security().dependencies());
-            dependencies.addAll(price.dependencies());
-            dependencies.addAll(partial.tender().dependencies());
-            dependencies.addAll(prepared.day().dependencies());
+            final List<StoreKernelContract.AggregateReadDependency> dependencies = mergeDependencies(
+                partial.security().dependencies(),
+                price.dependencies(),
+                partial.tender().dependencies(),
+                prepared.day().dependencies()
+            );
             return FormalBusinessCommandRouter.Outcome.commit(
                 FormalCheckoutCommitFactory.create(command, mapping, dependencies, deadline)
             );
@@ -240,6 +243,23 @@ public final class FormalCheckoutPaymentConfirmHandler implements FormalBusiness
             output.add(Objects.requireNonNull(dependency, "FORMAL_CHECKOUT_READ_SET_INVALID"));
         }
         return Collections.unmodifiableList(output);
+    }
+
+    @SafeVarargs
+    private static List<StoreKernelContract.AggregateReadDependency> mergeDependencies(
+        List<StoreKernelContract.AggregateReadDependency>... sources
+    ) {
+        final Map<String, StoreKernelContract.AggregateReadDependency> merged = new LinkedHashMap<>();
+        for (List<StoreKernelContract.AggregateReadDependency> source : sources) {
+            for (StoreKernelContract.AggregateReadDependency dependency : source) {
+                final String key = dependency.aggregateType + "\u0000" + dependency.aggregateId;
+                final StoreKernelContract.AggregateReadDependency prior = merged.putIfAbsent(key, dependency);
+                if (prior != null && prior.expectedRevision != dependency.expectedRevision) {
+                    throw new IllegalStateException("FORMAL_CHECKOUT_SOURCE_REVISION_MISMATCH");
+                }
+            }
+        }
+        return new ArrayList<>(merged.values());
     }
 
     private static long positiveDeadline(long value) {

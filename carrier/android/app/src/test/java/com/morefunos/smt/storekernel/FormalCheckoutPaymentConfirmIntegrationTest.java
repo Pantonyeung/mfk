@@ -365,6 +365,50 @@ public final class FormalCheckoutPaymentConfirmIntegrationTest {
     }
 
     @Test
+    public void identicalAdminDependencyFromPricingAndBusinessDayIsMergedOnce() throws Exception {
+        final FormalBusinessCommandContract.CommandEnvelope command = command("FORGED-CLIENT-PRODUCT");
+        final Facts trusted = facts(command);
+        final List<StoreKernelContract.AggregateReadDependency> dependencies = dependencies();
+        final long confirmedAtEpochMs = trusted.submission().confirmedAt().toEpochMilli();
+        seed(dependencies);
+        coordinator.close();
+        coordinator = new StoreKernelTransactionCoordinator(
+            database,
+            StoreKernelTransactionCoordinator.FailurePoint.NONE,
+            () -> confirmedAtEpochMs
+        );
+        final FormalCheckoutPaymentConfirmHandler handler = new FormalCheckoutPaymentConfirmHandler(
+            ignored -> CompletableFuture.completedFuture(new FormalCheckoutPaymentConfirmHandler.SecuritySnapshot(
+                trusted.security(), dependencies.subList(0, 3), confirmedAtEpochMs + 2_000L
+            )),
+            ignored -> CompletableFuture.completedFuture(new FormalCheckoutPaymentConfirmHandler.PricingSnapshot(
+                trusted.validatedIntentRef(), trusted.validatedIntentHash(), trusted.validatedIntentJson(),
+                trusted.channelId(), trusted.sourceIdentity(), trusted.quote(), trusted.discountDecision(),
+                dependencies.subList(3, 5), confirmedAtEpochMs + 1_900L
+            )),
+            (ignored, pricing) -> CompletableFuture.completedFuture(new FormalCheckoutPaymentConfirmHandler.TenderSnapshot(
+                trusted.tender(), trusted.submission().confirmationEvidenceRef(),
+                List.of(dependencies.get(5)), confirmedAtEpochMs + 1_800L
+            )),
+            ignored -> CompletableFuture.completedFuture(new FormalCheckoutPaymentConfirmHandler.BusinessDaySnapshot(
+                trusted.day(), List.of(dependencies.get(3), dependencies.get(6)), confirmedAtEpochMs + 2_100L
+            )),
+            new FormalCheckoutPaymentConfirmHandler.Clock() {
+                @Override public long epochMillis() { return confirmedAtEpochMs; }
+                @Override public Instant instant() { return trusted.submission().confirmedAt(); }
+            }
+        );
+        final FormalBusinessCommandRouter router = new FormalBusinessCommandRouter(
+            roomGateway(), allowedSecurity(), Map.of("CHECKOUT_PAYMENT_CONFIRM", handler)
+        );
+
+        final FormalBusinessCommandContract.Result result = router.submit(command).get(5, TimeUnit.SECONDS);
+
+        assertEquals("COMMITTED", result.state);
+        assertEquals(1, database.storeKernelDao().receiptCount());
+    }
+
+    @Test
     public void forgedClientReviewIsRejectedBeforeAnyTransactionWrite() throws Exception {
         final FormalBusinessCommandContract.CommandEnvelope command = command("FORGED-CLIENT-PRODUCT", 4_999L);
         final Mapping mapping = FormalCheckoutRecords.map(facts(command));
