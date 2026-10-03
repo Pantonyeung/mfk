@@ -1,6 +1,6 @@
 # MFP V3 POS Kernel Progress and Evidence — 2026-10-03
 
-Status: `SOURCE_VERIFIED` for the bounded Store Kernel read-dependency prerequisite only.
+Status: `SOURCE_VERIFIED` for bounded Store Kernel prerequisites and native value contracts; `CHECKOUT_PAYMENT_CONFIRM` remains fail-closed and unbound.
 
 This document records the latest Owner direction, the first verified native slice, the overnight candidate artifacts, and the OTA/source-binding evidence in one project. It does not authorize publish, deployment, OTA activation, live payment, merge, or replacement of the accepted production UI.
 
@@ -9,6 +9,7 @@ This document records the latest Owner direction, the first verified native slic
 - Original reviewed checkout: `48c7eca6c051e72562ea9974bc2c6465b8584a7b`
 - Isolated branch: `feat/MFP-V3-A9R-POS-KERNEL-R1-2026-10-03`
 - Verified prerequisite commit: `8c52b155fb75edd39e4018853ca3c4144682e179`
+- Latest verified local commit: `a2a3194732ee10b136eb488dad408d0442e6546a`
 - Existing Draft PR reference: `#651`; this branch has not been pushed to it.
 - Existing A9 base authority: `69adb11215677d506545c5428f8deea4b89e7db2`
 
@@ -23,6 +24,7 @@ This document records the latest Owner direction, the first verified native slic
 - Tender availability is driven by canonical enable/disable configuration.
 - Money uses integer minor units; duplicate taps and retries produce one effect.
 - Runtime assets and configuration remain updateable; no menu, price, tender, or runtime content is compiled as native truth.
+- Owner account/password authorization is the required parent of staff account/PIN sessions; a missing, changed, unknown, or revoked parent authorization removes staff access. Parent authorization/logout scope remains an explicit unresolved policy decision.
 
 ## Completed bounded slice
 
@@ -30,7 +32,13 @@ The Store Kernel now accepts an immutable trusted-native `AggregateReadDependenc
 
 The browser JSON parser rejects `readDependencies`; only trusted native handlers can attach them. Inputs are defensively copied, bounded to 32 entries, and reject invalid or duplicate aggregate keys.
 
-This is a prerequisite, not a working checkout handler. It does not authenticate a device or staff member, validate wall-clock expiry, prove remote provenance, build a quote, select an eligible tender, derive a Business Day, or map Order/payment records.
+This is a prerequisite, not a working checkout handler. The repository now also contains immutable session observations, exact Admin checkout source facts, and a proposed Order/Payment record mapping. Those additions do not authenticate a device, verify a PIN, issue an Owner/staff session, prove enrollment provenance, select a production tender, compute the final Student policy, emit an outbox event, or authorize a Checkout commit.
+
+The staff-session contract enforces a maximum 12-hour lifetime, transaction-time observation inputs, exact store/device/staff/session and parent-Owner authorization identity/revision, active frontline roles without a Manager-only gate, and rejects `VIEWER`/`REPORT_ONLY`, expired, inactive, revoked, unknown, or mismatched inputs. Verifier metadata is redacted and accepts only PBKDF2-SHA256 with a 256-bit hash; there is no raw-PIN field.
+
+The Admin checkout adapter consumes the accepted `ADMIN_ACTIVE_CONFIGURATION` Room state and extracts exact integer-minor money facts with provenance. It deliberately leaves `posTenderPolicy` and `studentEligibilityPolicy` unbound. `customerPaymentChannels` and promotion data remain evidence only.
+
+The proposed Order/Payment mapper validates deterministic identities, linked records, exact totals, discount selections, tender membership, cash/change, Business Day, and security evidence. It deliberately has no outbox binding, generates zero effects, and cannot pass `requireProductionReady()`. No handler uses it and no Order or Payment row is written by this slice.
 
 ## Test evidence
 
@@ -47,12 +55,26 @@ Command:
 gradle.bat -p carrier/android testDebugUnitTest -x verifySmtWebBundle --tests com.morefunos.smt.storekernel.business.* --tests com.morefunos.smt.storekernel.StoreKernelFormalReceiptTest --no-daemon
 ```
 
-Result:
+Result before the latest contract slice:
 
 - `FormalBusinessCommandContractTest`: 5 passed
 - `FormalBusinessCommandRouterTest`: 10 passed
 - `StoreKernelFormalReceiptTest`: 19 passed
 - Total: 34 passed, 0 failures, 0 errors
+
+Latest scoped command:
+
+```text
+gradle.bat -p carrier/android :app:testDebugUnitTest -x verifySmtWebBundle --tests com.morefunos.smt.storekernel.business.* --tests com.morefunos.smt.storekernel.StoreKernelFormalReceiptTest --tests com.morefunos.smt.storekernel.FormalAdminConfigSourceIntegrationTest --no-daemon
+```
+
+Latest result at `a2a3194732ee10b136eb488dad408d0442e6546a` plus the documentation-only working change:
+
+- 9 suites
+- 62 tests passed
+- 0 failures, 0 errors, 0 skipped
+- 24 real Room tests (`StoreKernelFormalReceiptTest` plus `FormalAdminConfigSourceIntegrationTest`)
+- `:app:assembleDebug -x verifySmtWebBundle --no-daemon`: successful, including desugaring, DEX, and APK packaging
 
 The persistence tests use Room, including failure injection after receipt write with full transaction rollback, serialized dependency-advance race, lost-reply receipt readback/replay, and close/reopen of a file-backed Room database. They are not FakeGateway-only tests.
 
@@ -113,12 +135,16 @@ No live endpoint is changed by this branch.
 ## Actual remaining blockers
 
 - Device admission needs an MFK-native enrollment/authorization record. Admin ACK membership is only config-delivery evidence and is not authorization.
-- Staff authentication can consume the canonical `MFK_STAFF_AUTH_V1` verifier projection, but the native session issuance/revocation contract and maximum 12-hour expiry must be implemented and tested without exposing PINs to persistence or logs.
+- Staff authentication can consume the canonical `MFK_STAFF_AUTH_V1` verifier projection, and the value contract now enforces the 12-hour maximum; the real native verifier, session issuer/revoker, and persisted producer remain unbound and must expose no PINs to persistence or logs.
+- Owner-parent authorization scope remains undecided: device-local, store-wide, or cross-device. The value contract fails closed but does not choose the scope or create account/password credentials.
 - `storeSettings.customerPaymentChannels` is a Customer electronic-channel configuration. It is not, by itself, proof of all-POS tender eligibility or settlement. The formal POS tender publication field/source must be bound explicitly and otherwise fails closed.
 - Admin `businessDay.cutoff` classifies the business date for reporting/history. Current accepted behavior does not establish an old-V2-style OPEN-only trading gate; no such gate may be invented.
 - The canonical source of `studentDiscountEligible` is not present in the published Admin contract. This is a money-policy/data decision; checkout must fail closed for Student Discount until the Owner selects a canonical eligibility field or publication rule.
+- Student discount still needs exact option/surcharge basis, odd-minor rounding, and stacking behavior against `riceballDrink`; the mapper does not invent those answers.
+- Electronic tender settlement still needs an explicit rule: staff-recorded evidence versus provider-verified success.
+- Checkout outbox event types, payload schema, deterministic identities, and downstream triggers remain unbound. The proposed mapper intentionally cannot claim production readiness.
 - No physical printer/device or live financial acceptance was run. Physical acceptance remains a separate gate.
 
 ## Next engineering action
 
-Implement the next bounded native slice in the order defined by `docs/plan/MFP_V3_POS_SOURCE_BINDINGS_AND_OTA_ROADMAP_2026-10-03.md`: canonical Admin active-config producer and Store Kernel projection first, then device/staff session and time-bound commit validation, then quote/tender/Business Day and one `CHECKOUT_PAYMENT_CONFIRM` handler.
+Bind a real device/Owner/staff producer and exact checkout outbox/tender policy before enabling `CHECKOUT_PAYMENT_CONFIRM`. While those decisions are pending, the safe parallel native work is to freeze `ORDER_FULFILLMENT_SET` and Dining read sets, state transitions, revision/idempotency rules, and fail-closed record/outbox contracts; it must not claim an end-to-end Order flow until Checkout creates a canonical Order.

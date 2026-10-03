@@ -31,7 +31,7 @@ Required native behavior:
 5. Preserve last-known-good state on network, parse, validation, or apply failure; expose exact source freshness and error without claiming convergence.
 6. Bind the existing v3 sync transport or provide a compatibility adapter from this same canonical envelope. Do not create a parallel polling authority.
 
-Implemented source slices: `521158dda13711c6ac3d7d4fb62e2181bb2d63ce` validates and projects the canonical envelope into the Store Kernel; `d87ad51` performs one explicit HTTPS-only `/api/admin-sync/active` read with redirects disabled, bounded time/body, 404 LKG preservation, and no automatic retry or polling. Runtime startup/doorbell wiring remains intentionally unbound until the device/session authority is integrated. Current scoped native regression: 54/54, including 24 real Room tests and HTTP-response-to-LKG integration.
+Implemented source slices: `521158dda13711c6ac3d7d4fb62e2181bb2d63ce` validates and projects the canonical envelope into the Store Kernel; `d87ad51` performs one explicit HTTPS-only `/api/admin-sync/active` read with redirects disabled, bounded time/body, 404 LKG preservation, and no automatic retry or polling. Runtime startup/doorbell wiring remains intentionally unbound until the device/session authority is integrated. Commit `a2a3194732ee10b136eb488dad408d0442e6546a` adds a native read-only adapter from the accepted Room envelope to immutable checkout source facts while leaving POS tender and Student eligibility explicitly unbound. Current scoped native regression: 62/62, including 24 real Room tests and HTTP-response-to-LKG integration.
 
 Acceptance: publish/sync convergence, idempotent same fingerprint, rollback/conflict rejection, offline LKG, restart recovery, and Store Kernel readback.
 
@@ -52,6 +52,10 @@ Rules:
 
 The actual device enrollment ceremony is security-sensitive and requires explicit approved provenance/credentials. Engineering can implement the fail-closed record/validator without inventing enrollment authority.
 
+Commit `a2a3194732ee10b136eb488dad408d0442e6546a` freezes the first fail-closed staff-session value contract. It enforces the 12-hour exclusive expiry boundary, exact store/device/staff/session and parent-Owner authorization identity/revision, active device/staff observations, operational roles/scopes, and published PBKDF2-SHA256 verifier metadata without persisting a PIN. `VIEWER` and `REPORT_ONLY` cannot operate. This is not a PIN verifier, device-enrollment authority, Owner-login producer, or session issuer.
+
+The Owner requirement is that a successful Owner account/password authorization is the parent prerequisite for staff account/PIN login, and Owner logout revokes descendant staff access. The safe record model binds every staff session to an opaque parent Owner authorization reference and revision, so missing, unknown, revoked, or changed parent authority rejects. The remaining policy decision is the scope of that parent authorization and logout effect: device-local, store-wide, or cross-device. No scope is inferred by the record model.
+
 ## Stage 3 — Formal quote, discount, tender, and Business Day producers
 
 Formal quote must re-resolve every submitted line against the active canonical published catalog and option/combo facts. Client preview totals and published fact copies are hints only.
@@ -66,6 +70,8 @@ Required money behavior:
 - the active Business Day is a canonical transaction classification derived from the accepted cutoff/timezone publication. No OPEN-only trading gate is added unless the controlling Owner contract explicitly requires one.
 
 Canonical eligibility for Student Discount is still absent from the Admin publication contract. Until the Owner selects the field/publication rule, any Student Discount request fails closed with a stable rejection; non-student checkout work can continue.
+
+Commit `a2a3194732ee10b136eb488dad408d0442e6546a` also freezes exact decimal-to-minor-unit conversion and path-indexed Admin catalog/option/combo money facts. It preserves catalog, option, promotion, and Customer channel data as source evidence, but never promotes Customer payment channels or promotion IDs into POS tender or Student policy. Malformed, rounded, overflowed, wrong-store, wrong-schema, or non-string money inputs fail closed.
 
 ## Stage 4 — One `CHECKOUT_PAYMENT_CONFIRM` handler
 
@@ -91,6 +97,8 @@ Initial exact transaction mapping:
 | outbox | deterministic event IDs | Order committed and payment confirmed projections; print dispatch may only be requested after this commit and remains separately idempotent |
 
 No Order/payment/outbox row is written before Payment Confirm. Duplicate submission replay cannot emit a second outbox event.
+
+Commit `a2a3194732ee10b136eb488dad408d0442e6546a` freezes a proposed native-only Order/Payment mapping with deterministic store/submission identities, exact safe-integer totals, cash/change consistency, tender membership, business-day evidence, Owner-parented security evidence, immutable lists, and replay conflict checks. It deliberately emits no outbox effects and `requireProductionReady()` always rejects with `CHECKOUT_RECORD_SCHEMA_AND_OUTBOX_UNBOUND`. Therefore this mapping cannot yet be used to return `COMMITTED`.
 
 Known rejection paths must be durable and distinguishable from uncertainty. After any coordinator/transport exception, read back the receipt before returning `UNKNOWN`; stable Store Kernel conflicts map to durable known rejection only when no receipt exists and the failure is classified safe.
 
