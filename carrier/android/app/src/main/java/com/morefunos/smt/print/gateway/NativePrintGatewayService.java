@@ -67,7 +67,7 @@ public final class NativePrintGatewayService extends Service {
         return response;
     }
 
-    private JSONObject enqueue(String requestId, JSONObject request) throws JSONException {
+    private synchronized JSONObject enqueue(String requestId, JSONObject request) throws JSONException {
         if (driver == null || store == null) return rejected(requestId, "PRINT_GATEWAY_UNAVAILABLE");
 
         final String canonicalPrintJobId = request.optString("canonicalPrintJobId", "").trim();
@@ -87,6 +87,14 @@ public final class NativePrintGatewayService extends Service {
         }
         if (payload.length < 1) return rejected(requestId, "PRINT_GATEWAY_PAYLOAD_REQUIRED");
 
+        final String payloadDigest = sha256(payload);
+        try {
+            final JSONObject existing = store.findByDispatchAttemptId(dispatchAttemptId);
+            if (existing != null) return replayAttempt(requestId, canonicalPrintJobId, target, payloadDigest, existing);
+        } catch (RuntimeException | JSONException error) {
+            return unknown(requestId, "PRINT_GATEWAY_QUEUE_READ_FAILED");
+        }
+
         final String localJobId = "pgw-" + UUID.randomUUID();
         final String now = now();
         try {
@@ -96,10 +104,16 @@ public final class NativePrintGatewayService extends Service {
                 dispatchAttemptId,
                 target,
                 payloadBase64,
-                sha256(payload),
+                payloadDigest,
                 now
             );
         } catch (RuntimeException error) {
+            try {
+                final JSONObject existing = store.findByDispatchAttemptId(dispatchAttemptId);
+                if (existing != null) return replayAttempt(requestId, canonicalPrintJobId, target, payloadDigest, existing);
+            } catch (RuntimeException | JSONException readError) {
+                return unknown(requestId, "PRINT_GATEWAY_QUEUE_READ_FAILED");
+            }
             return rejected(requestId, "PRINT_GATEWAY_QUEUE_PERSIST_FAILED");
         }
 
@@ -246,6 +260,56 @@ public final class NativePrintGatewayService extends Service {
 
         final Consumer<String> current = notifier;
         if (current != null) current.accept(raw);
+    }
+
+    private static JSONObject replayAttempt(
+        String requestId, String canonicalPrintJobId, JSONObject target, String payloadDigest, JSONObject existing
+    ) throws JSONException {
+        final JSONObject existingTarget = existing.optJSONObject("target");
+        final String kind = target.optString("kind", "").trim();
+        if (!canonicalPrintJobId.equals(existing.optString("canonicalPrintJobId"))
+            || !payloadDigest.equals(existing.optString("payloadDigest"))
+            || existingTarget == null
+            || !kind.equals(existingTarget.optString("kind", "").trim())
+            || ("LAN".equals(kind)
+                && !target.optString("endpointId", "").trim()
+                    .equals(existingTarget.optString("endpointId", "").trim()))) {
+            final JSONObject conflict = unknown(requestId, "PRINT_GATEWAY_ATTEMPT_CONFLICT");
+            conflict.put("dispatchAttemptId", existing.optString("dispatchAttemptId"));
+            conflict.put("state", existing.optString("state"));
+            return conflict;
+        }
+        final JSONObject response = gatewayAccepted(
+            requestId,
+            existing.optString("localJobId"),
+            canonicalPrintJobId,
+            existing.optString("dispatchAttemptId")
+        );
+        final String state = existing.optString("state");
+        response.put("state", state);
+        response.put("payloadDigest", payloadDigest);
+        response.put("lastStage", existing.optString("lastStage"));
+        response.put("lastCode", existing.opt("lastCode"));
+        response.put("createdAt", existing.optString("createdAt"));
+        response.put("updatedAt", existing.optString("updatedAt"));
+        response.put("observedAt", existing.optString("updatedAt"));
+        response.put("evidenceId", "native-print:" + existing.optString("dispatchAttemptId"));
+        if ("ACKNOWLEDGED".equals(state)) {
+            response.put("outcome", "ACKNOWLEDGED");
+        } else if ("FAILED_BEFORE_SEND".equals(state)) {
+            response.put("outcome", "REJECTED_BEFORE_SEND");
+            response.put("failureCode", existing.optString("lastCode", "PRINT_CONNECT_FAILED"));
+        } else if ("AMBIGUOUS_AFTER_SEND".equals(state)) {
+            response.put("outcome", "OUTCOME_UNKNOWN");
+            response.put("uncertaintyCode", existing.optString("lastCode", "PRINT_WRITE_OUTCOME_UNKNOWN"));
+        }
+        return response;
+    }
+
+    private static JSONObject unknown(String requestId, String failureCode) throws JSONException {
+        final JSONObject response = rejected(requestId, failureCode);
+        response.put("outcome", "OUTCOME_UNKNOWN");
+        return response;
     }
 
     private static JSONObject gatewayAccepted(

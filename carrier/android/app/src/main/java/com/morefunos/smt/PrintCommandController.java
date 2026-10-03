@@ -371,6 +371,7 @@ public final class PrintCommandController {
             result.put("outcome", outcome);
             result.put("observedAt", now());
             result.put("evidenceId", "native-print:" + dispatchAttemptId);
+            result.put("dispatchAttemptId", dispatchAttemptId);
             if (failureCode != null) result.put("failureCode", failureCode);
             if (uncertaintyCode != null) result.put("uncertaintyCode", uncertaintyCode);
             webNotifier.accept(result.toString());
