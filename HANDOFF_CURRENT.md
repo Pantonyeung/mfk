@@ -26,7 +26,7 @@ POS functionality is the priority and UI work remains paused. Continue bounded e
 
 ## Implemented and verified
 
-`CHECKOUT_PAYMENT_CONFIRM` now has a trusted-native non-Student cash assembler and an exact same-Room transaction mapping. It fresh-validates seven revisioned dependencies and the earliest freshness deadline, then atomically commits:
+`CHECKOUT_PAYMENT_CONFIRM` now has a trusted-native non-Student assembler, exact same-Room transaction mapping, and a high-level Android runtime quote/submit/readback bridge. It fresh-validates seven revisioned dependencies and the earliest freshness deadline, then atomically commits:
 
 - Business-Day display sequence CAS;
 - one canonical `ORDER`;
@@ -40,29 +40,33 @@ Outbox ACK and release now require the positive `attemptCount` from the claimed 
 
 Commit `1e94181` encodes the Owner's resolved policy without inventing provider proof: non-cash settlement requires canonical `STAFF_CONFIRMED` evidence, cash requires `CASH_COUNTED`, and no screenshot is stored. Parent Owner authorization is device-bound, so local logout invalidates existing/new staff access on that device while another device remains valid.
 
-At native code commit `1e94181b2bd433531571e68e13cb5516f9c08904`:
+Commits `2cfe244`, `8f9f228`, `ce6769b`, and `bfff335` add canonical Order readback plus Room-backed security, formal quote, canonical tender, Business Day, and display-allocation producers. Commit `0d5c18e33b6d4aee59ddd66f69973c82e9196b28` binds them to the high-level Android bridge, rejects browser raw aggregate/receipt/inbox/outbox operations, and fences stale quote and tender responses after a channel change.
 
-- 12 Android unit-test suites;
-- 89 tests passed;
+At native/web code commit `0d5c18e33b6d4aee59ddd66f69973c82e9196b28`:
+
+- 19 Android unit-test suites;
+- 122 tests passed;
 - 0 failures, 0 errors, 0 skipped;
 - `:app:lintDebug` passed;
 - `:app:assembleDebug -x verifySmtWebBundle --no-daemon` passed.
+- V3 web: 31 test files / 600 tests passed;
+- TypeScript typecheck and production build passed.
 
-These tests inject trusted source ports. They do not prove production device enrollment, Owner/staff authentication, electronic settlement, physical printing, OTA behavior, or public routing.
+The end-to-end Room bridge test seeds explicit test-only canonical records. It does not prove production device enrollment, Owner/staff authentication, POS tender publication, provider settlement, physical printing, OTA behavior, or live routing.
 
 ## Still fail-closed in production
 
-The public formal checkout bridge is intentionally not registered. It remains blocked until real native producers supply device/Owner/staff admission, formal quote/normalized intent, enabled POS tender, active Business Day, and display allocation. Student checkout also remains fail-closed until canonical eligibility and the remaining money-policy rules are published.
+The high-level formal checkout bridge is registered, but production inputs remain absent. The browser security authority has no approved device-enrollment, Owner-password, or staff-PIN/session issuer/revoker, and Admin has no explicit canonical POS-tender publication field/writer. Those missing records cause the Room-backed bridge to fail closed. Student checkout also remains fail-closed until canonical eligibility and the remaining money-policy rules are published.
 
 Every outbox dispatcher must echo the claim item's positive `attemptCount`. Missing or stale tokens must fail closed.
 
 ## Current bounded work
 
-1. Reconcile native Print/OTA handoff changes and add crash-recovery regression coverage without changing a live endpoint or activating an update.
-2. Freeze the exact canonical Orders/Dining read producer signature and schema.
-3. Keep the Dining planner unregistered until every `Order.dining` membership/lifecycle writer CASes and bumps the same Dining revision.
-4. Preserve Order identity, display number, payment, items, and first seated time; never fabricate an Order merely because a table is occupied.
-5. Continue real native producer/adapter binding and then register only the bounded capability whose complete input/read set is proven.
+1. Obtain the approved enrollment/login/session path and credential provenance before implementing production device/Owner/staff population.
+2. Obtain or add the explicit Admin `posTenders` publication field and bind its Store Kernel projector; do not promote `customerPaymentChannels` or `paymentRefs`.
+3. Wire canonical Admin startup/doorbell convergence, then verify bridge acceptance with non-production credentials and no live charge.
+4. Keep the Dining planner unregistered until every `Order.dining` membership/lifecycle writer CASes and bumps the same Dining revision.
+5. Continue Print/OTA crash recovery and dispatcher work without activation or physical-proof claims.
 
 ## Resolved Owner policy
 

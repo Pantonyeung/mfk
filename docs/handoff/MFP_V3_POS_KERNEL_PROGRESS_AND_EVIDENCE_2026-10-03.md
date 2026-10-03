@@ -1,6 +1,6 @@
 # MFP V3 POS Kernel Progress and Evidence — 2026-10-03
 
-Status: `SOURCE_AND_ROOM_VERIFIED` for the bounded non-Student cash `CHECKOUT_PAYMENT_CONFIRM` assembler and commit mapping. Trusted production source ports and the public bridge remain fail-closed and unbound.
+Status: `SOURCE_AND_ROOM_VERIFIED` for the bounded non-Student `CHECKOUT_PAYMENT_CONFIRM` assembler, Room producers, and high-level Android runtime bridge. Production admission and POS-tender population remain absent and fail closed.
 
 This document records the latest Owner direction, the first verified native slice, the overnight candidate artifacts, and the OTA/source-binding evidence in one project. It does not authorize publish, deployment, OTA activation, live payment, merge, or replacement of the accepted production UI.
 
@@ -9,7 +9,7 @@ This document records the latest Owner direction, the first verified native slic
 - Original reviewed checkout: `48c7eca6c051e72562ea9974bc2c6465b8584a7b`
 - Isolated branch: `feat/MFP-V3-A9R-POS-KERNEL-R1-2026-10-03`
 - Verified prerequisite commit: `8c52b155fb75edd39e4018853ca3c4144682e179`
-- Latest verified native code commit: `1e94181` (`CHECKOUT_PAYMENT_CONFIRM` mapping: `3e53a26`; outbox fence: `3c0cd77`)
+- Latest verified native/web code commit: `0d5c18e33b6d4aee59ddd66f69973c82e9196b28` (`CHECKOUT_PAYMENT_CONFIRM` mapping: `3e53a26`; outbox fence: `3c0cd77`; Order read: `2cfe244`; security: `8f9f228`; quote: `ce6769b`; tender/Business Day: `bfff335`)
 - Existing Draft PR reference: `#651`; this branch has not been pushed to it.
 - Existing A9 base authority: `69adb11215677d506545c5428f8deea4b89e7db2`
 
@@ -43,7 +43,11 @@ Commit `3e53a26` completes the bounded non-Student cash mapping behind trusted n
 
 Display-number allocation is compare-and-set in the same Room transaction. Two submissions that both claim sequence revision 0 / display `0001` cannot both commit. Receipt replay still precedes dependency/deadline checks, so a committed response survives retry, lost reply, advanced facts, coordinator replacement, and database reopen without a second effect.
 
-The production bridge is intentionally not activated. Tests inject trusted native source ports; absent real device/session, quote, POS tender, Business Day, and display-sequence producers, public checkout remains fail-closed. No browser field can attach read dependencies, supply canonical state, or choose aggregate/outbox identities.
+The high-level Android bridge is now source-bound. A quote request first revalidates the canonical device, device-local Owner authorization, and staff session; native pricing then rereads active Admin configuration and explicit `POS_TENDER_POLICY`, recomputes integer-minor totals, and atomically persists `FORMAL_QUOTE`. Payment Confirm rereads security, quote, Admin, tender, Business Day, and display sequence before the existing atomic commit. The runtime can send only formal quote/command/readback envelopes. Raw browser aggregate snapshots, receipts, inbox, outbox, and commits are rejected.
+
+Channel changes invalidate the current quote immediately. Both quote state and the mutable canonical tender snapshot use generation fencing, so an older native response cannot overwrite a newer channel validation. A VALID native quote without its same-response tender snapshot fails closed.
+
+Production checkout is still not usable because no approved device-enrollment, Owner-password, or staff-PIN/session writer populates the required security aggregates, the browser security authority is deliberately unbound, and Admin has no explicit canonical POS-tender publication field/writer. The bridge integration tests seed test-only records; they are not production authentication or tender evidence.
 
 ## Test evidence
 
@@ -73,15 +77,24 @@ Latest scoped command:
 gradle.bat -p carrier/android :app:testDebugUnitTest -x verifySmtWebBundle --tests com.morefunos.smt.storekernel.business.* --tests com.morefunos.smt.storekernel.StoreKernelFormalReceiptTest --tests com.morefunos.smt.storekernel.FormalAdminConfigSourceIntegrationTest --no-daemon
 ```
 
-Latest full native result at `1e94181`:
+Latest full native result at `0d5c18e`:
 
-- 12 suites
-- 89 tests passed
+- 19 suites
+- 122 tests passed
 - 0 failures, 0 errors, 0 skipped
 - 12 dedicated `FormalCheckoutPaymentConfirmIntegrationTest` cases using real Room
 - 25 `StoreKernelFormalReceiptTest` cases, including same-worker stale ACK/release lease races
+- real Room formal-bridge quote-to-commit coverage plus raw browser Store Kernel boundary coverage
 - `:app:lintDebug`: successful
 - `:app:assembleDebug -x verifySmtWebBundle --no-daemon`: successful, including desugaring, DEX, and APK packaging
+
+Latest V3 web result at the same code commit:
+
+- 31 test files
+- 600 tests passed
+- TypeScript typecheck successful
+- Vite production build successful
+- only the pre-existing chunk-size advisory remained
 
 The checkout persistence tests use Room and cover atomic commit/replay, forged review rejection, incomplete and mismatched read sets, malformed/trailing normalized intent, dependency advance, deadline expiry, injected failure after receipt with full rollback, display-sequence contention, Router lost-reply recovery from a durable receipt, and close/reopen of a file-backed database. They are not FakeGateway-only tests. The trusted authorities in this suite are test-injected and are not production-source proof.
 
@@ -149,10 +162,10 @@ No live endpoint is changed by this branch.
 - The canonical source of `studentDiscountEligible` is not present in the published Admin contract. This is a money-policy/data decision; checkout must fail closed for Student Discount until the Owner selects a canonical eligibility field or publication rule.
 - Student discount still needs exact option/surcharge basis, odd-minor rounding, and stacking behavior against `riceballDrink`; the mapper does not invent those answers.
 - Electronic tender evidence is settled as `STAFF_CONFIRMED` after staff visual review. The production tender producer remains unbound; it must not claim provider verification, store screenshots, or duplicate payment on reconnect/session change.
-- The native checkout handler ports still need real MFK producers for device/Owner/staff admission, formal quote/normalized intent, enabled POS tender, active Business Day, and display-sequence allocation. Public bridge registration stays fail-closed until all are available.
+- The checkout handler ports and bridge now use real Room-backed security, quote, tender, Business Day, display allocation, and canonical Order read producers. What remains absent is production population: device enrollment, Owner/password authorization, staff PIN/session issue/revoke, canonical Admin POS-tender publication/projector, and Admin startup/doorbell convergence. Missing records fail closed.
 - `MFP_ORDER_COMMITTED_V1` and `MFP_PAYMENT_CONFIRMED_V1` are now inserted atomically with deterministic identities, but dispatcher consumers and print/projection acknowledgement semantics remain separate stages. Commit `3c0cd77` fences outbox ACK/release by the claim's monotonically increasing `attemptCount`; a callback from an expired lease cannot alter a reclaimed lease even when the worker identity is reused. Dispatchers must echo the claim item's positive `attemptCount` or fail closed.
 - No physical printer/device or live financial acceptance was run. Physical acceptance remains a separate gate.
 
 ## Next engineering action
 
-Bind real device/Owner/staff, formal quote, POS tender, Business Day, and display-sequence producers to the verified handler before enabling public `CHECKOUT_PAYMENT_CONFIRM`. Continue one formal command family at a time through Orders/Dining readback and recovery, and update each outbox dispatcher to echo the claimed attempt token. Do not claim production checkout, live payment, printer, or OTA acceptance from the test-injected source suite.
+Obtain the approved device-enrollment and Owner/staff credential path, and decide/add the explicit Admin POS-tender publication field, before implementing their production writers. Then wire canonical Admin startup/doorbell convergence and run non-production bridge acceptance without a live charge. Continue one formal command family at a time through Orders/Dining and update each outbox dispatcher to echo the claimed attempt token. Do not claim production checkout, live payment, printer, or OTA acceptance from the test-only seeded bridge suite.

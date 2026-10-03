@@ -56,6 +56,8 @@ Commit `a2a3194732ee10b136eb488dad408d0442e6546a` freezes the first fail-closed 
 
 The Owner requirement is that a successful Owner account/password authorization is the parent prerequisite for staff account/PIN login, and Owner logout revokes descendant staff access on that device only. Commit `1e94181` binds every staff session to an opaque parent Owner authorization reference, revision, and device identity. Missing, unknown, revoked, changed, or cross-device parent authority rejects, while an independently authorized second device remains valid. The real verifier, issuer, persisted producer, and revoker remain unbound.
 
+Commit `8f9f2287844824538d12aca89ae61bb2b7008868` adds the Room-backed admission reader used by both the formal Router and checkout quote path. It atomically rereads `DEVICE_AUTHORIZATION`, device-local `OWNER_AUTHORIZATION`, and `STAFF_SESSION`, enforces embedded-versus-Room revisions and the 12-hour/time boundary, and returns the exact dependency set. It does not enroll a device, verify a password/PIN, or issue/revoke a session; those credential-sensitive population paths remain absent.
+
 ## Stage 3 — Formal quote, discount, tender, and Business Day producers
 
 Formal quote must re-resolve every submitted line against the active canonical published catalog and option/combo facts. Client preview totals and published fact copies are hints only.
@@ -73,6 +75,10 @@ Required money behavior:
 Canonical eligibility for Student Discount is still absent from the Admin publication contract. Until the Owner selects the field/publication rule, any Student Discount request fails closed with a stable rejection; non-student checkout work can continue.
 
 Commit `a2a3194732ee10b136eb488dad408d0442e6546a` also freezes exact decimal-to-minor-unit conversion and path-indexed Admin catalog/option/combo money facts. It preserves catalog, option, promotion, and Customer channel data as source evidence, but never promotes Customer payment channels or promotion IDs into POS tender or Student policy. Malformed, rounded, overflowed, wrong-store, wrong-schema, or non-string money inputs fail closed.
+
+Commit `ce6769bb088c5d3bcf4df5270e204b1868eb54ee` adds the bounded Room-backed non-Student quote producer. It fresh-reads `ADMIN_ACTIVE_CONFIGURATION` and explicit `POS_TENDER_POLICY`, re-resolves supported PRODUCT/no-option/no-combo `WALK_IN` intent, ignores browser preview money, applies the current takeaway adjustment, and writes `FORMAL_QUOTE` with source revisions and expiry. Commit `bfff335004ea26972a3b721b99c78ce48e30bff1` adds the tender and Business Day readers/classifier. Cash maps to `CASH_COUNTED`; electronic tender maps to `STAFF_CONFIRMED`; neither path claims provider verification. The Business Day uses Admin timezone/cutoff without inventing an OPEN gate.
+
+These readers are complete, but the explicit Admin POS-tender publication field/projector is not. `customerPaymentChannels` and `paymentRefs` remain insufficient and cannot populate `POS_TENDER_POLICY` without an Owner-approved canonical field.
 
 ## Stage 4 — One `CHECKOUT_PAYMENT_CONFIRM` handler
 
@@ -101,13 +107,15 @@ No Order/payment/outbox row is written before Payment Confirm. Duplicate submiss
 
 Commit `3e53a26` implements the bounded non-Student cash assembler and closed commit mapping behind trusted native ports. It validates the canonical normalized intent and client review against fresh security, quote, tender, and Business Day snapshots; attaches exactly seven native read dependencies and the earliest freshness deadline; and commits the Business-Day display sequence, canonical Order, linked Payment, durable receipt, and two deterministic outbox events in the existing coordinator transaction. The canonical Order shape matches the retained Orders read contract.
 
-Real Room tests prove full rollback after an injected post-receipt failure, stale dependency rejection, transaction deadline rejection, one-winner display-sequence contention, lost-reply receipt recovery through the real Router gateway, duplicate replay, and file-backed database reopen without a second effect. These tests inject trusted source ports. They do not prove device enrollment, PIN verification, production POS tender/Student eligibility, physical printing, or public bridge activation.
+Real Room tests prove full rollback after an injected post-receipt failure, stale dependency rejection, transaction deadline rejection, one-winner display-sequence contention, lost-reply receipt recovery through the real Router gateway, duplicate replay, and file-backed database reopen without a second effect. These tests do not prove device enrollment, PIN verification, production POS tender/Student eligibility, physical printing, or live bridge acceptance.
 
 Commit `3c0cd77` closes the same-worker outbox reclaim race without a schema migration: claim already atomically increments and returns `attemptCount`; ACK and release now require that positive token and include it in the Room compare-and-set predicate. A stale callback from attempt 1 cannot acknowledge or release attempt 2. Every dispatcher must echo the claimed token; omission fails closed.
 
 Commit `1e94181` freezes the resolved evidence and logout semantics. Tender mapping rejects cash without `CASH_COUNTED` and non-cash without `STAFF_CONFIRMED`, persists the mode in canonical Payment JSON, and deliberately defines no provider-verified mode. Device-bound parent authorization makes a local Owner revocation remove that device's staff access without affecting another device.
 
-The production bridge remains fail-closed until real MFK producers supply the exact security, pricing, tender, Business Day, and display-allocation snapshots. Non-Student cash behavior is implemented; Student requests continue to fail closed because the canonical eligibility and remaining money-policy decisions are unresolved.
+Commit `0d5c18e33b6d4aee59ddd66f69973c82e9196b28` binds the Room-backed security, quote, tender, Business Day, display allocation, and Payment Confirm handler to one high-level Android runtime bridge. The runtime can request a formal quote and submit/read a formal command, but cannot read named aggregates or operate receipts, inbox, outbox, or raw commits. Canonical tender choices travel with the same native quote response. Channel changes invalidate the quote, and generation fencing prevents stale quote/tender responses from replacing a newer validation.
+
+The bridge remains production-fail-closed because the security and tender aggregates have no approved production population writers. Non-Student behavior is source/Room verified with test-only seeded records; Student requests continue to fail closed because canonical eligibility and remaining money-policy decisions are unresolved.
 
 Known rejection paths must be durable and distinguishable from uncertainty. After any coordinator/transport exception, read back the receipt before returning `UNKNOWN`; stable Store Kernel conflicts map to durable known rejection only when no receipt exists and the failure is classified safe.
 
