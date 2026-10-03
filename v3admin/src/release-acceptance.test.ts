@@ -20,7 +20,13 @@ describe('Admin V3 acceptance release boundary',()=>{
     const old=json('../../v2admin/wrangler.jsonc'),release=json('../wrangler.release.jsonc');
     const {observability,...unchangedRelease}=release;
     expect(unchangedRelease).toEqual(old);
-    expect(observability).toEqual({enabled:false,head_sampling_rate:1,logs:{enabled:true,invocation_logs:true,head_sampling_rate:1}});
+    expect(observability).toEqual({
+      enabled:false,
+      head_sampling_rate:1,
+      redact_query_string:false,
+      logs:{enabled:true,head_sampling_rate:1,persist:true,invocation_logs:true},
+      traces:{enabled:false,persist:true,head_sampling_rate:1},
+    });
     expect(release.name).toBe('mfk-admin');
     expect(release.main).toBe('./worker.ts');
     expect(release.assets.directory).toBe('./dist');
