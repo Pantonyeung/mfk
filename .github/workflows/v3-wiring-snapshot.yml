@@ -20,6 +20,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p snapshot
+          git fetch --depth=1 origin 2635a8b44794d9f736949fc2fe7c04c4d50ef594
           git archive 2635a8b44794d9f736949fc2fe7c04c4d50ef594 | tar -x -C snapshot
           git fetch --depth=1 origin cefc455f3a13d2f11b87d7353bc04d28256236a2
           git archive cefc455f3a13d2f11b87d7353bc04d28256236a2 v3admin | tar -x -C snapshot
