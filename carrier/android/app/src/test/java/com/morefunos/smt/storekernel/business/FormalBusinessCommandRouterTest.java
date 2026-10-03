@@ -166,6 +166,26 @@ public final class FormalBusinessCommandRouterTest {
     }
 
     @Test
+    public void expiredNativeDeadlineWithoutReceiptBecomesDurableRejection() throws Exception {
+        final FakeGateway gateway = new FakeGateway();
+        gateway.failCommit = true;
+        gateway.failCommitCode = "STORE_KERNEL_COMMIT_DEADLINE_EXPIRED";
+        final FormalBusinessCommandRouter router = new FormalBusinessCommandRouter(
+            gateway,
+            allowedSecurity(),
+            Map.of("CHECKOUT_PAYMENT_CONFIRM", value -> CompletableFuture.completedFuture(
+                FormalBusinessCommandRouter.Outcome.commit(commitRequest(value))
+            ))
+        );
+
+        final FormalBusinessCommandContract.Result result = await(router.submit(command()));
+
+        assertEquals("REJECTED", result.state);
+        assertEquals("STORE_KERNEL_COMMIT_DEADLINE_EXPIRED", result.rejectionCode);
+        assertEquals(1, gateway.recordRejectedCount.get());
+    }
+
+    @Test
     public void committedRequiresReceiptEvidence() throws Exception {
         final FakeGateway gateway = new FakeGateway();
         gateway.receiptPresent = false;

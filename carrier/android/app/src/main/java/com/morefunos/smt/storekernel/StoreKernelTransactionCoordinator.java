@@ -17,6 +17,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.LongSupplier;
 
 public final class StoreKernelTransactionCoordinator implements AutoCloseable {
     enum FailurePoint {
@@ -35,20 +36,37 @@ public final class StoreKernelTransactionCoordinator implements AutoCloseable {
     private final StoreKernelDatabase database;
     private final StoreKernelDao dao;
     private final FailurePoint failurePoint;
+    private final LongSupplier nowEpochMs;
     private final AtomicBoolean closed = new AtomicBoolean(false);
 
     public static StoreKernelTransactionCoordinator open(@NonNull Context context) {
-        return new StoreKernelTransactionCoordinator(StoreKernelDatabase.open(context), FailurePoint.NONE);
+        return new StoreKernelTransactionCoordinator(
+            StoreKernelDatabase.open(context),
+            FailurePoint.NONE,
+            System::currentTimeMillis
+        );
     }
 
     StoreKernelTransactionCoordinator(StoreKernelDatabase database) {
-        this(database, FailurePoint.NONE);
+        this(database, FailurePoint.NONE, System::currentTimeMillis);
     }
 
     StoreKernelTransactionCoordinator(StoreKernelDatabase database, FailurePoint failurePoint) {
+        this(database, failurePoint, System::currentTimeMillis);
+    }
+
+    StoreKernelTransactionCoordinator(
+        StoreKernelDatabase database,
+        FailurePoint failurePoint,
+        LongSupplier nowEpochMs
+    ) {
+        if (database == null || failurePoint == null || nowEpochMs == null) {
+            throw new IllegalArgumentException("STORE_KERNEL_COORDINATOR_DEPENDENCY_REQUIRED");
+        }
         this.database = database;
         this.dao = database.storeKernelDao();
         this.failurePoint = failurePoint;
+        this.nowEpochMs = nowEpochMs;
     }
 
     public CompletableFuture<CommitResult> commit(StoreKernelContract.CommitRequest request) {
@@ -196,6 +214,9 @@ public final class StoreKernelTransactionCoordinator implements AutoCloseable {
             return CommitResult.replay(request.requestId, prior);
         }
 
+        if (request.commitDeadlineEpochMs != null && nowEpochMs.getAsLong() >= request.commitDeadlineEpochMs) {
+            throw failure("STORE_KERNEL_COMMIT_DEADLINE_EXPIRED");
+        }
         validateClosedCommit(request);
         // Replay above is final even when dependencies later change. For a new command,
         // validate every read-only dependency in the same transaction as the writes below.

@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
 @RunWith(RobolectricTestRunner.class)
 @Config(manifest = Config.NONE, sdk = 30)
@@ -382,6 +383,84 @@ public final class StoreKernelFormalReceiptTest {
         assertEquals(1, database.storeKernelDao().aggregateCount());
         assertEquals(1, database.storeKernelDao().receiptCount());
         assertEquals(1, database.storeKernelDao().outboxCount());
+    }
+
+    @Test
+    public void expiredNativeCommitDeadlineRejectsBeforeAnyWrite() throws Exception {
+        final AtomicLong nowEpochMs = new AtomicLong(2_000L);
+        coordinator.close();
+        coordinator = new StoreKernelTransactionCoordinator(
+            database,
+            StoreKernelTransactionCoordinator.FailurePoint.NONE,
+            nowEpochMs::get
+        );
+        final StoreKernelContract.CommitRequest request = nativeCommitRequest("DEADLINE-1")
+            .withCommitDeadlineEpochMs(2_000L);
+
+        final ExecutionException error = assertThrows(
+            ExecutionException.class,
+            () -> coordinator.commit(request).get(5, TimeUnit.SECONDS)
+        );
+
+        assertEquals("STORE_KERNEL_COMMIT_DEADLINE_EXPIRED", error.getCause().getMessage());
+        assertEquals(0, database.storeKernelDao().aggregateCount());
+        assertEquals(0, database.storeKernelDao().receiptCount());
+        assertEquals(0, database.storeKernelDao().outboxCount());
+        assertEquals(0, database.storeKernelDao().journalCount());
+    }
+
+    @Test
+    public void committedReplayWinsAfterNativeDeadlineExpires() throws Exception {
+        final AtomicLong nowEpochMs = new AtomicLong(1_000L);
+        coordinator.close();
+        coordinator = new StoreKernelTransactionCoordinator(
+            database,
+            StoreKernelTransactionCoordinator.FailurePoint.NONE,
+            nowEpochMs::get
+        );
+        final StoreKernelContract.CommitRequest request = nativeCommitRequest("DEADLINE-2")
+            .withCommitDeadlineEpochMs(1_500L);
+        final StoreKernelTransactionCoordinator.CommitResult first = coordinator.commit(request).get(5, TimeUnit.SECONDS);
+        nowEpochMs.set(2_000L);
+
+        final StoreKernelTransactionCoordinator.CommitResult replay = coordinator.commit(request).get(5, TimeUnit.SECONDS);
+
+        assertFalse(first.replayed);
+        assertTrue(replay.replayed);
+        assertEquals(first.commitSequence, replay.commitSequence);
+        assertEquals(1, database.storeKernelDao().receiptCount());
+    }
+
+    @Test
+    public void nativeDeadlineCannotBeInjectedAndComposesWithReadDependencies() throws Exception {
+        final JSONObject raw = new JSONObject()
+            .put("protocolVersion", StoreKernelContract.PROTOCOL_VERSION)
+            .put("type", StoreKernelContract.COMMIT)
+            .put("commitDeadlineEpochMs", 2_000L);
+
+        final IllegalArgumentException wireError = assertThrows(
+            IllegalArgumentException.class,
+            () -> StoreKernelContract.parseCommit(raw)
+        );
+        final IllegalArgumentException deadlineError = assertThrows(
+            IllegalArgumentException.class,
+            () -> nativeCommitRequest("DEADLINE-3").withCommitDeadlineEpochMs(0)
+        );
+        final StoreKernelContract.AggregateReadDependency dependency =
+            new StoreKernelContract.AggregateReadDependency("ADMIN_CONFIG", "ACTIVE", 1);
+        final StoreKernelContract.CommitRequest deadlineThenReads = nativeCommitRequest("DEADLINE-4")
+            .withCommitDeadlineEpochMs(2_000L)
+            .withReadDependencies(List.of(dependency));
+        final StoreKernelContract.CommitRequest readsThenDeadline = nativeCommitRequest("DEADLINE-5")
+            .withReadDependencies(List.of(dependency))
+            .withCommitDeadlineEpochMs(2_000L);
+
+        assertEquals("STORE_KERNEL_COMMIT_DEADLINE_NATIVE_ONLY", wireError.getMessage());
+        assertEquals("STORE_KERNEL_COMMIT_DEADLINE_INVALID", deadlineError.getMessage());
+        assertEquals(Long.valueOf(2_000L), deadlineThenReads.commitDeadlineEpochMs);
+        assertEquals(1, deadlineThenReads.readDependencies.size());
+        assertEquals(Long.valueOf(2_000L), readsThenDeadline.commitDeadlineEpochMs);
+        assertEquals(1, readsThenDeadline.readDependencies.size());
     }
 
     private static StoreKernelContract.CommandResultRequest resultRequest(String fingerprint, String rejectionCode) throws Exception {

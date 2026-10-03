@@ -74,6 +74,9 @@ public final class StoreKernelContract {
         if (request.has("readDependencies")) {
             throw new IllegalArgumentException("STORE_KERNEL_READ_DEPENDENCIES_NATIVE_ONLY");
         }
+        if (request.has("commitDeadlineEpochMs")) {
+            throw new IllegalArgumentException("STORE_KERNEL_COMMIT_DEADLINE_NATIVE_ONLY");
+        }
         final JSONArray rawMutations = requiredArray(request, "mutations");
         if (rawMutations.length() < 1 || rawMutations.length() > MAX_MUTATIONS) {
             throw new IllegalArgumentException("STORE_KERNEL_MUTATION_COUNT_INVALID");
@@ -481,6 +484,7 @@ public final class StoreKernelContract {
         public final String traceId;
         public final String committedAt;
         public final List<AggregateReadDependency> readDependencies;
+        public final Long commitDeadlineEpochMs;
         public final List<AggregateMutation> mutations;
         public final List<OutboxEffect> outbox;
         public final InboxConsumption inbox;
@@ -500,7 +504,7 @@ public final class StoreKernelContract {
             InboxConsumption inbox
         ) {
             this(requestId, commandId, storeId, operationId, idempotencyKey, requestFingerprint,
-                resultJson, traceId, committedAt, mutations, outbox, inbox, Collections.emptyList());
+                resultJson, traceId, committedAt, mutations, outbox, inbox, Collections.emptyList(), null);
         }
 
         private CommitRequest(
@@ -516,7 +520,8 @@ public final class StoreKernelContract {
             List<AggregateMutation> mutations,
             List<OutboxEffect> outbox,
             InboxConsumption inbox,
-            List<AggregateReadDependency> readDependencies
+            List<AggregateReadDependency> readDependencies,
+            Long commitDeadlineEpochMs
         ) {
             this.requestId = requestId;
             this.commandId = commandId;
@@ -528,6 +533,7 @@ public final class StoreKernelContract {
             this.traceId = traceId;
             this.committedAt = committedAt;
             this.readDependencies = Collections.unmodifiableList(new ArrayList<>(readDependencies));
+            this.commitDeadlineEpochMs = commitDeadlineEpochMs;
             this.mutations = Collections.unmodifiableList(new ArrayList<>(mutations));
             this.outbox = Collections.unmodifiableList(new ArrayList<>(outbox));
             this.inbox = inbox;
@@ -553,7 +559,18 @@ public final class StoreKernelContract {
                 }
             }
             return new CommitRequest(requestId, commandId, storeId, operationId, idempotencyKey,
-                requestFingerprint, resultJson, traceId, committedAt, mutations, outbox, inbox, snapshot);
+                requestFingerprint, resultJson, traceId, committedAt, mutations, outbox, inbox, snapshot,
+                commitDeadlineEpochMs);
+        }
+
+        /** Returns a copy that must begin committing before the trusted native absolute deadline. */
+        public CommitRequest withCommitDeadlineEpochMs(long deadlineEpochMs) {
+            if (deadlineEpochMs <= 0) {
+                throw new IllegalArgumentException("STORE_KERNEL_COMMIT_DEADLINE_INVALID");
+            }
+            return new CommitRequest(requestId, commandId, storeId, operationId, idempotencyKey,
+                requestFingerprint, resultJson, traceId, committedAt, mutations, outbox, inbox,
+                readDependencies, deadlineEpochMs);
         }
     }
 

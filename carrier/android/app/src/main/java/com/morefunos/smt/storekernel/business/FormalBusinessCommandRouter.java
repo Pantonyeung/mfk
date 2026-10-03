@@ -206,7 +206,8 @@ public final class FormalBusinessCommandRouter {
         }
         final String code = current.getMessage();
         if ("STORE_KERNEL_READ_DEPENDENCY_REVISION_CONFLICT".equals(code)
-            || "STORE_KERNEL_AGGREGATE_REVISION_CONFLICT".equals(code)) return code;
+            || "STORE_KERNEL_AGGREGATE_REVISION_CONFLICT".equals(code)
+            || "STORE_KERNEL_COMMIT_DEADLINE_EXPIRED".equals(code)) return code;
         return null;
     }
 
