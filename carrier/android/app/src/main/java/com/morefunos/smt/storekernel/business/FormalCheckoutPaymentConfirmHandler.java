@@ -155,7 +155,7 @@ public final class FormalCheckoutPaymentConfirmHandler implements FormalBusiness
                 throw new IllegalStateException("FORMAL_CHECKOUT_CLOCK_INVALID");
             }
         } catch (RuntimeException error) {
-            return CompletableFuture.failedFuture(error);
+            return failed(error);
         }
 
         final CompletableFuture<SecuritySnapshot> securityFuture;
@@ -166,7 +166,7 @@ public final class FormalCheckoutPaymentConfirmHandler implements FormalBusiness
             pricingFuture = requireFuture(pricing.validate(command));
             dayFuture = requireFuture(businessDay.readActive(command));
         } catch (RuntimeException error) {
-            return CompletableFuture.failedFuture(error);
+            return failed(error);
         }
 
         return pricingFuture.thenCompose(pricingSnapshot -> {
@@ -175,7 +175,7 @@ public final class FormalCheckoutPaymentConfirmHandler implements FormalBusiness
                     .thenCombine(securityFuture, (tenderSnapshot, securitySnapshot) ->
                         new Partial(securitySnapshot, pricingSnapshot, tenderSnapshot));
             } catch (RuntimeException error) {
-                return CompletableFuture.failedFuture(error);
+                return failed(error);
             }
         }).thenCombine(dayFuture, Prepared::new).thenApply(prepared -> {
             final Partial partial = prepared.partial();
@@ -223,6 +223,12 @@ public final class FormalCheckoutPaymentConfirmHandler implements FormalBusiness
     private static <T> CompletableFuture<T> requireFuture(CompletableFuture<T> value) {
         if (value == null) throw new IllegalStateException("FORMAL_CHECKOUT_PORT_RESULT_INVALID");
         return value;
+    }
+
+    private static <T> CompletableFuture<T> failed(Throwable error) {
+        final CompletableFuture<T> future = new CompletableFuture<>();
+        future.completeExceptionally(error);
+        return future;
     }
 
     private static List<StoreKernelContract.AggregateReadDependency> immutableDependencies(

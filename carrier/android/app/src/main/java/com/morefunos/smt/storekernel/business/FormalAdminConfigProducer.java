@@ -296,11 +296,13 @@ public final class FormalAdminConfigProducer {
     }
 
     private static <T> CompletableFuture<T> failed(String code) {
-        return CompletableFuture.failedFuture(new IllegalStateException(code));
+        return failed(new IllegalStateException(code));
     }
 
     private static <T> CompletableFuture<T> failed(Throwable error) {
-        return CompletableFuture.failedFuture(error);
+        final CompletableFuture<T> future = new CompletableFuture<>();
+        future.completeExceptionally(error);
+        return future;
     }
 
     private static final class Envelope {

@@ -3,6 +3,7 @@ package com.morefunos.smt.storekernel.business;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URLEncoder;
@@ -110,10 +111,10 @@ public final class FormalAdminConfigSourceClient {
         try {
             responseFuture = transport.get(activeUri);
         } catch (Throwable error) {
-            return CompletableFuture.failedFuture(error);
+            return failed(error);
         }
         if (responseFuture == null) {
-            return CompletableFuture.failedFuture(new IllegalStateException("ADMIN_CONFIG_SOURCE_TRANSPORT_INVALID"));
+            return failed("ADMIN_CONFIG_SOURCE_TRANSPORT_INVALID");
         }
         return responseFuture.thenCompose(response -> {
             if (response == null) return failed("ADMIN_CONFIG_SOURCE_RESPONSE_INVALID");
@@ -131,14 +132,14 @@ public final class FormalAdminConfigSourceClient {
             try {
                 observedAt = clock.get();
             } catch (Throwable error) {
-                return CompletableFuture.failedFuture(error);
+                return failed(error);
             }
             if (observedAt == null) return failed("ADMIN_CONFIG_SOURCE_CLOCK_INVALID");
             final CompletableFuture<FormalAdminConfigProducer.ApplyResult> applied;
             try {
                 applied = sink.apply(response.body, observedAt.toString());
             } catch (Throwable error) {
-                return CompletableFuture.failedFuture(error);
+                return failed(error);
             }
             if (applied == null) return failed("ADMIN_CONFIG_SOURCE_SINK_INVALID");
             return applied.thenApply(FetchResult::applied);
@@ -161,8 +162,16 @@ public final class FormalAdminConfigSourceClient {
         }
         final StringBuilder value = new StringBuilder("https://").append(origin.getRawAuthority());
         value.append("/api/admin-sync/active?storeId=")
-            .append(URLEncoder.encode(storeId, StandardCharsets.UTF_8).replace("+", "%20"));
+            .append(urlEncode(storeId));
         return URI.create(value.toString());
+    }
+
+    private static String urlEncode(String value) {
+        try {
+            return URLEncoder.encode(value, StandardCharsets.UTF_8.name()).replace("+", "%20");
+        } catch (UnsupportedEncodingException impossible) {
+            throw new IllegalStateException("ADMIN_CONFIG_SOURCE_UTF8_UNAVAILABLE", impossible);
+        }
     }
 
     private static String identifier(String value) {
@@ -183,7 +192,13 @@ public final class FormalAdminConfigSourceClient {
     }
 
     private static <T> CompletableFuture<T> failed(String code) {
-        return CompletableFuture.failedFuture(new IllegalStateException(code));
+        return failed(new IllegalStateException(code));
+    }
+
+    private static <T> CompletableFuture<T> failed(Throwable error) {
+        final CompletableFuture<T> future = new CompletableFuture<>();
+        future.completeExceptionally(error);
+        return future;
     }
 
     /** HTTPS transport with redirects disabled, bounded reads, and no ambient credentials. */
