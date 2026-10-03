@@ -1,0 +1,41 @@
+name: v3-wiring-snapshot
+on:
+  push:
+    branches: [work/MFP-V3-LIVE-WIRING-2026-10-03]
+    paths: [.github/workflows/v3-wiring-snapshot.yml]
+permissions:
+  contents: read
+concurrency:
+  group: v3-wiring-snapshot
+  cancel-in-progress: false
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Export exact deployed sources and install test dependencies without lifecycle scripts
+        run: |
+          set -euo pipefail
+          mkdir -p snapshot
+          git archive 2635a8b44794d9f736949fc2fe7c04c4d50ef594 | tar -x -C snapshot
+          git fetch --depth=1 origin cefc455f3a13d2f11b87d7353bc04d28256236a2
+          git archive cefc455f3a13d2f11b87d7353bc04d28256236a2 v3admin | tar -x -C snapshot
+          git fetch --depth=1 origin a8d8ab76896574dbf3f0ab09a15ec2c11154ff98
+          git archive a8d8ab76896574dbf3f0ab09a15ec2c11154ff98 v3customer | tar -x -C snapshot
+          printf '%s\n' 'Admin=cefc455f3a13d2f11b87d7353bc04d28256236a2' 'Customer=a8d8ab76896574dbf3f0ab09a15ec2c11154ff98' 'POS=2635a8b44794d9f736949fc2fe7c04c4d50ef594' > snapshot/DEPLOYED_SOURCES.txt
+          (cd snapshot/v3admin && npm install --ignore-scripts --no-audit --no-fund --legacy-peer-deps --package-lock=false) &
+          a=$!
+          (cd snapshot/v3smt && npm ci --ignore-scripts --no-audit --no-fund) &
+          p=$!
+          (cd snapshot/v3customer && npm install --ignore-scripts --no-audit --no-fund --legacy-peer-deps --package-lock=false) &
+          c=$!
+          wait "$a"; wait "$p"; wait "$c"
+          tar -czf v3-wiring-snapshot.tar.gz -C snapshot .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: v3-wiring-exact-source
+          path: v3-wiring-snapshot.tar.gz
+          retention-days: 3
